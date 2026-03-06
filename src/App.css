@@ -35,7 +35,9 @@
 }
 
 .page-workspace {
-  width: min(1920px, calc(100vw - 2.5rem));
+  width: min(2000px, calc(100vw - 1.5rem));
+  margin-left: 0.75rem;
+  margin-right: auto;
 }
 
 .topbar {
@@ -1215,12 +1217,12 @@
 
 .workspace-home-grid {
   grid-template-columns:
-    clamp(15rem, 16vw, 20rem)
-    minmax(0, 1.9fr)
-    clamp(16rem, 18vw, 22rem);
+    clamp(13.5rem, 14vw, 17.5rem)
+    minmax(0, 2.05fr)
+    clamp(14.5rem, 15vw, 19rem);
   align-items: start;
   margin-top: 1.3rem;
-  gap: clamp(1.5rem, 2.4vw, 3rem);
+  gap: clamp(1.8rem, 2.8vw, 3.5rem);
 }
 
 .workspace-library-column,
@@ -2557,6 +2559,8 @@
 
   .page-workspace {
     width: min(100% - 1rem, 100%);
+    margin-left: auto;
+    margin-right: auto;
   }
 
   .metric-grid {
@@ -2570,14 +2574,16 @@
 
 @media (min-width: 1600px) {
   .page-workspace {
-    width: min(2200px, calc(100vw - 3rem));
+    width: min(2200px, calc(100vw - 1.75rem));
+    margin-left: 0.875rem;
+    margin-right: auto;
   }
 
   .workspace-home-grid {
     grid-template-columns:
-      clamp(14.5rem, 15vw, 19rem)
-      minmax(64rem, 2.2fr)
-      clamp(15.5rem, 16vw, 20rem);
+      clamp(13rem, 13vw, 16rem)
+      minmax(0, 2.25fr)
+      clamp(14rem, 14vw, 18rem);
   }
 
   .workspace-chat-card {
