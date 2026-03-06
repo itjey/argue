@@ -21,6 +21,12 @@ import {
   type OpenRouterChatMessage,
   type OpenRouterModel,
 } from '../lib/openrouter'
+import { ModelStatsPanel } from './ModelStatsPanel'
+import {
+  fetchOpenRouterStatsSnapshot,
+  resolveOpenRouterModelStats,
+  type OpenRouterStatsSnapshot,
+} from '../lib/openrouterStats'
 
 type ChatWorkspaceProps = {
   currentUser: User
@@ -79,6 +85,9 @@ function ChatWorkspace({
   const [modelsError, setModelsError] = useState('')
   const [modelSearch, setModelSearch] = useState('')
   const [selectedModelId, setSelectedModelId] = useState('')
+  const [statsSnapshot, setStatsSnapshot] = useState<OpenRouterStatsSnapshot | null>(null)
+  const [statsLoading, setStatsLoading] = useState(true)
+  const [statsError, setStatsError] = useState('')
   const [messages, setMessages] = useState<WorkspaceMessage[]>([])
   const [draftMessage, setDraftMessage] = useState('')
   const [chatError, setChatError] = useState('')
@@ -97,6 +106,10 @@ function ChatWorkspace({
 
   useEffect(() => {
     void loadModels()
+  }, [])
+
+  useEffect(() => {
+    void loadStatsSnapshot()
   }, [])
 
   useEffect(() => {
@@ -137,6 +150,24 @@ function ChatWorkspace({
       )
     } finally {
       setModelsLoading(false)
+    }
+  }
+
+  async function loadStatsSnapshot() {
+    setStatsLoading(true)
+    setStatsError('')
+
+    try {
+      const snapshot = await fetchOpenRouterStatsSnapshot()
+      setStatsSnapshot(snapshot)
+    } catch (error) {
+      setStatsError(
+        error instanceof Error
+          ? error.message
+          : 'OpenRouter stats could not be loaded.',
+      )
+    } finally {
+      setStatsLoading(false)
     }
   }
 
@@ -263,6 +294,7 @@ function ChatWorkspace({
 
   const selectedModel =
     models.find((model) => model.id === selectedModelId) ?? recentModels[0] ?? null
+  const selectedModelStats = resolveOpenRouterModelStats(statsSnapshot, selectedModel)
   const catalogCountLabel = modelsLoading
     ? 'Refreshing the live OpenRouter catalog.'
     : `${models.length} models are available from the current OpenRouter index.`
@@ -484,6 +516,14 @@ function ChatWorkspace({
               </>
             ) : null}
           </div>
+
+          <ModelStatsPanel
+            modelName={selectedModel?.name ?? 'Selected model'}
+            snapshotRefreshedAt={statsSnapshot?.refreshedAt ?? null}
+            statsEntry={selectedModelStats}
+            statsError={statsError}
+            statsLoading={statsLoading}
+          />
 
           <div className="control-card workspace-chat-card">
             <div className="workspace-chat-header">

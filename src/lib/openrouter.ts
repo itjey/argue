@@ -2,6 +2,7 @@ type OpenRouterPricing = Record<string, string | undefined>
 
 type OpenRouterModel = {
   id: string
+  canonical_slug?: string
   name: string
   description: string
   created?: number

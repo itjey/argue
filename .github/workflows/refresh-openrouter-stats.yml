@@ -1,0 +1,45 @@
+name: Refresh OpenRouter Stats
+
+on:
+  schedule:
+    - cron: '15 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Refresh bundled OpenRouter stats
+        run: npm run refresh:openrouter-stats
+
+      - name: Commit refreshed stats if needed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet -- public/openrouter-stats.json; then
+            echo "No OpenRouter stats changes detected."
+            exit 0
+          fi
+
+          git add public/openrouter-stats.json
+          git commit -m "Refresh OpenRouter stats snapshot"
+          git push
