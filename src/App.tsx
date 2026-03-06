@@ -263,6 +263,8 @@ const thread: Message[] = [
 
 function App() {
   const lastScrollYRef = useRef(0)
+  const topbarHiddenRef = useRef(false)
+  const scrollFrameRef = useRef<number | null>(null)
   const [authDialogOpen, setAuthDialogOpen] = useState(false)
   const [authMode, setAuthMode] = useState<AuthMode>('sign-in')
   const [authEmail, setAuthEmail] = useState('')
@@ -302,26 +304,46 @@ function App() {
 
   useEffect(() => {
     lastScrollYRef.current = window.scrollY
+    topbarHiddenRef.current = false
 
-    const handleScroll = () => {
+    const updateTopbarVisibility = () => {
+      scrollFrameRef.current = null
       const nextScrollY = window.scrollY
       const delta = nextScrollY - lastScrollYRef.current
+      let nextHidden = topbarHiddenRef.current
 
       if (nextScrollY <= 48) {
-        setTopbarHidden(false)
-      } else if (delta >= 8) {
-        setTopbarHidden(true)
-      } else if (delta <= -8) {
-        setTopbarHidden(false)
+        nextHidden = false
+      } else if (delta >= 4) {
+        nextHidden = true
+      } else if (delta <= -4) {
+        nextHidden = false
+      }
+
+      if (nextHidden !== topbarHiddenRef.current) {
+        topbarHiddenRef.current = nextHidden
+        setTopbarHidden(nextHidden)
       }
 
       lastScrollYRef.current = nextScrollY
+    }
+
+    const handleScroll = () => {
+      if (scrollFrameRef.current != null) {
+        return
+      }
+
+      scrollFrameRef.current = window.requestAnimationFrame(updateTopbarVisibility)
     }
 
     window.addEventListener('scroll', handleScroll, { passive: true })
 
     return () => {
       window.removeEventListener('scroll', handleScroll)
+
+      if (scrollFrameRef.current != null) {
+        window.cancelAnimationFrame(scrollFrameRef.current)
+      }
     }
   }, [])
 
