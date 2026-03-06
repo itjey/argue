@@ -69,7 +69,7 @@
 
 .brand-fan {
   position: relative;
-  width: 1.92rem;
+  width: 1.86rem;
   height: 1.04rem;
   transition: transform 240ms ease;
 }
@@ -78,7 +78,7 @@
   position: absolute;
   left: 0;
   top: 50%;
-  width: 1.66rem;
+  width: 1.62rem;
   height: 0.82rem;
   transform-origin: 0% 50%;
   transition:
@@ -90,39 +90,49 @@
 
 .brand-blade-left {
   z-index: 1;
-  transform: translateY(-50%) translateX(0.02rem) rotate(-16deg);
+  transform: translateY(-50%) rotate(-30deg);
 }
 
 .brand-blade-center {
-  z-index: 2;
-  transform: translateY(-50%) translateX(0.12rem) rotate(0deg);
+  z-index: 3;
+  transform: translateY(-50%) rotate(0deg);
 }
 
 .brand-blade-right {
-  z-index: 3;
-  transform: translateY(-50%) translateX(0.22rem) rotate(16deg);
+  z-index: 2;
+  transform: translateY(-50%) rotate(30deg);
 }
 
+.topbar:hover .brand-blade-left,
+.topbar:focus-within .brand-blade-left,
 .brand:hover .brand-blade-left,
 .brand:focus-visible .brand-blade-left {
-  transform: translateY(-50%) translateX(0.1rem) rotate(0deg);
+  transform: translateY(-50%) rotate(0deg) translateX(0.02rem);
 }
 
+.topbar:hover .brand-blade-center,
+.topbar:focus-within .brand-blade-center,
 .brand:hover .brand-blade-center,
 .brand:focus-visible .brand-blade-center {
-  transform: translateY(-50%) translateX(0.18rem) rotate(0deg);
+  transform: translateY(-50%) rotate(0deg) translateX(0.14rem);
 }
 
+.topbar:hover .brand-blade-right,
+.topbar:focus-within .brand-blade-right,
 .brand:hover .brand-blade-right,
 .brand:focus-visible .brand-blade-right {
-  transform: translateY(-50%) translateX(0.26rem) rotate(0deg);
+  transform: translateY(-50%) rotate(0deg) translateX(0.26rem);
 }
 
+.topbar:hover .brand-blade,
+.topbar:focus-within .brand-blade,
 .brand:hover .brand-blade,
 .brand:focus-visible .brand-blade {
   filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.2));
 }
 
+.topbar:hover .brand-fan,
+.topbar:focus-within .brand-fan,
 .brand:hover .brand-fan,
 .brand:focus-visible .brand-fan {
   transform: scale(0.9);
@@ -130,6 +140,19 @@
 
 .brand-wordmark {
   font-size: 0.84rem;
+}
+
+.brand-typewriter {
+  display: inline-block;
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  padding-right: 0.04rem;
+  border-right: 1.5px solid rgba(255, 255, 255, 0.88);
+  line-height: 1.15;
+  animation:
+    typing 2.4s steps(6, end) 0.4s forwards,
+    caret 0.9s step-end infinite;
 }
 
 .nav {
@@ -199,7 +222,7 @@
   letter-spacing: -0.08em;
   color: var(--ink-strong);
   animation:
-    typing 2.4s steps(7, end) 0.4s forwards,
+    typing 2.4s steps(6, end) 0.4s forwards,
     caret 0.9s step-end infinite;
 }
 
@@ -787,6 +810,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .brand-typewriter,
   .hero-typewriter {
     width: auto;
     border-right: 0;

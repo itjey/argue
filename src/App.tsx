@@ -227,7 +227,9 @@ function App() {
               </svg>
             </span>
           </span>
-          <span className="brand-wordmark">argue</span>
+          <span className="brand-wordmark brand-typewriter" aria-label="argue.">
+            argue.
+          </span>
         </a>
 
         <nav className="nav" aria-label="Primary navigation">
