@@ -1,7 +1,22 @@
+import { useEffect, useState } from 'react'
+import type { FirebaseError } from 'firebase/app'
+import {
+  createUserWithEmailAndPassword,
+  EmailAuthProvider,
+  GoogleAuthProvider,
+  linkWithCredential,
+  onAuthStateChanged,
+  reload,
+  sendEmailVerification,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signOut,
+  type OAuthCredential,
+  type User,
+} from 'firebase/auth'
 import type { LucideIcon } from 'lucide-react'
 import {
   ArrowRight,
-  ArrowUpRight,
   BadgeCheck,
   BrainCircuit,
   Braces,
@@ -13,13 +28,23 @@ import {
   KeyRound,
   Layers3,
   LockKeyhole,
+  LogIn,
   MessagesSquare,
   ScrollText,
   ShieldCheck,
   Sigma,
   SlidersHorizontal,
+  User as UserIcon,
   Workflow,
 } from 'lucide-react'
+import { AuthDialog, type AuthMode } from './components/AuthDialog'
+import {
+  auth,
+  getProviderLabels,
+  googleProvider,
+  hasPasswordProvider,
+  syncUserProfile,
+} from './lib/firebase'
 import './App.css'
 
 type FeatureCard = {
@@ -53,6 +78,45 @@ type Message = {
   speaker: string
   role: string
   text: string
+}
+
+type PendingGoogleLink = {
+  credential: OAuthCredential
+  email: string
+}
+
+function buildVerificationUrl() {
+  return `${window.location.origin}${import.meta.env.BASE_URL}`
+}
+
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase()
+}
+
+function formatAuthError(error: FirebaseError) {
+  switch (error.code) {
+    case 'auth/account-exists-with-different-credential':
+      return 'This email already exists with another sign-in method. Sign in first and the Google account can be linked automatically.'
+    case 'auth/email-already-in-use':
+      return 'This email already belongs to an account. Sign in instead. If it started as Google, use Google first and then link a password from your account panel.'
+    case 'auth/invalid-credential':
+    case 'auth/invalid-login-credentials':
+      return 'The email or password did not match an existing account.'
+    case 'auth/popup-closed-by-user':
+      return 'Google sign-in was closed before it finished.'
+    case 'auth/popup-blocked':
+      return 'The browser blocked the Google popup. Allow popups for this site and try again.'
+    case 'auth/operation-not-allowed':
+      return 'That sign-in method is not enabled in Firebase yet.'
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Wait a moment and try again.'
+    case 'auth/weak-password':
+      return 'Use a stronger password with at least 8 characters.'
+    case 'auth/provider-already-linked':
+      return 'That sign-in method is already linked to this account.'
+    default:
+      return 'Authentication failed. Please try again.'
+  }
 }
 
 const metrics: Metric[] = [
@@ -188,6 +252,333 @@ const thread: Message[] = [
 ]
 
 function App() {
+  const [authDialogOpen, setAuthDialogOpen] = useState(false)
+  const [authMode, setAuthMode] = useState<AuthMode>('sign-in')
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authConfirmPassword, setAuthConfirmPassword] = useState('')
+  const [linkPassword, setLinkPassword] = useState('')
+  const [linkPasswordConfirm, setLinkPasswordConfirm] = useState('')
+  const [statusMessage, setStatusMessage] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
+  const [busyAction, setBusyAction] = useState<string | null>(null)
+  const [currentUser, setCurrentUser] = useState<User | null>(auth.currentUser)
+  const [pendingGoogleLink, setPendingGoogleLink] =
+    useState<PendingGoogleLink | null>(null)
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
+      setCurrentUser(nextUser)
+
+      if (nextUser) {
+        setAuthEmail(nextUser.email ?? '')
+        void syncUserProfile(nextUser).catch(() => undefined)
+      }
+    })
+
+    return unsubscribe
+  }, [])
+
+  useEffect(() => {
+    if (!authDialogOpen) {
+      return undefined
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setAuthDialogOpen(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleEscape)
+
+    return () => {
+      window.removeEventListener('keydown', handleEscape)
+    }
+  }, [authDialogOpen])
+
+  function clearFeedback() {
+    setStatusMessage('')
+    setErrorMessage('')
+  }
+
+  function resetCredentialForms() {
+    setAuthPassword('')
+    setAuthConfirmPassword('')
+    setLinkPassword('')
+    setLinkPasswordConfirm('')
+  }
+
+  async function syncUserState(
+    user: User,
+    options?: Parameters<typeof syncUserProfile>[1],
+  ) {
+    await syncUserProfile(user, options)
+    setCurrentUser(auth.currentUser ?? user)
+  }
+
+  function openAuthDialog(mode: AuthMode = 'sign-in') {
+    clearFeedback()
+    resetCredentialForms()
+    setAuthMode(mode)
+
+    if (!currentUser) {
+      if (mode === 'sign-up' && pendingGoogleLink) {
+        setAuthEmail(pendingGoogleLink.email)
+      } else if (mode === 'sign-in' && pendingGoogleLink) {
+        setAuthEmail(pendingGoogleLink.email)
+      }
+    }
+
+    setAuthDialogOpen(true)
+  }
+
+  function handleDialogClose() {
+    clearFeedback()
+    resetCredentialForms()
+    setAuthDialogOpen(false)
+  }
+
+  function handleModeChange(mode: AuthMode) {
+    clearFeedback()
+    resetCredentialForms()
+    setAuthMode(mode)
+  }
+
+  async function handleGoogleSignIn() {
+    clearFeedback()
+    setBusyAction('google')
+
+    try {
+      const result = await signInWithPopup(auth, googleProvider)
+      await syncUserState(result.user, { lastAuthMethod: 'google' })
+      setPendingGoogleLink(null)
+      resetCredentialForms()
+      setAuthDialogOpen(false)
+    } catch (error) {
+      const firebaseError = error as FirebaseError
+
+      if (firebaseError.code === 'auth/account-exists-with-different-credential') {
+        const credential = GoogleAuthProvider.credentialFromError(
+          firebaseError,
+        ) as OAuthCredential | null
+        const conflictEmail = String(firebaseError.customData?.email ?? '').trim()
+
+        if (credential && conflictEmail) {
+          setPendingGoogleLink({ credential, email: conflictEmail })
+          setAuthEmail(conflictEmail)
+        }
+
+        setAuthMode('sign-in')
+        setAuthDialogOpen(true)
+        setStatusMessage(
+          'Google found an existing account for this email. Sign in with the matching email account first and Argue will merge Google into it.',
+        )
+      } else {
+        setErrorMessage(formatAuthError(firebaseError))
+      }
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  async function handleEmailSubmit() {
+    const email = authEmail.trim()
+    const normalizedEmail = normalizeEmail(email)
+
+    clearFeedback()
+
+    if (!email) {
+      setErrorMessage('Enter an email address to continue.')
+      return
+    }
+
+    if (!authPassword) {
+      setErrorMessage('Enter a password to continue.')
+      return
+    }
+
+    if (authPassword.length < 8) {
+      setErrorMessage('Use a password with at least 8 characters.')
+      return
+    }
+
+    if (authMode === 'sign-up' && authPassword !== authConfirmPassword) {
+      setErrorMessage('The password confirmation does not match.')
+      return
+    }
+
+    if (
+      authMode === 'sign-in' &&
+      pendingGoogleLink &&
+      normalizeEmail(pendingGoogleLink.email) !== normalizedEmail
+    ) {
+      setErrorMessage(
+        `Use ${pendingGoogleLink.email} to finish linking the Google account.`,
+      )
+      return
+    }
+
+    setBusyAction('email-submit')
+
+    try {
+      if (authMode === 'sign-up') {
+        const result = await createUserWithEmailAndPassword(auth, email, authPassword)
+
+        await sendEmailVerification(result.user, { url: buildVerificationUrl() })
+        await syncUserState(result.user, {
+          lastAuthMethod: 'password',
+          verificationEmailRequested: true,
+        })
+
+        setStatusMessage(
+          'Account created. Check your email for the verification link, then return here and refresh the account state.',
+        )
+        setAuthPassword('')
+        setAuthConfirmPassword('')
+        setAuthDialogOpen(true)
+        return
+      }
+
+      const result = await signInWithEmailAndPassword(auth, email, authPassword)
+
+      if (
+        pendingGoogleLink &&
+        normalizeEmail(result.user.email ?? '') === normalizeEmail(pendingGoogleLink.email)
+      ) {
+        await linkWithCredential(result.user, pendingGoogleLink.credential)
+        setPendingGoogleLink(null)
+        await syncUserState(result.user, {
+          lastAuthMethod: 'password',
+          linkedProvider: 'google',
+        })
+        setStatusMessage(
+          'Signed in and linked with Google. This email now stays on one unified account.',
+        )
+      } else {
+        await syncUserState(result.user, { lastAuthMethod: 'password' })
+      }
+
+      resetCredentialForms()
+      setAuthDialogOpen(false)
+    } catch (error) {
+      setErrorMessage(formatAuthError(error as FirebaseError))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  async function handleResendVerification() {
+    if (!currentUser) {
+      return
+    }
+
+    clearFeedback()
+    setBusyAction('resend-verification')
+
+    try {
+      await sendEmailVerification(currentUser, { url: buildVerificationUrl() })
+      await syncUserState(currentUser, { verificationEmailRequested: true })
+      setStatusMessage('Verification email sent. Check your inbox and spam folder.')
+    } catch (error) {
+      setErrorMessage(formatAuthError(error as FirebaseError))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  async function handleRefreshVerification() {
+    if (!currentUser) {
+      return
+    }
+
+    clearFeedback()
+    setBusyAction('refresh-verification')
+
+    try {
+      await reload(currentUser)
+      const refreshedUser = auth.currentUser
+
+      if (!refreshedUser) {
+        setCurrentUser(null)
+        return
+      }
+
+      await syncUserState(refreshedUser)
+      setStatusMessage(
+        refreshedUser.emailVerified
+          ? 'Email verified. The account is fully active now.'
+          : 'Verification is still pending. Open the email link first, then refresh again.',
+      )
+    } catch (error) {
+      setErrorMessage(formatAuthError(error as FirebaseError))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  async function handleAddPassword() {
+    if (!currentUser || !currentUser.email) {
+      return
+    }
+
+    clearFeedback()
+
+    if (!linkPassword) {
+      setErrorMessage('Enter a password to add email sign-in.')
+      return
+    }
+
+    if (linkPassword.length < 8) {
+      setErrorMessage('Use a password with at least 8 characters.')
+      return
+    }
+
+    if (linkPassword !== linkPasswordConfirm) {
+      setErrorMessage('The password confirmation does not match.')
+      return
+    }
+
+    setBusyAction('link-password')
+
+    try {
+      const credential = EmailAuthProvider.credential(currentUser.email, linkPassword)
+      const linkedUser = await linkWithCredential(currentUser, credential)
+      await syncUserState(linkedUser.user, {
+        lastAuthMethod: 'google',
+        linkedProvider: 'password',
+      })
+      resetCredentialForms()
+      setStatusMessage(
+        'Password sign-in added. Google and email now use the same Argue account.',
+      )
+    } catch (error) {
+      setErrorMessage(formatAuthError(error as FirebaseError))
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  async function handleSignOut() {
+    clearFeedback()
+
+    try {
+      await signOut(auth)
+      setCurrentUser(null)
+      setPendingGoogleLink(null)
+      setAuthEmail('')
+      setAuthMode('sign-in')
+      resetCredentialForms()
+      setAuthDialogOpen(false)
+    } catch (error) {
+      setErrorMessage(formatAuthError(error as FirebaseError))
+    }
+  }
+
+  const providerLabels = getProviderLabels(currentUser)
+  const canAddPassword = Boolean(currentUser?.email && !hasPasswordProvider(currentUser))
+  const isVerified = currentUser?.emailVerified ?? false
+
   return (
     <div className="app-shell">
       <div className="ambient ambient-one" />
@@ -239,15 +630,29 @@ function App() {
           <a href="#trust">Trust</a>
         </nav>
 
-        <a
-          className="topbar-cta"
-          href="https://github.com/itjey/argue"
-          target="_blank"
-          rel="noreferrer"
+        <button
+          className="topbar-cta topbar-account-button"
+          onClick={() => openAuthDialog('sign-in')}
+          type="button"
         >
-          Repository
-          <ArrowUpRight size={16} />
-        </a>
+          {currentUser ? (
+            <>
+              {isVerified ? <ShieldCheck size={16} /> : <UserIcon size={16} />}
+              <span className="topbar-account-copy">
+                <strong>{currentUser.email ?? 'Account'}</strong>
+                <small>{isVerified ? 'Verified account' : 'Verification needed'}</small>
+              </span>
+            </>
+          ) : (
+            <>
+              <LogIn size={16} />
+              <span className="topbar-account-copy">
+                <strong>Login</strong>
+                <small>Google or email</small>
+              </span>
+            </>
+          )}
+        </button>
       </header>
 
       <main className="page" id="top">
@@ -267,10 +672,14 @@ function App() {
             </p>
 
             <div className="hero-actions">
-              <a className="button button-primary" href="#workflow">
-                Explore the flow
+              <button
+                className="button button-primary"
+                onClick={() => openAuthDialog(currentUser ? 'sign-in' : 'sign-up')}
+                type="button"
+              >
+                {currentUser ? 'Open account' : 'Create account'}
                 <ArrowRight size={18} />
-              </a>
+              </button>
               <a className="button button-secondary" href="#interface">
                 See the interface
                 <ChevronRight size={18} />
@@ -482,28 +891,28 @@ function App() {
               <div className="control-card control-card-primary">
                 <div className="control-card-header">
                   <div>
-                    <p className="panel-label">Provider vault</p>
-                    <h3>Connect your models once</h3>
+                    <p className="panel-label">Account layer</p>
+                    <h3>Unified sign-in across Google and email</h3>
                   </div>
                   <ShieldCheck size={18} />
                 </div>
 
                 <div className="provider-list">
                   <div className="provider-row">
-                    <span>OpenAI</span>
-                    <strong>Connected</strong>
-                  </div>
-                  <div className="provider-row">
-                    <span>Anthropic</span>
-                    <strong>Connected</strong>
-                  </div>
-                  <div className="provider-row">
                     <span>Google</span>
-                    <strong>Connected</strong>
+                    <strong>Enabled</strong>
                   </div>
                   <div className="provider-row">
-                    <span>Mistral</span>
-                    <strong>Ready</strong>
+                    <span>Email + password</span>
+                    <strong>Enabled</strong>
+                  </div>
+                  <div className="provider-row">
+                    <span>Verification</span>
+                    <strong>Required</strong>
+                  </div>
+                  <div className="provider-row">
+                    <span>Profile sync</span>
+                    <strong>Firestore</strong>
                   </div>
                 </div>
               </div>
@@ -532,17 +941,17 @@ function App() {
               </div>
 
               <div className="control-card control-card-accent">
-                <p className="panel-label">Result</p>
-                <h3>One elegant thread from prompt to final position.</h3>
+                <p className="panel-label">Identity result</p>
+                <h3>One account per email, even when Google gets linked later.</h3>
                 <p className="control-copy">
-                  Argue is designed to feel expensive because expensive products
-                  protect attention. The interface should look composed even when
-                  the thinking underneath is intense.
+                  The auth layer writes account state to Firestore, keeps the email
+                  visible in the product, and prevents messy duplicate identities
+                  when the same person uses different sign-in methods.
                 </p>
                 <div className="chip-row">
-                  <span>Private trace</span>
-                  <span>Role-based models</span>
-                  <span>Export ready</span>
+                  <span>Email verified</span>
+                  <span>Google linked</span>
+                  <span>Firestore profile</span>
                 </div>
               </div>
             </div>
@@ -564,20 +973,51 @@ function App() {
             <div className="cta-points">
               <div className="cta-point">
                 <CheckCircle2 size={18} />
-                <span>GitHub Pages ready</span>
+                <span>Google and email login</span>
               </div>
               <div className="cta-point">
                 <CheckCircle2 size={18} />
-                <span>Single monochrome palette</span>
+                <span>Verification flow</span>
               </div>
               <div className="cta-point">
                 <CheckCircle2 size={18} />
-                <span>Angular, responsive geometry</span>
+                <span>Firestore profile sync</span>
               </div>
             </div>
           </div>
         </section>
       </main>
+
+      <AuthDialog
+        busyAction={busyAction}
+        canAddPassword={canAddPassword}
+        confirmPassword={authConfirmPassword}
+        currentUser={currentUser}
+        email={authEmail}
+        errorMessage={errorMessage}
+        isVerified={isVerified}
+        linkPassword={linkPassword}
+        linkPasswordConfirm={linkPasswordConfirm}
+        mode={authMode}
+        open={authDialogOpen}
+        password={authPassword}
+        pendingGoogleEmail={pendingGoogleLink?.email ?? null}
+        providerLabels={providerLabels}
+        statusMessage={statusMessage}
+        onAddPassword={handleAddPassword}
+        onClose={handleDialogClose}
+        onConfirmPasswordChange={setAuthConfirmPassword}
+        onEmailChange={setAuthEmail}
+        onEmailSubmit={handleEmailSubmit}
+        onGoogleSignIn={handleGoogleSignIn}
+        onLinkPasswordChange={setLinkPassword}
+        onLinkPasswordConfirmChange={setLinkPasswordConfirm}
+        onModeChange={handleModeChange}
+        onPasswordChange={setAuthPassword}
+        onRefreshVerification={handleRefreshVerification}
+        onResendVerification={handleResendVerification}
+        onSignOut={handleSignOut}
+      />
     </div>
   )
 }
