@@ -832,6 +832,7 @@ function buildAssistantRequestFromReply(assistantReply: {
 
 function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
   const attachmentInputRef = useRef<HTMLInputElement | null>(null)
+  const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const messageStackRef = useRef<HTMLDivElement | null>(null)
   const shouldAutoScrollRef = useRef(true)
   const [draftApiKey, setDraftApiKey] = useState('')
@@ -905,6 +906,17 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
     const distanceFromBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight
     shouldAutoScrollRef.current = distanceFromBottom <= 96
+  }
+
+  function resizeComposerTextarea(textarea: HTMLTextAreaElement) {
+    const baseHeight = 32
+    textarea.style.height = `${baseHeight}px`
+    textarea.style.height = `${Math.max(textarea.scrollHeight, baseHeight)}px`
+  }
+
+  function handleDraftMessageChange(event: ChangeEvent<HTMLTextAreaElement>) {
+    setDraftMessage(event.target.value)
+    resizeComposerTextarea(event.currentTarget)
   }
 
   async function loadModels() {
@@ -1105,6 +1117,11 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
     shouldAutoScrollRef.current = true
     setMessages(nextMessages)
     setDraftMessage('')
+    const composerTextarea = composerTextareaRef.current
+
+    if (composerTextarea) {
+      composerTextarea.style.height = '32px'
+    }
     setAttachments([])
     setChatError('')
     setChatStatus('')
@@ -1702,9 +1719,11 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
               <div className="workspace-input-wrapper">
                 <textarea
                   className="workspace-textarea"
-                  onChange={(event) => setDraftMessage(event.target.value)}
+                  onChange={handleDraftMessageChange}
                   onKeyDown={handleComposerKeyDown}
                   placeholder="Ask the selected model anything, attach files it can understand, or request an image from image-capable models..."
+                  ref={composerTextareaRef}
+                  rows={1}
                   spellCheck={false}
                   value={draftMessage}
                 />

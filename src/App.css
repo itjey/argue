@@ -1764,9 +1764,11 @@
 }
 
 .workspace-textarea {
+  box-sizing: border-box;
   width: 100%;
+  height: 2rem;
   min-height: 2rem;
-  padding: 0.2rem 3.2rem 0.2rem 0.95rem;
+  padding: 0.2rem 3rem 0.2rem 0.9rem;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 999px;
   color: var(--ink-strong);
@@ -1774,7 +1776,7 @@
   overflow: hidden;
   resize: none;
   font-size: 1rem;
-  line-height: 1.35;
+  line-height: 1.3;
   transition:
     border-color 180ms ease,
     background-color 180ms ease;
