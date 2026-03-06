@@ -1508,7 +1508,7 @@ function ChatWorkspace({
             {hasThreadUsageTotals ? (
               <div className="workspace-thread-metrics" aria-label="Thread totals">
                 <span className="workspace-message-metric workspace-message-metric-strong">
-                  Thread total {formatTokenCount(threadUsageTotals.totalTokens)}
+                  Total {formatTokenCount(threadUsageTotals.totalTokens)}
                 </span>
                 <span className="workspace-message-metric">
                   Prompt {formatTokenCount(threadUsageTotals.promptTokens)}
@@ -1523,7 +1523,7 @@ function ChatWorkspace({
                 ) : null}
                 {threadUsageTotals.hasEstimatedCost ? (
                   <span className="workspace-message-metric workspace-message-metric-strong">
-                    Est. cost {formatEstimatedCost(threadUsageTotals.estimatedCost)}
+                    Cost {formatEstimatedCost(threadUsageTotals.estimatedCost)}
                   </span>
                 ) : null}
               </div>
@@ -1541,8 +1541,8 @@ function ChatWorkspace({
                 <div className="workspace-empty-state">
                   <Bot size={20} />
                   <div>
-                    <h4>Try a prompt.</h4>
-                    <p>Add a key, pick a model, and send text or files.</p>
+                    <h4>Start a thread.</h4>
+                    <p>Pick a model, add your key, and send text or files.</p>
                   </div>
                 </div>
               ) : null}
@@ -1590,7 +1590,7 @@ function ChatWorkspace({
                           </span>
                         ) : null}
                         <span className="workspace-message-metric workspace-message-metric-strong">
-                          Est. cost {formatEstimatedCost(message.estimatedCost)}
+                          Cost {formatEstimatedCost(message.estimatedCost)}
                         </span>
                       </div>
                     ) : null}
@@ -1644,29 +1644,25 @@ function ChatWorkspace({
                   <div className="workspace-composer-capability">
                     <ImagePlus size={14} />
                     <span>
-                      {selectedModelProfile?.canInputImage
-                        ? 'Image input ready'
-                        : 'No image input'}
+                      {selectedModelProfile?.canInputImage ? 'Image input' : 'No images'}
                     </span>
                   </div>
                   <div className="workspace-composer-capability">
                     <FileText size={14} />
                     <span>
-                      {selectedModelProfile?.canInputFile
-                        ? 'PDF input ready'
-                        : 'PDF input hidden'}
+                      {selectedModelProfile?.canInputFile ? 'PDF input' : 'No PDFs'}
                     </span>
                   </div>
                   <div className="workspace-composer-capability">
                     <Code2 size={14} />
-                    <span>Code files inline as text</span>
+                    <span>Code as text</span>
                   </div>
                   <div className="workspace-composer-capability">
                     <BrainCircuit size={14} />
                     <span>
                       {selectedModelProfile?.supportsReasoning
                         ? `Thinking ${reasoningEffort === 'none' ? 'off' : reasoningEffort}`
-                        : 'No thinking controls'}
+                        : 'No thinking'}
                     </span>
                   </div>
                 </div>
@@ -1721,24 +1717,28 @@ function ChatWorkspace({
                 </div>
               ) : null}
 
-              <textarea
-                className="workspace-textarea"
-                onChange={(event) => setDraftMessage(event.target.value)}
-                onKeyDown={handleComposerKeyDown}
-                placeholder="Message the selected model or attach files..."
-                spellCheck={false}
-                value={draftMessage}
-              />
-              <p className="workspace-composer-note">{composerHint}</p>
-              <button
-                className="button button-primary"
-                disabled={isSending || (!draftMessage.trim() && attachments.length === 0)}
-                onClick={() => void handleSendMessage()}
-                type="button"
-              >
-                <Send size={16} />
-                Send
-              </button>
+              <div className="workspace-composer-shell">
+                <textarea
+                  className="workspace-textarea"
+                  onChange={(event) => setDraftMessage(event.target.value)}
+                  onKeyDown={handleComposerKeyDown}
+                  placeholder="Message..."
+                  spellCheck={false}
+                  value={draftMessage}
+                />
+                <div className="workspace-composer-footer">
+                  <p className="workspace-composer-note">{composerHint}</p>
+                  <button
+                    className="button button-primary"
+                    disabled={isSending || (!draftMessage.trim() && attachments.length === 0)}
+                    onClick={() => void handleSendMessage()}
+                    type="button"
+                  >
+                    <Send size={16} />
+                    Send
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
