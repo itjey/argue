@@ -32,6 +32,10 @@
   z-index: 1;
 }
 
+.page-workspace {
+  width: min(1540px, calc(100% - 2rem));
+}
+
 .topbar {
   position: sticky;
   top: 0.8rem;
@@ -1038,8 +1042,9 @@
 }
 
 .workspace-home-header {
-  grid-template-columns: minmax(0, 1.12fr) minmax(18rem, 0.88fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
+  max-width: 52rem;
 }
 
 .workspace-home-header h1 {
@@ -1094,12 +1099,14 @@
 }
 
 .workspace-home-grid {
-  grid-template-columns: minmax(20rem, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(15rem, 0.2fr) minmax(0, 0.6fr) minmax(15rem, 0.2fr);
   align-items: start;
   margin-top: 1.3rem;
+  gap: 1.25rem;
 }
 
 .workspace-library-column,
+.workspace-detail-column,
 .workspace-chat-column,
 .workspace-form-stack,
 .workspace-model-spotlight-grid,
@@ -1109,6 +1116,15 @@
 .model-stats-panel {
   display: grid;
   gap: 1rem;
+}
+
+.workspace-library-column,
+.workspace-detail-column {
+  align-self: start;
+}
+
+.workspace-chat-column {
+  min-width: 0;
 }
 
 .workspace-inline-actions,
@@ -1294,12 +1310,13 @@
 }
 
 .workspace-chat-card {
-  min-height: 100%;
+  min-height: calc(100vh - 8rem);
+  align-content: start;
 }
 
 .workspace-message-stack {
-  min-height: 24rem;
-  max-height: 36rem;
+  min-height: 34rem;
+  max-height: calc(100vh - 25rem);
 }
 
 .workspace-empty-state,
@@ -1366,13 +1383,14 @@
 
 .workspace-textarea {
   width: 100%;
-  min-height: 9rem;
-  padding: 0.9rem;
+  min-height: 12.5rem;
+  padding: 1.05rem 1.1rem;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 0.24rem;
   color: var(--ink-strong);
   background: rgba(255, 255, 255, 0.02);
   resize: vertical;
+  font-size: 1rem;
   line-height: 1.7;
   transition:
     border-color 180ms ease,
@@ -1400,6 +1418,11 @@
 
 .workspace-composer .button {
   justify-self: start;
+}
+
+.workspace-chat-column .workspace-inline-actions .button,
+.workspace-chat-column .button.button-primary {
+  min-width: 11rem;
 }
 
 .workspace-model-card-meta,
@@ -2296,6 +2319,10 @@
   .stats-app-grid,
   .workspace-model-capability-overview {
     grid-template-columns: 1fr;
+  }
+
+  .page-workspace {
+    width: min(100% - 1rem, 100%);
   }
 
   .metric-grid {

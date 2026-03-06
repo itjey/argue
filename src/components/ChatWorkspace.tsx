@@ -1014,40 +1014,39 @@ function ChatWorkspace({
           <p className="section-kicker">Workspace</p>
           <h1>Connect OpenRouter, choose any live model, and start chatting.</h1>
           <p className="workspace-home-copy">
-            The library below reads OpenRouter&apos;s current catalog at runtime, then
-            adapts the chat surface to each model&apos;s real input, output, and
-            reasoning support.
+            Argue reads OpenRouter&apos;s live catalog at runtime, then shapes the
+            workspace around each model&apos;s real input, output, and reasoning
+            support.
           </p>
-        </div>
-
-        <div className="workspace-account-card" id="account">
-          <div className="workspace-account-header">
-            <div>
-              <p className="panel-label">Signed in</p>
-              <h2>{currentUser.email ?? 'Argue account'}</h2>
-            </div>
-            <div className="status-pill">
-              {isVerified ? <ShieldCheck size={16} /> : <KeyRound size={16} />}
-              {isVerified ? 'Verified' : 'Verification pending'}
-            </div>
-          </div>
-          <p className="workspace-account-copy">
-            Your Firebase login controls access to the workspace. Your OpenRouter
-            API key stays local to this browser unless you choose to paste it again
-            elsewhere.
-          </p>
-          <button
-            className="button button-secondary"
-            onClick={onOpenAccount}
-            type="button"
-          >
-            Manage account
-          </button>
         </div>
       </div>
 
       <div className="workspace-home-grid">
         <aside className="workspace-library-column" id="models">
+          <div className="workspace-account-card" id="account">
+            <div className="workspace-account-header">
+              <div>
+                <p className="panel-label">Signed in</p>
+                <h2>{currentUser.email ?? 'Argue account'}</h2>
+              </div>
+              <div className="status-pill">
+                {isVerified ? <ShieldCheck size={16} /> : <KeyRound size={16} />}
+                {isVerified ? 'Verified' : 'Verification pending'}
+              </div>
+            </div>
+            <p className="workspace-account-copy">
+              Your Firebase login unlocks the workspace. Your OpenRouter key stays
+              local to this browser unless you choose to reuse it elsewhere.
+            </p>
+            <button
+              className="button button-secondary"
+              onClick={onOpenAccount}
+              type="button"
+            >
+              Manage account
+            </button>
+          </div>
+
           <div className="control-card">
             <div className="control-card-header">
               <div>
@@ -1244,174 +1243,6 @@ function ChatWorkspace({
         </aside>
 
         <div className="workspace-chat-column">
-          <div className="control-card workspace-selected-model-card">
-            <div className="control-card-header">
-              <div>
-                <p className="panel-label">Selected model</p>
-                <h3>{selectedModel?.name ?? 'Choose a model'}</h3>
-              </div>
-              <Bot size={18} />
-            </div>
-
-            {selectedModel && selectedModelProfile ? (
-              <>
-                <p className="workspace-selected-model-copy">
-                  {selectedModel.description}
-                </p>
-
-                <div className="workspace-model-capability-overview">
-                  <div className="workspace-smartness-card">
-                    <div className="workspace-smartness-copy">
-                      <span>Smartness</span>
-                      <strong>{selectedModelProfile.smartness.score}/100</strong>
-                    </div>
-                    <div className="workspace-lightbulb-row workspace-lightbulb-row-large">
-                      {createLightbulbIcons(
-                        selectedModelProfile.smartness.bulbs,
-                        `${selectedModel.id}-selected`,
-                      )}
-                    </div>
-                    <p>
-                      {selectedModelProfile.smartness.label}.{' '}
-                      {selectedModelProfile.smartness.detail}
-                    </p>
-                  </div>
-
-                  <div className="workspace-capability-grid">
-                    <div className="workspace-capability-column">
-                      <span>Understands</span>
-                      <div className="workspace-capability-chip-row">
-                        {getInputCapabilityLabels(selectedModelProfile).map((label) => (
-                          <span className="workspace-capability-chip" key={label}>
-                            {label}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="workspace-capability-column">
-                      <span>Returns</span>
-                      <div className="workspace-capability-chip-row">
-                        {getOutputCapabilityLabels(selectedModelProfile).map((label) => (
-                          <span className="workspace-capability-chip" key={label}>
-                            {label}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="workspace-capability-column">
-                      <span>Modes</span>
-                      <div className="workspace-capability-chip-row">
-                        {selectedModelProfile.isMultimodal ? (
-                          <span className="workspace-capability-chip">Multimodal</span>
-                        ) : null}
-                        {selectedModelProfile.supportsReasoning ? (
-                          <span className="workspace-capability-chip">
-                            {selectedModelProfile.reasoningExposure.badge}
-                          </span>
-                        ) : null}
-                        {selectedModelProfile.supportsTools ? (
-                          <span className="workspace-capability-chip">Tools</span>
-                        ) : null}
-                        {selectedModelProfile.supportsStructuredOutputs ? (
-                          <span className="workspace-capability-chip">
-                            Structured output
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="workspace-model-meta-grid">
-                  <div className="workspace-model-meta">
-                    <span>Model id</span>
-                    <strong>{selectedModel.id}</strong>
-                  </div>
-                  <div className="workspace-model-meta">
-                    <span>Prompt pricing</span>
-                    <strong>{formatOpenRouterPrice(selectedModel.pricing?.prompt)}</strong>
-                  </div>
-                  <div className="workspace-model-meta">
-                    <span>Completion pricing</span>
-                    <strong>
-                      {formatOpenRouterPrice(selectedModel.pricing?.completion)}
-                    </strong>
-                  </div>
-                  <div className="workspace-model-meta">
-                    <span>Context window</span>
-                    <strong>{formatLargeNumber(selectedModel.context_length)}</strong>
-                  </div>
-                </div>
-
-                {selectedModelProfile.canOutputImage ? (
-                  <div className="workspace-setting-card">
-                    <div className="workspace-setting-copy">
-                      <p className="panel-label">Output mode</p>
-                      <h4>Control whether image-capable models return pictures.</h4>
-                    </div>
-                    <div className="workspace-setting-pill-row">
-                      {responseModeOptions.map((option) => (
-                        <button
-                          className={`workspace-setting-pill ${
-                            responseMode === option.id
-                              ? 'workspace-setting-pill-active'
-                              : ''
-                          }`}
-                          key={option.id}
-                          onClick={() => setResponseMode(option.id)}
-                          type="button"
-                        >
-                          <strong>{option.label}</strong>
-                          <span>{option.description}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                {selectedModelProfile.supportsReasoning ? (
-                  <div className="workspace-setting-card">
-                    <div className="workspace-setting-copy">
-                      <p className="panel-label">Thinking depth</p>
-                      <h4>Ask reasoning-capable models to expose more of their trace.</h4>
-                      <p className="workspace-setting-detail">
-                        {selectedModelProfile.reasoningExposure.detail}
-                      </p>
-                    </div>
-                    <div className="workspace-setting-pill-row workspace-setting-pill-row-compact">
-                      {reasoningEffortOptions.map((option) => (
-                        <button
-                          className={`workspace-setting-pill ${
-                            reasoningEffort === option.id
-                              ? 'workspace-setting-pill-active'
-                              : ''
-                          }`}
-                          key={option.id}
-                          onClick={() => setReasoningEffort(option.id)}
-                          type="button"
-                        >
-                          <strong>{option.label}</strong>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                <p className="workspace-inline-note">{composerHint}</p>
-              </>
-            ) : null}
-          </div>
-
-          <ModelStatsPanel
-            modelName={selectedModel?.name ?? 'Selected model'}
-            snapshotRefreshedAt={statsSnapshot?.refreshedAt ?? null}
-            statsEntry={selectedModelStats}
-            statsError={statsError}
-            statsLoading={statsLoading}
-          />
-
           <div className="control-card workspace-chat-card">
             <div className="workspace-chat-header">
               <div>
@@ -1611,6 +1442,176 @@ function ChatWorkspace({
             </div>
           </div>
         </div>
+
+        <aside className="workspace-detail-column">
+          <div className="control-card workspace-selected-model-card">
+            <div className="control-card-header">
+              <div>
+                <p className="panel-label">Selected model</p>
+                <h3>{selectedModel?.name ?? 'Choose a model'}</h3>
+              </div>
+              <Bot size={18} />
+            </div>
+
+            {selectedModel && selectedModelProfile ? (
+              <>
+                <p className="workspace-selected-model-copy">
+                  {selectedModel.description}
+                </p>
+
+                <div className="workspace-model-capability-overview">
+                  <div className="workspace-smartness-card">
+                    <div className="workspace-smartness-copy">
+                      <span>Smartness</span>
+                      <strong>{selectedModelProfile.smartness.score}/100</strong>
+                    </div>
+                    <div className="workspace-lightbulb-row workspace-lightbulb-row-large">
+                      {createLightbulbIcons(
+                        selectedModelProfile.smartness.bulbs,
+                        `${selectedModel.id}-selected`,
+                      )}
+                    </div>
+                    <p>
+                      {selectedModelProfile.smartness.label}.{' '}
+                      {selectedModelProfile.smartness.detail}
+                    </p>
+                  </div>
+
+                  <div className="workspace-capability-grid">
+                    <div className="workspace-capability-column">
+                      <span>Understands</span>
+                      <div className="workspace-capability-chip-row">
+                        {getInputCapabilityLabels(selectedModelProfile).map((label) => (
+                          <span className="workspace-capability-chip" key={label}>
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="workspace-capability-column">
+                      <span>Returns</span>
+                      <div className="workspace-capability-chip-row">
+                        {getOutputCapabilityLabels(selectedModelProfile).map((label) => (
+                          <span className="workspace-capability-chip" key={label}>
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="workspace-capability-column">
+                      <span>Modes</span>
+                      <div className="workspace-capability-chip-row">
+                        {selectedModelProfile.isMultimodal ? (
+                          <span className="workspace-capability-chip">Multimodal</span>
+                        ) : null}
+                        {selectedModelProfile.supportsReasoning ? (
+                          <span className="workspace-capability-chip">
+                            {selectedModelProfile.reasoningExposure.badge}
+                          </span>
+                        ) : null}
+                        {selectedModelProfile.supportsTools ? (
+                          <span className="workspace-capability-chip">Tools</span>
+                        ) : null}
+                        {selectedModelProfile.supportsStructuredOutputs ? (
+                          <span className="workspace-capability-chip">
+                            Structured output
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="workspace-model-meta-grid">
+                  <div className="workspace-model-meta">
+                    <span>Model id</span>
+                    <strong>{selectedModel.id}</strong>
+                  </div>
+                  <div className="workspace-model-meta">
+                    <span>Prompt pricing</span>
+                    <strong>{formatOpenRouterPrice(selectedModel.pricing?.prompt)}</strong>
+                  </div>
+                  <div className="workspace-model-meta">
+                    <span>Completion pricing</span>
+                    <strong>
+                      {formatOpenRouterPrice(selectedModel.pricing?.completion)}
+                    </strong>
+                  </div>
+                  <div className="workspace-model-meta">
+                    <span>Context window</span>
+                    <strong>{formatLargeNumber(selectedModel.context_length)}</strong>
+                  </div>
+                </div>
+
+                {selectedModelProfile.canOutputImage ? (
+                  <div className="workspace-setting-card">
+                    <div className="workspace-setting-copy">
+                      <p className="panel-label">Output mode</p>
+                      <h4>Control whether image-capable models return pictures.</h4>
+                    </div>
+                    <div className="workspace-setting-pill-row">
+                      {responseModeOptions.map((option) => (
+                        <button
+                          className={`workspace-setting-pill ${
+                            responseMode === option.id
+                              ? 'workspace-setting-pill-active'
+                              : ''
+                          }`}
+                          key={option.id}
+                          onClick={() => setResponseMode(option.id)}
+                          type="button"
+                        >
+                          <strong>{option.label}</strong>
+                          <span>{option.description}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {selectedModelProfile.supportsReasoning ? (
+                  <div className="workspace-setting-card">
+                    <div className="workspace-setting-copy">
+                      <p className="panel-label">Thinking depth</p>
+                      <h4>Ask reasoning-capable models to expose more of their trace.</h4>
+                      <p className="workspace-setting-detail">
+                        {selectedModelProfile.reasoningExposure.detail}
+                      </p>
+                    </div>
+                    <div className="workspace-setting-pill-row workspace-setting-pill-row-compact">
+                      {reasoningEffortOptions.map((option) => (
+                        <button
+                          className={`workspace-setting-pill ${
+                            reasoningEffort === option.id
+                              ? 'workspace-setting-pill-active'
+                              : ''
+                          }`}
+                          key={option.id}
+                          onClick={() => setReasoningEffort(option.id)}
+                          type="button"
+                        >
+                          <strong>{option.label}</strong>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                <p className="workspace-inline-note">{composerHint}</p>
+              </>
+            ) : null}
+          </div>
+
+          <ModelStatsPanel
+            modelName={selectedModel?.name ?? 'Selected model'}
+            snapshotRefreshedAt={statsSnapshot?.refreshedAt ?? null}
+            statsEntry={selectedModelStats}
+            statsError={statsError}
+            statsLoading={statsLoading}
+          />
+        </aside>
       </div>
     </section>
   )

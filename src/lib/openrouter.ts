@@ -323,25 +323,25 @@ function appendUniqueStrings(currentValues: string[], nextValues: string[]) {
 }
 
 function mergeTextFragments(previousValue: string, nextValue?: string | null) {
-  const trimmedNext = nextValue?.trim() ?? ''
+  const nextFragment = nextValue ?? ''
 
-  if (!trimmedNext) {
+  if (!nextFragment) {
     return previousValue
   }
 
   if (!previousValue) {
-    return trimmedNext
+    return nextFragment
   }
 
-  if (trimmedNext.startsWith(previousValue)) {
-    return trimmedNext
+  if (nextFragment.startsWith(previousValue)) {
+    return nextFragment
   }
 
-  if (previousValue.endsWith(trimmedNext)) {
+  if (previousValue.endsWith(nextFragment)) {
     return previousValue
   }
 
-  return `${previousValue}${trimmedNext}`
+  return `${previousValue}${nextFragment}`
 }
 
 function getReasoningDetailKey(detail: OpenRouterReasoningDetail) {
