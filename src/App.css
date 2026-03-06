@@ -35,9 +35,8 @@
 }
 
 .page-workspace {
-  width: min(2000px, calc(100vw - 1.5rem));
-  margin-left: 0.75rem;
-  margin-right: auto;
+  width: min(1920px, calc(100vw - 2.5rem));
+  margin: 0 auto;
 }
 
 .topbar {
@@ -1162,6 +1161,11 @@
   align-items: start;
   max-width: 70rem;
   margin-bottom: 0.4rem;
+}
+
+.workspace-home-header > div,
+.workspace-library-column {
+  position: relative;
 }
 
 .workspace-home-header h1 {
@@ -2574,9 +2578,7 @@
 
 @media (min-width: 1600px) {
   .page-workspace {
-    width: min(2200px, calc(100vw - 1.75rem));
-    margin-left: 0.875rem;
-    margin-right: auto;
+    width: min(2200px, calc(100vw - 3rem));
   }
 
   .workspace-home-grid {
@@ -2593,6 +2595,20 @@
   .workspace-message-stack {
     min-height: 42rem;
     max-height: calc(100vh - 21.5rem);
+  }
+}
+
+@media (min-width: 1101px) {
+  .workspace-home-header > div,
+  .workspace-library-column {
+    left: clamp(-2.25rem, -1.2vw, -1rem);
+  }
+}
+
+@media (min-width: 1600px) {
+  .workspace-home-header > div,
+  .workspace-library-column {
+    left: clamp(-3.25rem, -1.7vw, -1.6rem);
   }
 }
 
