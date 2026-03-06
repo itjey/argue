@@ -447,7 +447,7 @@
 
 .auth-form-grid + .auth-primary-button,
 .auth-form-grid + .auth-secondary-button {
-  margin-top: 0.4rem;
+  margin-top: 0.95rem;
 }
 
 .auth-field {
