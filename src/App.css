@@ -1216,15 +1216,10 @@
 .workspace-library-column,
 .workspace-detail-column {
   align-self: start;
-  position: sticky;
-  top: 5.85rem;
-  max-height: calc(100vh - 6.7rem);
-  overflow-y: auto;
-  overflow-x: hidden;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable both-edges;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+  position: static;
+  top: auto;
+  max-height: none;
+  overflow: visible;
   padding-inline: 0;
   flex-shrink: 0;
 }
@@ -1531,15 +1526,11 @@
   scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
 }
 
-.workspace-library-column::-webkit-scrollbar,
-.workspace-detail-column::-webkit-scrollbar,
 .workspace-library-list::-webkit-scrollbar,
 .workspace-message-stack::-webkit-scrollbar {
   width: 0.5rem;
 }
 
-.workspace-library-column::-webkit-scrollbar-thumb,
-.workspace-detail-column::-webkit-scrollbar-thumb,
 .workspace-library-list::-webkit-scrollbar-thumb,
 .workspace-message-stack::-webkit-scrollbar-thumb {
   border-radius: 999px;

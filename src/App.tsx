@@ -866,7 +866,11 @@ function App() {
 
       <main className={`page${workspaceVisible ? ' page-workspace' : ''}`} id="top">
         {workspaceVisible ? (
-          <ChatWorkspace currentUser={currentUser!} />
+          <ChatWorkspace
+            currentUser={currentUser!}
+            isVerified={isVerified}
+            onOpenAccount={() => openAuthDialog('sign-in')}
+          />
         ) : (
           <>
         <section className="hero section" id="concept">

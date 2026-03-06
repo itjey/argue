@@ -1,5 +1,4 @@
 import {
-  useCallback,
   useDeferredValue,
   useEffect,
   useRef,
@@ -23,14 +22,11 @@ import {
   LibraryBig,
   Lightbulb,
   LoaderCircle,
-  PanelLeftClose,
-  PanelLeftOpen,
-  PanelRightClose,
-  PanelRightOpen,
   Paperclip,
   RefreshCcw,
   Search,
   Send,
+  ShieldCheck,
   Sparkles,
   Trash2,
   X,
@@ -72,6 +68,8 @@ import { ModelStatsPanel } from './ModelStatsPanel'
 
 type ChatWorkspaceProps = {
   currentUser: User
+  isVerified: boolean
+  onOpenAccount: () => void
 }
 
 type WorkspaceAttachment = RichMessageAttachment & {
@@ -835,13 +833,19 @@ function buildAssistantRequestFromReply(assistantReply: {
   } satisfies OpenRouterChatMessage
 }
 
-function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
+function ChatWorkspace({
+  currentUser,
+  isVerified,
+  onOpenAccount,
+}: ChatWorkspaceProps) {
   const attachmentInputRef = useRef<HTMLInputElement | null>(null)
   const messageStackRef = useRef<HTMLDivElement | null>(null)
   const shouldAutoScrollRef = useRef(true)
   const [draftApiKey, setDraftApiKey] = useState('')
   const [savedApiKey, setSavedApiKey] = useState('')
-  const [keyStatus, setKeyStatus] = useState('Local only.')
+  const [keyStatus, setKeyStatus] = useState(
+    'Stored locally in this browser only.',
+  )
   const [models, setModels] = useState<OpenRouterModel[]>([])
   const [modelsLoading, setModelsLoading] = useState(true)
   const [modelsError, setModelsError] = useState('')
@@ -862,58 +866,6 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
   const [chatStatus, setChatStatus] = useState('')
   const [isSending, setIsSending] = useState(false)
   const deferredModelSearch = useDeferredValue(modelSearch)
-
-  const [leftCollapsed, setLeftCollapsed] = useState(false)
-  const [rightCollapsed, setRightCollapsed] = useState(false)
-  const [leftWidth, setLeftWidth] = useState(() => {
-    const stored = window.localStorage.getItem('argue-left-panel-width')
-    return stored ? Number(stored) : 260
-  })
-  const [rightWidth, setRightWidth] = useState(() => {
-    const stored = window.localStorage.getItem('argue-right-panel-width')
-    return stored ? Number(stored) : 300
-  })
-  const gridRef = useRef<HTMLDivElement | null>(null)
-  const draggingRef = useRef<'left' | 'right' | null>(null)
-  const startXRef = useRef(0)
-  const startWidthRef = useRef(0)
-
-  const handlePointerDown = useCallback(
-    (side: 'left' | 'right', event: React.PointerEvent) => {
-      event.preventDefault()
-      draggingRef.current = side
-      startXRef.current = event.clientX
-      startWidthRef.current = side === 'left' ? leftWidth : rightWidth
-      document.body.style.cursor = 'col-resize'
-      document.body.style.userSelect = 'none'
-
-      const handlePointerMove = (moveEvent: PointerEvent) => {
-        const delta = moveEvent.clientX - startXRef.current
-        const dir = draggingRef.current === 'left' ? 1 : -1
-        const next = Math.max(180, Math.min(600, startWidthRef.current + delta * dir))
-
-        if (draggingRef.current === 'left') {
-          setLeftWidth(next)
-          window.localStorage.setItem('argue-left-panel-width', String(next))
-        } else {
-          setRightWidth(next)
-          window.localStorage.setItem('argue-right-panel-width', String(next))
-        }
-      }
-
-      const handlePointerUp = () => {
-        draggingRef.current = null
-        document.body.style.cursor = ''
-        document.body.style.userSelect = ''
-        window.removeEventListener('pointermove', handlePointerMove)
-        window.removeEventListener('pointerup', handlePointerUp)
-      }
-
-      window.addEventListener('pointermove', handlePointerMove)
-      window.addEventListener('pointerup', handlePointerUp)
-    },
-    [leftWidth, rightWidth],
-  )
 
   useEffect(() => {
     const storedKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
@@ -1020,18 +972,18 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
 
     if (trimmedKey) {
       window.localStorage.setItem(OPENROUTER_KEY_STORAGE, trimmedKey)
-      setKeyStatus('Saved locally.')
+      setKeyStatus('OpenRouter key saved locally in this browser.')
       return
     }
 
     window.localStorage.removeItem(OPENROUTER_KEY_STORAGE)
-    setKeyStatus('Removed from this browser.')
+    setKeyStatus('OpenRouter key cleared from this browser.')
   }
 
   function handleClearApiKey() {
     setDraftApiKey('')
     setSavedApiKey('')
-    setKeyStatus('Removed from this browser.')
+    setKeyStatus('OpenRouter key cleared from this browser.')
     window.localStorage.removeItem(OPENROUTER_KEY_STORAGE)
   }
 
@@ -1280,7 +1232,7 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
     setMessages([])
     setAttachments([])
     setChatError('')
-    setChatStatus('New thread.')
+    setChatStatus('Started a new thread.')
   }
 
   const recentModels = getRecentOpenRouterModels(models, 8)
@@ -1300,8 +1252,8 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
     ? getModelCapabilityProfile(selectedModel, selectedModelStats)
     : null
   const catalogCountLabel = modelsLoading
-    ? 'Refreshing catalog.'
-    : `${models.length} live models.`
+    ? 'Refreshing the live OpenRouter catalog.'
+    : `${models.length} models are available from the current OpenRouter index.`
   const attachmentAccept = getAttachmentAccept(selectedModelProfile)
   const composerHint = selectedModelProfile
     ? getAttachmentSupportHint(selectedModelProfile)
@@ -1318,31 +1270,46 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
       <div className="workspace-home-header">
         <div>
           <p className="section-kicker">Workspace</p>
-          <h1>OpenRouter workspace.</h1>
+          <h1>Connect OpenRouter, choose any live model, and start chatting.</h1>
           <p className="workspace-home-copy">
-            Local key. Live models. One clean thread.
+            Argue reads OpenRouter&apos;s live catalog at runtime, then shapes the
+            workspace around each model&apos;s real input, output, and reasoning
+            support.
           </p>
         </div>
       </div>
 
-      <div
-        className="workspace-home-grid"
-        ref={gridRef}
-        style={{
-          '--left-width': leftCollapsed ? '0px' : `${leftWidth}px`,
-          '--right-width': rightCollapsed ? '0px' : `${rightWidth}px`,
-        } as React.CSSProperties}
-      >
-        <aside
-          className={`workspace-library-column${leftCollapsed ? ' workspace-panel-collapsed' : ''}`}
-          id="models"
-          style={leftCollapsed ? undefined : { width: leftWidth }}
-        >
+      <div className="workspace-home-grid">
+        <aside className="workspace-library-column" id="models">
+          <div className="workspace-account-card" id="account">
+            <div className="workspace-account-header">
+              <div>
+                <p className="panel-label">Signed in</p>
+                <h2>{currentUser.email ?? 'Argue account'}</h2>
+              </div>
+              <div className="status-pill">
+                {isVerified ? <ShieldCheck size={16} /> : <KeyRound size={16} />}
+                {isVerified ? 'Verified' : 'Verification pending'}
+              </div>
+            </div>
+            <p className="workspace-account-copy">
+              Your Firebase login unlocks the workspace. Your OpenRouter key stays
+              local to this browser unless you choose to reuse it elsewhere.
+            </p>
+            <button
+              className="button button-secondary"
+              onClick={onOpenAccount}
+              type="button"
+            >
+              Manage account
+            </button>
+          </div>
+
           <div className="control-card">
             <div className="control-card-header">
               <div>
                 <p className="panel-label">OpenRouter key</p>
-                <h3>Local key storage</h3>
+                <h3>Attach your API access</h3>
               </div>
               <KeyRound size={18} />
             </div>
@@ -1384,9 +1351,9 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
 
           <CollapsibleWorkspacePanel
             icon={Sparkles}
-            kicker="Newest"
-            note="Latest releases."
-            title="Recent additions"
+            kicker="Newest on OpenRouter"
+            note="A tighter shortlist for quickly switching models."
+            title="Recent models worth testing first"
           >
             <div className="workspace-model-spotlight-grid">
               {recentModels.map((model) => {
@@ -1436,8 +1403,8 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
           <CollapsibleWorkspacePanel
             icon={LibraryBig}
             kicker="Model library"
-            note="Live index."
-            title="All models"
+            note="Open the full catalog only when you need deeper browsing."
+            title="All current OpenRouter models"
           >
             <label className="workspace-search-field">
               <Search size={16} />
@@ -1527,29 +1494,12 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
           </CollapsibleWorkspacePanel>
         </aside>
 
-        <div className="workspace-resize-gutter workspace-resize-gutter-left">
-          <button
-            aria-label={leftCollapsed ? 'Expand left panel' : 'Collapse left panel'}
-            className="workspace-collapse-toggle"
-            onClick={() => setLeftCollapsed((c) => !c)}
-            type="button"
-          >
-            {leftCollapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
-          </button>
-          {!leftCollapsed && (
-            <div
-              className="workspace-resize-handle"
-              onPointerDown={(e) => handlePointerDown('left', e)}
-            />
-          )}
-        </div>
-
         <div className="workspace-chat-column">
           <div className="control-card workspace-chat-card">
             <div className="workspace-chat-header">
               <div>
                 <p className="panel-label">Chat</p>
-                <h3>Thread</h3>
+                <h3>Direct conversation with the model you selected</h3>
               </div>
               <button
                 className="button button-secondary"
@@ -1564,7 +1514,7 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
             {hasThreadUsageTotals ? (
               <div className="workspace-thread-metrics" aria-label="Thread totals">
                 <span className="workspace-message-metric workspace-message-metric-strong">
-                  Total {formatTokenCount(threadUsageTotals.totalTokens)}
+                  Thread total {formatTokenCount(threadUsageTotals.totalTokens)}
                 </span>
                 <span className="workspace-message-metric">
                   Prompt {formatTokenCount(threadUsageTotals.promptTokens)}
@@ -1579,7 +1529,7 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                 ) : null}
                 {threadUsageTotals.hasEstimatedCost ? (
                   <span className="workspace-message-metric workspace-message-metric-strong">
-                    Cost {formatEstimatedCost(threadUsageTotals.estimatedCost)}
+                    Est. cost {formatEstimatedCost(threadUsageTotals.estimatedCost)}
                   </span>
                 ) : null}
               </div>
@@ -1597,8 +1547,11 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                 <div className="workspace-empty-state">
                   <Bot size={20} />
                   <div>
-                    <h4>Start a thread.</h4>
-                    <p>Pick a model, add your key, and send text or files.</p>
+                    <h4>Start with one of these prompts.</h4>
+                    <p>
+                      Save your OpenRouter key, choose a model, and send text, code,
+                      or supported attachments.
+                    </p>
                   </div>
                 </div>
               ) : null}
@@ -1646,7 +1599,7 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                           </span>
                         ) : null}
                         <span className="workspace-message-metric workspace-message-metric-strong">
-                          Cost {formatEstimatedCost(message.estimatedCost)}
+                          Est. cost {formatEstimatedCost(message.estimatedCost)}
                         </span>
                       </div>
                     ) : null}
@@ -1657,7 +1610,7 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
 
             <details className="workspace-inline-disclosure">
               <summary className="workspace-inline-disclosure-summary">
-                <span>Prompts</span>
+                <span>Starter prompts</span>
                 <ChevronDown className="workspace-collapsible-chevron" size={16} />
               </summary>
               <div className="workspace-inline-disclosure-content workspace-suggestion-row">
@@ -1700,25 +1653,29 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                   <div className="workspace-composer-capability">
                     <ImagePlus size={14} />
                     <span>
-                      {selectedModelProfile?.canInputImage ? 'Image input' : 'No images'}
+                      {selectedModelProfile?.canInputImage
+                        ? 'Image input ready'
+                        : 'No image input'}
                     </span>
                   </div>
                   <div className="workspace-composer-capability">
                     <FileText size={14} />
                     <span>
-                      {selectedModelProfile?.canInputFile ? 'PDF input' : 'No PDFs'}
+                      {selectedModelProfile?.canInputFile
+                        ? 'PDF input ready'
+                        : 'PDF input hidden'}
                     </span>
                   </div>
                   <div className="workspace-composer-capability">
                     <Code2 size={14} />
-                    <span>Code as text</span>
+                    <span>Code files inline as text</span>
                   </div>
                   <div className="workspace-composer-capability">
                     <BrainCircuit size={14} />
                     <span>
                       {selectedModelProfile?.supportsReasoning
                         ? `Thinking ${reasoningEffort === 'none' ? 'off' : reasoningEffort}`
-                        : 'No thinking'}
+                        : 'No thinking controls'}
                     </span>
                   </div>
                 </div>
@@ -1773,53 +1730,29 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                 </div>
               ) : null}
 
-              <div className="workspace-composer-shell">
-                <textarea
-                  className="workspace-textarea"
-                  onChange={(event) => setDraftMessage(event.target.value)}
-                  onKeyDown={handleComposerKeyDown}
-                  placeholder="Ask anything"
-                  spellCheck={false}
-                  value={draftMessage}
-                />
-                <div className="workspace-composer-footer">
-                  <p className="workspace-composer-note">{composerHint}</p>
-                  <button
-                    className="button button-primary"
-                    disabled={isSending || (!draftMessage.trim() && attachments.length === 0)}
-                    onClick={() => void handleSendMessage()}
-                    type="button"
-                  >
-                    <Send size={16} />
-                    Send
-                  </button>
-                </div>
-              </div>
+              <textarea
+                className="workspace-textarea"
+                onChange={(event) => setDraftMessage(event.target.value)}
+                onKeyDown={handleComposerKeyDown}
+                placeholder="Ask the selected model anything, attach files it can understand, or request an image from image-capable models..."
+                spellCheck={false}
+                value={draftMessage}
+              />
+              <p className="workspace-composer-note">{composerHint}</p>
+              <button
+                className="button button-primary"
+                disabled={isSending || (!draftMessage.trim() && attachments.length === 0)}
+                onClick={() => void handleSendMessage()}
+                type="button"
+              >
+                <Send size={16} />
+                Send
+              </button>
             </div>
           </div>
         </div>
 
-        <div className="workspace-resize-gutter workspace-resize-gutter-right">
-          <button
-            aria-label={rightCollapsed ? 'Expand right panel' : 'Collapse right panel'}
-            className="workspace-collapse-toggle"
-            onClick={() => setRightCollapsed((c) => !c)}
-            type="button"
-          >
-            {rightCollapsed ? <PanelRightOpen size={14} /> : <PanelRightClose size={14} />}
-          </button>
-          {!rightCollapsed && (
-            <div
-              className="workspace-resize-handle"
-              onPointerDown={(e) => handlePointerDown('right', e)}
-            />
-          )}
-        </div>
-
-        <aside
-          className={`workspace-detail-column${rightCollapsed ? ' workspace-panel-collapsed' : ''}`}
-          style={rightCollapsed ? undefined : { width: rightWidth }}
-        >
+        <aside className="workspace-detail-column">
           <div className="control-card workspace-selected-model-card">
             <div className="control-card-header">
               <div>
@@ -1933,7 +1866,7 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                         <div className="workspace-setting-card">
                           <div className="workspace-setting-copy">
                             <p className="panel-label">Output mode</p>
-                            <h4>Choose whether image-capable models return images.</h4>
+                            <h4>Control whether image-capable models return pictures.</h4>
                           </div>
                           <div className="workspace-setting-pill-row">
                             {responseModeOptions.map((option) => (
@@ -1959,7 +1892,7 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                         <div className="workspace-setting-card">
                           <div className="workspace-setting-copy">
                             <p className="panel-label">Thinking depth</p>
-                            <h4>Choose how much reasoning to expose.</h4>
+                            <h4>Ask reasoning-capable models to expose more of their trace.</h4>
                             <p className="workspace-setting-detail">
                               {selectedModelProfile.reasoningExposure.detail}
                             </p>
