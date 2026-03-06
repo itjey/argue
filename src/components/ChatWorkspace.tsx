@@ -41,6 +41,7 @@ import {
   type OpenRouterOutputModality,
   type OpenRouterReasoningEffort,
   type OpenRouterReasoningDetail,
+  type OpenRouterUsage,
 } from '../lib/openrouter'
 import {
   getAttachmentSupportHint,
@@ -77,14 +78,28 @@ type WorkspaceMessage = {
   id: string
   role: 'user' | 'assistant'
   isStreaming?: boolean
+  modelId?: string
+  modelName?: string
   text: string
   images: string[]
   audio: RichMessageAudio | null
   reasoning: string
   reasoningDetails: OpenRouterReasoningDetail[]
   refusal: string
+  usage?: OpenRouterUsage | null
+  estimatedCost?: number | null
   attachments: WorkspaceAttachment[]
   request: OpenRouterChatMessage
+}
+
+type ThreadUsageTotals = {
+  hasEstimatedCost: boolean
+  hasReasoningTokens: boolean
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+  reasoningTokens: number
+  estimatedCost: number
 }
 
 type ResponseMode = 'auto' | 'text' | 'text-image'
@@ -178,6 +193,157 @@ function formatLargeNumber(value?: number) {
     notation: 'compact',
     maximumFractionDigits: 1,
   }).format(value)
+}
+
+function formatTokenCount(value?: number | null) {
+  if (value == null || !Number.isFinite(value)) {
+    return 'n/a'
+  }
+
+  return new Intl.NumberFormat('en-US').format(value)
+}
+
+function getTokenDetailValue(
+  usage: OpenRouterUsage | null | undefined,
+  bucket: 'prompt_tokens_details' | 'completion_tokens_details',
+  detailName: string,
+) {
+  const detailValue = usage?.[bucket]?.[detailName]
+  return typeof detailValue === 'number' && Number.isFinite(detailValue)
+    ? detailValue
+    : null
+}
+
+function getReasoningTokenUsage(usage: OpenRouterUsage | null | undefined) {
+  const promptReasoningTokens = getTokenDetailValue(
+    usage,
+    'prompt_tokens_details',
+    'reasoning_tokens',
+  )
+  const completionReasoningTokens = getTokenDetailValue(
+    usage,
+    'completion_tokens_details',
+    'reasoning_tokens',
+  )
+  const hasReasoningTokens =
+    promptReasoningTokens != null || completionReasoningTokens != null
+
+  return {
+    hasReasoningTokens,
+    value: (promptReasoningTokens ?? 0) + (completionReasoningTokens ?? 0),
+  }
+}
+
+function getTotalTokenUsage(usage: OpenRouterUsage | null | undefined) {
+  if (!usage) {
+    return null
+  }
+
+  if (typeof usage.total_tokens === 'number' && Number.isFinite(usage.total_tokens)) {
+    return usage.total_tokens
+  }
+
+  const promptTokens = usage.prompt_tokens ?? 0
+  const completionTokens = usage.completion_tokens ?? 0
+  return promptTokens + completionTokens
+}
+
+function parseOpenRouterPrice(value?: string) {
+  if (!value) {
+    return null
+  }
+
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? numericValue : null
+}
+
+function estimateUsageCost(
+  usage:
+    | {
+        prompt_tokens?: number
+        completion_tokens?: number
+        total_tokens?: number
+      }
+    | null
+    | undefined,
+  pricing?: {
+    prompt?: string
+    completion?: string
+  },
+) {
+  if (!usage) {
+    return null
+  }
+
+  const promptPrice = parseOpenRouterPrice(pricing?.prompt)
+  const completionPrice = parseOpenRouterPrice(pricing?.completion)
+
+  if (promptPrice == null && completionPrice == null) {
+    return null
+  }
+
+  const promptCost = (usage.prompt_tokens ?? 0) * (promptPrice ?? 0)
+  const completionCost = (usage.completion_tokens ?? 0) * (completionPrice ?? 0)
+  const totalCost = promptCost + completionCost
+
+  return Number.isFinite(totalCost) ? totalCost : null
+}
+
+function formatEstimatedCost(value?: number | null) {
+  if (value == null || !Number.isFinite(value)) {
+    return 'n/a'
+  }
+
+  if (value === 0) {
+    return '$0.00'
+  }
+
+  if (value < 0.0001) {
+    return `$${value.toFixed(6)}`
+  }
+
+  if (value < 0.01) {
+    return `$${value.toFixed(4)}`
+  }
+
+  return `$${value.toFixed(2)}`
+}
+
+function getThreadUsageTotals(messages: WorkspaceMessage[]): ThreadUsageTotals {
+  return messages.reduce<ThreadUsageTotals>(
+    (totals, message) => {
+      if (message.role !== 'assistant' || !message.usage) {
+        return totals
+      }
+
+      totals.promptTokens += message.usage.prompt_tokens ?? 0
+      totals.completionTokens += message.usage.completion_tokens ?? 0
+      totals.totalTokens += getTotalTokenUsage(message.usage) ?? 0
+
+      const reasoningUsage = getReasoningTokenUsage(message.usage)
+
+      if (reasoningUsage.hasReasoningTokens) {
+        totals.hasReasoningTokens = true
+        totals.reasoningTokens += reasoningUsage.value
+      }
+
+      if (message.estimatedCost != null && Number.isFinite(message.estimatedCost)) {
+        totals.hasEstimatedCost = true
+        totals.estimatedCost += message.estimatedCost
+      }
+
+      return totals
+    },
+    {
+      hasEstimatedCost: false,
+      hasReasoningTokens: false,
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+      reasoningTokens: 0,
+      estimatedCost: 0,
+    },
+  )
 }
 
 function formatBytes(value: number) {
@@ -635,7 +801,8 @@ function ChatWorkspace({
   onOpenAccount,
 }: ChatWorkspaceProps) {
   const attachmentInputRef = useRef<HTMLInputElement | null>(null)
-  const messageEndRef = useRef<HTMLDivElement | null>(null)
+  const messageStackRef = useRef<HTMLDivElement | null>(null)
+  const shouldAutoScrollRef = useRef(true)
   const [draftApiKey, setDraftApiKey] = useState('')
   const [savedApiKey, setSavedApiKey] = useState('')
   const [keyStatus, setKeyStatus] = useState(
@@ -681,11 +848,33 @@ function ChatWorkspace({
   }, [])
 
   useEffect(() => {
-    messageEndRef.current?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'end',
+    if (!shouldAutoScrollRef.current) {
+      return
+    }
+
+    const container = messageStackRef.current
+
+    if (!container) {
+      return
+    }
+
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: 'auto',
     })
   }, [isSending, messages])
+
+  function handleMessageStackScroll() {
+    const container = messageStackRef.current
+
+    if (!container) {
+      return
+    }
+
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight
+    shouldAutoScrollRef.current = distanceFromBottom <= 96
+  }
 
   async function loadModels() {
     setModelsLoading(true)
@@ -836,17 +1025,29 @@ function ChatWorkspace({
       role: 'user',
       content: buildMessageContent(trimmedMessage, nextUserAttachments),
     } satisfies OpenRouterChatMessage
+    const activeModelSnapshot = {
+      id: selectedModel.id,
+      name: selectedModel.name,
+      pricing: {
+        prompt: selectedModel.pricing?.prompt,
+        completion: selectedModel.pricing?.completion,
+      },
+    }
     const assistantMessageId = createId()
     const assistantPlaceholder = {
       id: assistantMessageId,
       role: 'assistant',
       isStreaming: true,
+      modelId: activeModelSnapshot.id,
+      modelName: activeModelSnapshot.name,
       text: '',
       images: [],
       audio: null,
       reasoning: '',
       reasoningDetails: [],
       refusal: '',
+      usage: null,
+      estimatedCost: null,
       attachments: [],
       request: {
         role: 'assistant',
@@ -870,6 +1071,7 @@ function ChatWorkspace({
       assistantPlaceholder,
     ]
 
+    shouldAutoScrollRef.current = true
     setMessages(nextMessages)
     setDraftMessage('')
     setAttachments([])
@@ -911,6 +1113,11 @@ function ChatWorkspace({
                         reasoning: partialReply.reasoning,
                         reasoningDetails: partialReply.reasoningDetails,
                         refusal: partialReply.refusal,
+                        usage: partialReply.usage,
+                        estimatedCost: estimateUsageCost(
+                          partialReply.usage,
+                          activeModelSnapshot.pricing,
+                        ),
                         request: buildAssistantRequestFromReply(partialReply),
                       }
                     : message,
@@ -931,12 +1138,19 @@ function ChatWorkspace({
       const assistantMessage = {
         ...assistantPlaceholder,
         isStreaming: false,
+        modelId: activeModelSnapshot.id,
+        modelName: activeModelSnapshot.name,
         text: assistantReply.text,
         images: assistantReply.images,
         audio: getAudioPayload(assistantReply.audio),
         reasoning: assistantReply.reasoning,
         reasoningDetails: assistantReply.reasoningDetails,
         refusal: assistantReply.refusal,
+        usage: assistantReply.usage,
+        estimatedCost: estimateUsageCost(
+          assistantReply.usage,
+          activeModelSnapshot.pricing,
+        ),
         request: buildAssistantRequestFromReply(assistantReply),
       } satisfies WorkspaceMessage
 
@@ -1006,6 +1220,12 @@ function ChatWorkspace({
   const composerHint = selectedModelProfile
     ? getAttachmentSupportHint(selectedModelProfile)
     : 'Choose a model to see which inputs it accepts.'
+  const threadUsageTotals = getThreadUsageTotals(messages)
+  const hasThreadUsageTotals =
+    threadUsageTotals.promptTokens > 0 ||
+    threadUsageTotals.completionTokens > 0 ||
+    threadUsageTotals.totalTokens > 0 ||
+    threadUsageTotals.hasReasoningTokens
 
   return (
     <section className="workspace-home section" id="chat">
@@ -1259,10 +1479,38 @@ function ChatWorkspace({
               </button>
             </div>
 
+            {hasThreadUsageTotals ? (
+              <div className="workspace-thread-metrics" aria-label="Thread totals">
+                <span className="workspace-message-metric workspace-message-metric-strong">
+                  Thread total {formatTokenCount(threadUsageTotals.totalTokens)}
+                </span>
+                <span className="workspace-message-metric">
+                  Prompt {formatTokenCount(threadUsageTotals.promptTokens)}
+                </span>
+                <span className="workspace-message-metric">
+                  Completion {formatTokenCount(threadUsageTotals.completionTokens)}
+                </span>
+                {threadUsageTotals.hasReasoningTokens ? (
+                  <span className="workspace-message-metric">
+                    Reasoning {formatTokenCount(threadUsageTotals.reasoningTokens)}
+                  </span>
+                ) : null}
+                {threadUsageTotals.hasEstimatedCost ? (
+                  <span className="workspace-message-metric workspace-message-metric-strong">
+                    Est. cost {formatEstimatedCost(threadUsageTotals.estimatedCost)}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+
             {chatStatus ? <p className="workspace-status">{chatStatus}</p> : null}
             {chatError ? <p className="workspace-error">{chatError}</p> : null}
 
-            <div className="workspace-message-stack">
+            <div
+              className="workspace-message-stack"
+              onScroll={handleMessageStackScroll}
+              ref={messageStackRef}
+            >
               {messages.length === 0 ? (
                 <div className="workspace-empty-state">
                   <Bot size={20} />
@@ -1276,33 +1524,56 @@ function ChatWorkspace({
                 </div>
               ) : null}
 
-              {messages.map((message) => (
-                <article
-                  className={`workspace-message workspace-message-${message.role}`}
-                  key={message.id}
-                >
-                  <div className="workspace-message-meta">
-                    <strong>{message.role === 'user' ? 'You' : 'Model'}</strong>
-                    <span>
-                      {message.role === 'assistant'
-                        ? selectedModel?.name ?? 'Assistant'
-                        : currentUser.email ?? 'User'}
-                    </span>
-                  </div>
-                  <RichMessageContent
-                    attachments={message.attachments}
-                    audio={message.audio}
-                    images={message.images}
-                    isStreaming={Boolean(message.isStreaming)}
-                    reasoning={message.reasoning}
-                    reasoningDetails={message.reasoningDetails}
-                    refusal={message.refusal}
-                    text={message.text}
-                  />
-                </article>
-              ))}
+              {messages.map((message) => {
+                const reasoningUsage = getReasoningTokenUsage(message.usage)
 
-              <div ref={messageEndRef} />
+                return (
+                  <article
+                    className={`workspace-message workspace-message-${message.role}`}
+                    key={message.id}
+                  >
+                    <div className="workspace-message-meta">
+                      <strong>{message.role === 'user' ? 'You' : 'Model'}</strong>
+                      <span>
+                        {message.role === 'assistant'
+                          ? message.modelName ?? 'Assistant'
+                          : currentUser.email ?? 'User'}
+                      </span>
+                    </div>
+                    <RichMessageContent
+                      attachments={message.attachments}
+                      audio={message.audio}
+                      images={message.images}
+                      isStreaming={Boolean(message.isStreaming)}
+                      reasoning={message.reasoning}
+                      reasoningDetails={message.reasoningDetails}
+                      refusal={message.refusal}
+                      text={message.text}
+                    />
+                    {message.role === 'assistant' && message.usage ? (
+                      <div className="workspace-message-metrics" aria-label="Response metrics">
+                        <span className="workspace-message-metric">
+                          Prompt {formatTokenCount(message.usage.prompt_tokens)}
+                        </span>
+                        <span className="workspace-message-metric">
+                          Completion {formatTokenCount(message.usage.completion_tokens)}
+                        </span>
+                        <span className="workspace-message-metric">
+                          Total {formatTokenCount(getTotalTokenUsage(message.usage))}
+                        </span>
+                        {reasoningUsage.hasReasoningTokens ? (
+                          <span className="workspace-message-metric">
+                            Reasoning {formatTokenCount(reasoningUsage.value)}
+                          </span>
+                        ) : null}
+                        <span className="workspace-message-metric workspace-message-metric-strong">
+                          Est. cost {formatEstimatedCost(message.estimatedCost)}
+                        </span>
+                      </div>
+                    ) : null}
+                  </article>
+                )
+              })}
             </div>
 
             <div className="workspace-suggestion-row">

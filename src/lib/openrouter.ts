@@ -161,13 +161,25 @@ type OpenRouterChatStreamChunk = {
   }
 }
 
+type OpenRouterTokenDetails = {
+  reasoning_tokens?: number
+  cached_tokens?: number
+  audio_tokens?: number
+  image_tokens?: number
+  [key: string]: number | undefined
+}
+
+type OpenRouterUsage = {
+  prompt_tokens?: number
+  completion_tokens?: number
+  total_tokens?: number
+  prompt_tokens_details?: OpenRouterTokenDetails
+  completion_tokens_details?: OpenRouterTokenDetails
+}
+
 type OpenRouterChatResponse = {
   choices?: OpenRouterChatChoice[]
-  usage?: {
-    prompt_tokens?: number
-    completion_tokens?: number
-    total_tokens?: number
-  }
+  usage?: OpenRouterUsage
   error?: {
     message?: string
   }
@@ -733,4 +745,6 @@ export type {
   OpenRouterOutputModality,
   OpenRouterReasoningDetail,
   OpenRouterReasoningEffort,
+  OpenRouterTokenDetails,
+  OpenRouterUsage,
 }
