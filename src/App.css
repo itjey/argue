@@ -1759,21 +1759,28 @@
 }
 
 .workspace-input-wrapper {
-  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.3rem;
   width: 100%;
   min-height: 2rem;
+  padding: 1px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-sizing: border-box;
   overflow: hidden;
   border-radius: 999px;
+  background: transparent;
 }
 
 .workspace-textarea {
   box-sizing: border-box;
-  width: 100%;
+  flex: 1 1 auto;
+  width: auto;
   height: 2rem;
   min-height: 2rem;
-  padding: 0.2rem 3rem 0.2rem 0.9rem;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 999px;
+  padding: 0.2rem 0.2rem 0.2rem 0.9rem;
+  border: 0;
+  border-radius: 0;
   color: var(--ink-strong);
   background: transparent;
   overflow: hidden;
@@ -1787,15 +1794,12 @@
 
 .workspace-send-icon {
   box-sizing: border-box;
-  position: absolute;
-  top: 1px;
-  right: 1px;
-  bottom: 1px;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
   width: calc(2rem - 2px);
-  height: auto;
+  height: calc(2rem - 2px);
   padding: 0;
   border: 0;
   border-radius: 999px;
