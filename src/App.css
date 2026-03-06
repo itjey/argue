@@ -1460,10 +1460,10 @@
 
 .workspace-inline-disclosure {
   padding: 0.9rem 0.95rem;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 0.9rem;
-  background: rgba(255, 255, 255, 0.008);
-  box-shadow: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.03);
 }
 
 .workspace-inline-disclosure-summary {
@@ -1607,7 +1607,7 @@
   border: 1px solid rgba(255, 255, 255, 0.04);
   border-radius: 0.9rem;
   background: transparent;
-  box-shadow: none;
+  box-shadow: 0 0 34px rgba(255, 255, 255, 0.05);
   backdrop-filter: none;
   overflow: hidden;
 }
@@ -1649,9 +1649,10 @@
 
 .workspace-empty-state {
   padding: 1rem 1.05rem;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 0.85rem;
-  background: rgba(255, 255, 255, 0.01);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: 0 0 22px rgba(255, 255, 255, 0.035);
 }
 
 .workspace-empty-state h4 {
@@ -1694,36 +1695,37 @@
   align-items: center;
   min-height: 1.65rem;
   padding: 0.2rem 0.46rem;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 0;
   border-radius: 999px;
   color: var(--ink-soft);
-  background: rgba(255, 255, 255, 0.012);
+  background: transparent;
   font-size: 0.72rem;
   letter-spacing: 0;
   text-transform: none;
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.028);
 }
 
 .workspace-message-metric-strong {
   color: var(--ink-strong);
-  border-color: rgba(255, 255, 255, 0.11);
-  background: rgba(255, 255, 255, 0.028);
+  background: transparent;
 }
 
 .workspace-message-user {
   width: min(100%, 44rem);
   justify-self: end;
-  padding: 0.8rem 0.95rem;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 0.95rem;
-  background: rgba(255, 255, 255, 0.045);
-  box-shadow: none;
+  padding: 0.55rem 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: 0 0 24px rgba(255, 255, 255, 0.04);
 }
 
 .workspace-message-assistant {
   width: min(100%, 58rem);
   padding: 0.05rem 0.2rem 0.05rem 0.9rem;
-  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 0;
   color: var(--ink-muted);
+  box-shadow: 0 0 24px rgba(255, 255, 255, 0.028);
 }
 
 .workspace-message-assistant .workspace-message-meta {
@@ -1847,10 +1849,10 @@
   display: grid;
   gap: 0.7rem;
   padding: 0.95rem 1rem 0.9rem;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 0.9rem;
-  background: rgba(255, 255, 255, 0.01);
-  box-shadow: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: 0 0 28px rgba(255, 255, 255, 0.04);
 }
 
 .workspace-composer-footer {
@@ -2081,9 +2083,10 @@
   gap: 0.8rem;
   align-items: center;
   padding: 0.72rem 0.8rem;
-  border: 1px solid var(--workspace-border-soft);
-  border-radius: 0.8rem;
-  background: var(--workspace-surface-soft);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.03);
 }
 
 .workspace-attachment-card {
@@ -2121,10 +2124,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 0.65rem;
+  border: 0;
+  border-radius: 0;
   color: var(--ink-strong);
-  background: rgba(255, 255, 255, 0.015);
+  background: transparent;
 }
 
 .workspace-draft-attachment-remove {
@@ -2283,9 +2286,10 @@
 .workspace-refusal-card,
 .workspace-thinking {
   padding: 0.95rem 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 0.8rem;
-  background: rgba(255, 255, 255, 0.018);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: 0 0 22px rgba(255, 255, 255, 0.03);
 }
 
 .workspace-audio-player {
@@ -2333,13 +2337,14 @@
   align-items: center;
   min-height: 1.75rem;
   padding: 0.2rem 0.55rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 0;
   border-radius: 999px;
   color: var(--ink-soft);
   font-size: 0.72rem;
   font-weight: 500;
   line-height: 1.3;
-  background: rgba(255, 255, 255, 0.03);
+  background: transparent;
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.028);
 }
 
 .workspace-thinking-toggle-copy {
@@ -2354,9 +2359,10 @@
 
 .workspace-thinking-block {
   padding: 0.9rem 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 0.2rem;
-  background: rgba(0, 0, 0, 0.16);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.028);
 }
 
 .workspace-thinking-label {
