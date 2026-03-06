@@ -1267,9 +1267,9 @@ function ChatWorkspace({
       <div className="workspace-home-header">
         <div>
           <p className="section-kicker">Workspace</p>
-          <h1>Connect OpenRouter and start.</h1>
+          <h1>OpenRouter workspace.</h1>
           <p className="workspace-home-copy">
-            Live catalog, local key storage, model-aware controls.
+            Local key. Live models. One clean thread.
           </p>
         </div>
       </div>
@@ -1287,8 +1287,7 @@ function ChatWorkspace({
               ) : null}
             </div>
             <p className="workspace-account-copy">
-              Firebase controls access. Your OpenRouter key stays local to this
-              browser.
+              Firebase auth. Your OpenRouter key stays in this browser.
             </p>
             <button
               className="button button-secondary"
@@ -1345,8 +1344,8 @@ function ChatWorkspace({
 
           <CollapsibleWorkspacePanel
             icon={Sparkles}
-            kicker="Newest on OpenRouter"
-            note="Quick shortlist."
+            kicker="Newest"
+            note="Latest releases."
             title="Recent additions"
           >
             <div className="workspace-model-spotlight-grid">
@@ -1397,8 +1396,8 @@ function ChatWorkspace({
           <CollapsibleWorkspacePanel
             icon={LibraryBig}
             kicker="Model library"
-            note="Open only when you need the full list."
-            title="Browse live models"
+            note="Live index."
+            title="All models"
           >
             <label className="workspace-search-field">
               <Search size={16} />
@@ -1601,7 +1600,7 @@ function ChatWorkspace({
 
             <details className="workspace-inline-disclosure">
               <summary className="workspace-inline-disclosure-summary">
-                <span>Starter prompts</span>
+                <span>Prompts</span>
                 <ChevronDown className="workspace-collapsible-chevron" size={16} />
               </summary>
               <div className="workspace-inline-disclosure-content workspace-suggestion-row">
@@ -1722,7 +1721,7 @@ function ChatWorkspace({
                   className="workspace-textarea"
                   onChange={(event) => setDraftMessage(event.target.value)}
                   onKeyDown={handleComposerKeyDown}
-                  placeholder="Message..."
+                  placeholder="Ask anything"
                   spellCheck={false}
                   value={draftMessage}
                 />
