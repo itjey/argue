@@ -10,6 +10,7 @@ import {
 import type { User } from 'firebase/auth'
 import type { LucideIcon } from 'lucide-react'
 import {
+  ArrowUp,
   AudioLines,
   Bot,
   BrainCircuit,
@@ -25,7 +26,6 @@ import {
   Paperclip,
   RefreshCcw,
   Search,
-  Send,
   Sparkles,
   Trash2,
   X,
@@ -1699,24 +1699,26 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                 </div>
               ) : null}
 
-              <textarea
-                className="workspace-textarea"
-                onChange={(event) => setDraftMessage(event.target.value)}
-                onKeyDown={handleComposerKeyDown}
-                placeholder="Ask the selected model anything, attach files it can understand, or request an image from image-capable models..."
-                spellCheck={false}
-                value={draftMessage}
-              />
+              <div className="workspace-input-wrapper">
+                <textarea
+                  className="workspace-textarea"
+                  onChange={(event) => setDraftMessage(event.target.value)}
+                  onKeyDown={handleComposerKeyDown}
+                  placeholder="Ask the selected model anything, attach files it can understand, or request an image from image-capable models..."
+                  spellCheck={false}
+                  value={draftMessage}
+                />
+                <button
+                  className="workspace-send-icon"
+                  disabled={isSending || (!draftMessage.trim() && attachments.length === 0)}
+                  onClick={() => void handleSendMessage()}
+                  type="button"
+                  aria-label="Send message"
+                >
+                  <ArrowUp size={18} />
+                </button>
+              </div>
               <p className="workspace-composer-note">{composerHint}</p>
-              <button
-                className="button button-primary"
-                disabled={isSending || (!draftMessage.trim() && attachments.length === 0)}
-                onClick={() => void handleSendMessage()}
-                type="button"
-              >
-                <Send size={16} />
-                Send
-              </button>
             </div>
           </div>
         </div>
