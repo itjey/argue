@@ -40,7 +40,77 @@ type RichMessageContentProps = {
   text?: string
 }
 
+const supportedLatexBlockEnvironments = new Set([
+  'align',
+  'align*',
+  'aligned',
+  'array',
+  'Bmatrix',
+  'bmatrix',
+  'cases',
+  'CD',
+  'equation',
+  'equation*',
+  'gather',
+  'gather*',
+  'matrix',
+  'multline',
+  'multline*',
+  'pmatrix',
+  'smallmatrix',
+  'split',
+  'Vmatrix',
+  'vmatrix',
+])
+
+const codeOrInlineCodePattern = /(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]+`)/g
+
+function normalizeLatexSegment(segment: string) {
+  const withNormalizedDelimiters = segment
+    .replace(/\\\[([\s\S]*?)\\\]/g, (_, content: string) => {
+      const trimmed = content.trim()
+
+      return trimmed ? `\n$$\n${trimmed}\n$$\n` : ''
+    })
+    .replace(/\\\(([\s\S]*?)\\\)/g, (_, content: string) => {
+      const trimmed = content.trim()
+
+      return trimmed ? `$${trimmed}$` : ''
+    })
+
+  return withNormalizedDelimiters
+    .split(/(\$\$[\s\S]*?\$\$)/g)
+    .map((part) => {
+      if (part.startsWith('$$') && part.endsWith('$$')) {
+        return part
+      }
+
+      return part.replace(
+        /(^|\n)(\s*)(\\begin\{([A-Za-z*]+)\}[\s\S]*?\\end\{\4\})(\s*)(?=\n|$)/g,
+        (match, lineStart: string, leadingWhitespace: string, environmentBlock: string, environmentName: string) => {
+          if (!supportedLatexBlockEnvironments.has(environmentName)) {
+            return match
+          }
+
+          const trimmedBlock = environmentBlock.trim()
+
+          return `${lineStart}${leadingWhitespace}$$\n${trimmedBlock}\n$$`
+        },
+      )
+    })
+    .join('')
+}
+
+function normalizeMarkdownMath(content: string) {
+  return content
+    .split(codeOrInlineCodePattern)
+    .map((segment, index) => (index % 2 === 0 ? normalizeLatexSegment(segment) : segment))
+    .join('')
+}
+
 function MarkdownBlock({ children }: { children: string }) {
+  const normalizedChildren = normalizeMarkdownMath(children)
+
   return (
     <ReactMarkdown
       components={{
@@ -62,10 +132,10 @@ function MarkdownBlock({ children }: { children: string }) {
           )
         },
       }}
-      rehypePlugins={[rehypeKatex]}
+      rehypePlugins={[[rehypeKatex, { strict: false, throwOnError: false }]]}
       remarkPlugins={[remarkGfm, remarkMath]}
     >
-      {children}
+      {normalizedChildren}
     </ReactMarkdown>
   )
 }

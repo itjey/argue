@@ -1680,6 +1680,7 @@
 .workspace-markdown {
   color: var(--ink-muted);
   line-height: 1.75;
+  overflow-wrap: anywhere;
 }
 
 .workspace-markdown > :first-child,
@@ -1706,6 +1707,31 @@
 .workspace-markdown blockquote,
 .workspace-markdown table {
   margin: 0.9rem 0;
+}
+
+.workspace-markdown .katex {
+  color: var(--ink-strong);
+  font-size: 1.02em;
+}
+
+.workspace-markdown .katex-display {
+  margin: 1rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.35rem 0.1rem 0.55rem;
+}
+
+.workspace-markdown .katex-display > .katex {
+  min-width: fit-content;
+}
+
+.workspace-markdown .katex-display::-webkit-scrollbar {
+  height: 0.42rem;
+}
+
+.workspace-markdown .katex-display::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .workspace-markdown pre {
@@ -1737,6 +1763,27 @@
   padding-left: 1rem;
   border-left: 1px solid rgba(255, 255, 255, 0.16);
   color: var(--ink-soft);
+}
+
+.workspace-markdown table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.workspace-markdown th,
+.workspace-markdown td {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+  vertical-align: top;
+}
+
+.workspace-markdown th {
+  color: var(--ink-strong);
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .workspace-generated-image-grid {
