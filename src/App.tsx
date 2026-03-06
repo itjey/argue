@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { FirebaseError } from 'firebase/app'
 import {
+  applyActionCode,
+  confirmPasswordReset,
   createUserWithEmailAndPassword,
   EmailAuthProvider,
   GoogleAuthProvider,
@@ -13,6 +15,7 @@ import {
   signOut,
   type OAuthCredential,
   type User,
+  verifyPasswordResetCode,
 } from 'firebase/auth'
 import type { LucideIcon } from 'lucide-react'
 import {
@@ -27,8 +30,10 @@ import {
   FileOutput,
   KeyRound,
   Layers3,
+  LoaderCircle,
   LockKeyhole,
   LogIn,
+  MailCheck,
   MessagesSquare,
   ScrollText,
   ShieldCheck,
@@ -36,6 +41,7 @@ import {
   SlidersHorizontal,
   User as UserIcon,
   Workflow,
+  X,
 } from 'lucide-react'
 import { AuthDialog, type AuthMode } from './components/AuthDialog'
 import {
@@ -114,6 +120,10 @@ function formatAuthError(error: FirebaseError) {
       return 'Use a stronger password with at least 8 characters.'
     case 'auth/provider-already-linked':
       return 'That sign-in method is already linked to this account.'
+    case 'auth/expired-action-code':
+      return 'This email link has expired. Request a new one and try again.'
+    case 'auth/invalid-action-code':
+      return 'This email link is invalid or has already been used.'
     default:
       return 'Authentication failed. Please try again.'
   }
@@ -265,6 +275,15 @@ function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(auth.currentUser)
   const [pendingGoogleLink, setPendingGoogleLink] =
     useState<PendingGoogleLink | null>(null)
+  const [passwordResetOpen, setPasswordResetOpen] = useState(false)
+  const [passwordResetCode, setPasswordResetCode] = useState('')
+  const [passwordResetEmail, setPasswordResetEmail] = useState('')
+  const [passwordResetPassword, setPasswordResetPassword] = useState('')
+  const [passwordResetConfirm, setPasswordResetConfirm] = useState('')
+  const [passwordResetBusy, setPasswordResetBusy] = useState(false)
+  const [passwordResetComplete, setPasswordResetComplete] = useState(false)
+  const [passwordResetMessage, setPasswordResetMessage] = useState('')
+  const [passwordResetError, setPasswordResetError] = useState('')
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
@@ -302,6 +321,18 @@ function App() {
     setErrorMessage('')
   }
 
+  function resetPasswordResetState() {
+    setPasswordResetOpen(false)
+    setPasswordResetCode('')
+    setPasswordResetEmail('')
+    setPasswordResetPassword('')
+    setPasswordResetConfirm('')
+    setPasswordResetBusy(false)
+    setPasswordResetComplete(false)
+    setPasswordResetMessage('')
+    setPasswordResetError('')
+  }
+
   function resetCredentialForms() {
     setAuthPassword('')
     setAuthConfirmPassword('')
@@ -316,6 +347,72 @@ function App() {
     await syncUserProfile(user, options)
     setCurrentUser(auth.currentUser ?? user)
   }
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const mode = params.get('mode')
+    const oobCode = params.get('oobCode')
+
+    if (!mode || !oobCode) {
+      return
+    }
+
+    window.history.replaceState({}, document.title, buildVerificationUrl())
+
+    if (mode === 'verifyEmail') {
+      clearFeedback()
+      resetCredentialForms()
+      setAuthMode('sign-in')
+      setAuthDialogOpen(true)
+      setBusyAction('email-action')
+
+      void (async () => {
+        try {
+          await applyActionCode(auth, oobCode)
+
+          if (auth.currentUser) {
+            await reload(auth.currentUser)
+            await syncUserState(auth.currentUser)
+          }
+
+          setStatusMessage('Email verified. Sign in to continue.')
+        } catch (error) {
+          setErrorMessage(formatAuthError(error as FirebaseError))
+        } finally {
+          setBusyAction(null)
+        }
+      })()
+
+      return
+    }
+
+    if (mode === 'resetPassword') {
+      setPasswordResetOpen(true)
+      setPasswordResetCode(oobCode)
+      setPasswordResetBusy(true)
+      setPasswordResetComplete(false)
+      setPasswordResetMessage('')
+      setPasswordResetError('')
+
+      void verifyPasswordResetCode(auth, oobCode)
+        .then((email) => {
+          setPasswordResetEmail(email)
+          setAuthEmail(email)
+        })
+        .catch((error) => {
+          setPasswordResetError(formatAuthError(error as FirebaseError))
+        })
+        .finally(() => {
+          setPasswordResetBusy(false)
+        })
+
+      return
+    }
+
+    setAuthMode('sign-in')
+    setAuthDialogOpen(true)
+    setErrorMessage('This email action is not supported in the current flow.')
+  }, [])
 
   function openAuthDialog(mode: AuthMode = 'sign-in') {
     clearFeedback()
@@ -573,6 +670,55 @@ function App() {
     } catch (error) {
       setErrorMessage(formatAuthError(error as FirebaseError))
     }
+  }
+
+  function handlePasswordResetClose() {
+    resetPasswordResetState()
+  }
+
+  async function handlePasswordResetSubmit() {
+    if (!passwordResetCode) {
+      setPasswordResetError('This password reset link is invalid or expired.')
+      return
+    }
+
+    setPasswordResetError('')
+
+    if (!passwordResetPassword) {
+      setPasswordResetError('Enter a new password to continue.')
+      return
+    }
+
+    if (passwordResetPassword.length < 8) {
+      setPasswordResetError('Use a password with at least 8 characters.')
+      return
+    }
+
+    if (passwordResetPassword !== passwordResetConfirm) {
+      setPasswordResetError('The password confirmation does not match.')
+      return
+    }
+
+    setPasswordResetBusy(true)
+
+    try {
+      await confirmPasswordReset(auth, passwordResetCode, passwordResetPassword)
+      setPasswordResetComplete(true)
+      setPasswordResetMessage(
+        'Password updated. Sign in with your new password to continue.',
+      )
+      setPasswordResetCode('')
+      setAuthMode('sign-in')
+    } catch (error) {
+      setPasswordResetError(formatAuthError(error as FirebaseError))
+    } finally {
+      setPasswordResetBusy(false)
+    }
+  }
+
+  function handleOpenLoginFromReset() {
+    resetPasswordResetState()
+    openAuthDialog('sign-in')
   }
 
   const providerLabels = getProviderLabels(currentUser)
@@ -1018,6 +1164,104 @@ function App() {
         onResendVerification={handleResendVerification}
         onSignOut={handleSignOut}
       />
+
+      {passwordResetOpen ? (
+        <div className="auth-backdrop" onClick={handlePasswordResetClose}>
+          <section
+            aria-modal="true"
+            aria-labelledby="password-reset-title"
+            className="auth-dialog"
+            role="dialog"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="auth-dialog-header">
+              <div>
+                <p className="auth-dialog-kicker">Recovery</p>
+                <h2 id="password-reset-title">Reset your password</h2>
+              </div>
+              <button
+                aria-label="Close password reset panel"
+                className="auth-close"
+                onClick={handlePasswordResetClose}
+                type="button"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {passwordResetMessage ? (
+              <div className="auth-feedback auth-feedback-success">
+                <MailCheck size={16} />
+                <span>{passwordResetMessage}</span>
+              </div>
+            ) : null}
+
+            {passwordResetError ? (
+              <div className="auth-feedback auth-feedback-error">
+                <KeyRound size={16} />
+                <span>{passwordResetError}</span>
+              </div>
+            ) : null}
+
+            {passwordResetBusy ? (
+              <div className="auth-note">
+                <LoaderCircle className="spin" size={16} />
+                <span>Validating your password reset link.</span>
+              </div>
+            ) : null}
+
+            {!passwordResetBusy && passwordResetEmail && !passwordResetComplete ? (
+              <>
+                <p className="auth-copy">
+                  Create a new password for <strong>{passwordResetEmail}</strong>.
+                </p>
+                <div className="auth-form-grid">
+                  <label className="auth-field">
+                    <span>New password</span>
+                    <input
+                      autoComplete="new-password"
+                      className="auth-input"
+                      onChange={(event) => setPasswordResetPassword(event.target.value)}
+                      type="password"
+                      value={passwordResetPassword}
+                    />
+                  </label>
+                  <label className="auth-field">
+                    <span>Confirm password</span>
+                    <input
+                      autoComplete="new-password"
+                      className="auth-input"
+                      onChange={(event) => setPasswordResetConfirm(event.target.value)}
+                      type="password"
+                      value={passwordResetConfirm}
+                    />
+                  </label>
+                </div>
+                <button
+                  className="auth-primary-button"
+                  disabled={passwordResetBusy}
+                  onClick={handlePasswordResetSubmit}
+                  type="button"
+                >
+                  <KeyRound size={16} />
+                  Update password
+                </button>
+              </>
+            ) : null}
+
+            {!passwordResetBusy && passwordResetComplete ? (
+              <button
+                className="auth-primary-button"
+                onClick={handleOpenLoginFromReset}
+                type="button"
+              >
+                <LogIn size={16} />
+                Open login
+              </button>
+            ) : null}
+          </section>
+        </div>
+      ) : null}
     </div>
   )
 }

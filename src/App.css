@@ -445,6 +445,11 @@
   gap: 0.85rem;
 }
 
+.auth-form-grid + .auth-primary-button,
+.auth-form-grid + .auth-secondary-button {
+  margin-top: 0.4rem;
+}
+
 .auth-field {
   display: grid;
   gap: 0.42rem;
@@ -480,6 +485,11 @@
   margin: 0.9rem 0 0;
   color: var(--ink-soft);
   line-height: 1.65;
+}
+
+.auth-copy strong {
+  color: var(--ink-strong);
+  font-weight: 600;
 }
 
 .auth-card {
