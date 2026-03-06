@@ -1,32 +1,31 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Cormorant+Garamond:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 :root {
   font-family: var(--font-sans);
   line-height: 1.5;
   font-weight: 400;
-  color-scheme: light;
-  color: #2a1d16;
+  color-scheme: dark;
+  color: #f5f5f2;
   background:
-    radial-gradient(circle at top left, rgba(230, 194, 149, 0.24), transparent 32%),
-    radial-gradient(circle at 88% 10%, rgba(120, 75, 43, 0.16), transparent 24%),
-    linear-gradient(180deg, #fff9f2 0%, #f4e8d9 56%, #fbf5ed 100%);
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.09), transparent 26%),
+    radial-gradient(circle at 88% 10%, rgba(255, 255, 255, 0.06), transparent 18%),
+    linear-gradient(180deg, #050505 0%, #080809 58%, #030304 100%);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  --font-sans: 'Manrope', sans-serif;
-  --font-display: 'Cormorant Garamond', serif;
-  --surface: #fff8f1;
-  --surface-soft: #f7efe5;
-  --surface-muted: #f0e2d2;
-  --accent: #c58b51;
-  --accent-deep: #8b5931;
-  --ink-strong: #241812;
-  --ink-muted: #5a4332;
-  --ink-soft: #6f5643;
-  --ink-inverse: #fff7ef;
-  --line: rgba(89, 55, 33, 0.12);
-  --line-strong: rgba(89, 55, 33, 0.18);
+  --font-sans: 'Space Grotesk', sans-serif;
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+  --surface: #0d0d0e;
+  --surface-soft: #111112;
+  --surface-muted: #181819;
+  --ink-strong: #f5f5f2;
+  --ink-muted: #c5c5bf;
+  --ink-soft: #94948f;
+  --ink-inverse: #050505;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.14);
 }
 
 *,
@@ -43,6 +42,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background: transparent;
 }
 
 body,

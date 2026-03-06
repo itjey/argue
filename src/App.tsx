@@ -18,7 +18,6 @@ import {
   ShieldCheck,
   Sigma,
   SlidersHorizontal,
-  Sparkles,
   Workflow,
 } from 'lucide-react'
 import './App.css'
@@ -204,7 +203,7 @@ function App() {
               <span className="brand-blade brand-blade-right" />
             </span>
           </span>
-          <span className="brand-wordmark">Argue</span>
+          <span className="brand-wordmark">argue</span>
         </a>
 
         <nav className="nav" aria-label="Primary navigation">
@@ -229,19 +228,21 @@ function App() {
         <section className="hero section" id="concept">
           <div className="hero-copy">
             <div className="eyebrow-row">
-              <span className="eyebrow-pill">
-                <Sparkles size={14} />
-                Collaborative LLM orchestration
-              </span>
-              <span className="eyebrow-subtle">Designed for calm, difficult work</span>
+              <span className="eyebrow-pill">Private multi-model debates</span>
+              <span className="eyebrow-subtle">A monochrome concept for serious work</span>
             </div>
 
-            <h1>Let your models argue until the clearest answer survives.</h1>
+            <div className="hero-type-line">
+              <span className="hero-typewriter" aria-label="argue.">
+                argue.
+              </span>
+            </div>
+            <h1>Make frontier models challenge each other until the answer holds.</h1>
             <p className="hero-text">
-              Argue is a premium multi-model workspace for professionals who want
-              sharper thinking, not noisier automation. Choose the models, assign
-              the roles, paste your own API keys, and let specialists challenge
-              each other across programming, math, research, and planning.
+              Argue is a stripped-back multi-model workspace for professionals who
+              want sharper thinking, not louder software. Choose the models,
+              assign the roles, paste your own API keys, and let specialists
+              challenge each other across programming, math, research, and planning.
             </p>
 
             <div className="hero-actions">
@@ -379,7 +380,7 @@ function App() {
             </h2>
             <p className="section-copy">
               The design language is restrained on purpose. Argue should feel like
-              a private suite for deep work, not a dashboard shouting for attention.
+              a private control room for difficult decisions, not a dashboard chasing attention.
             </p>
           </div>
 
@@ -431,11 +432,10 @@ function App() {
           <div className="split-layout">
             <div className="split-copy">
               <p className="section-kicker">Interface</p>
-              <h2>A warm, modern command surface for serious multi-model work.</h2>
+              <h2>A precise command surface for serious multi-model work.</h2>
               <p className="section-copy">
-                Every panel is tuned for clarity. No wasted chrome. No cramped
-                controls. Just enough softness, depth, and amber light to make
-                long sessions feel focused instead of cold.
+                Every panel is tuned for clarity. No wasted chrome. No soft decoration.
+                Just structure, contrast, and enough visual hierarchy to keep long sessions readable.
               </p>
 
               <div className="trust-list">
@@ -534,9 +534,9 @@ function App() {
               <p className="section-kicker">Positioning</p>
               <h2>A premium frontend for people who treat AI tooling like infrastructure.</h2>
               <p>
-                This concept leans into a refined brown palette, Lucide-only iconography,
-                tight spatial rhythm, and responsive balance across desktop, tablet,
-                and mobile. It feels soft and welcoming, but still exact.
+                This concept leans into a monochrome system, Lucide-only iconography,
+                a horizontal three-blade mark, typed hero branding, and a tighter,
+                more architectural layout across desktop, tablet, and mobile.
               </p>
             </div>
 
@@ -547,11 +547,11 @@ function App() {
               </div>
               <div className="cta-point">
                 <CheckCircle2 size={18} />
-                <span>Single cohesive amber-brown palette</span>
+                <span>Single monochrome palette</span>
               </div>
               <div className="cta-point">
                 <CheckCircle2 size={18} />
-                <span>Responsive by design</span>
+                <span>Angular, responsive geometry</span>
               </div>
             </div>
           </div>
