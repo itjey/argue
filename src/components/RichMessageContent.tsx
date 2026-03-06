@@ -40,6 +40,12 @@ type RichMessageContentProps = {
   text?: string
 }
 
+type ReasoningBreakdown = {
+  encryptedCount: number
+  summaryCount: number
+  traceCount: number
+}
+
 const supportedLatexBlockEnvironments = new Set([
   'align',
   'align*',
@@ -206,6 +212,61 @@ function getReasoningNode(detail: OpenRouterReasoningDetail): ReactNode {
   )
 }
 
+function getReasoningBreakdown(
+  reasoning: string,
+  reasoningDetails: OpenRouterReasoningDetail[],
+): ReasoningBreakdown {
+  return reasoningDetails.reduce<ReasoningBreakdown>(
+    (counts, detail) => {
+      if (detail.type === 'reasoning.summary') {
+        counts.summaryCount += 1
+        return counts
+      }
+
+      if (detail.type === 'reasoning.text') {
+        counts.traceCount += 1
+        return counts
+      }
+
+      counts.encryptedCount += 1
+      return counts
+    },
+    {
+      encryptedCount: 0,
+      summaryCount: 0,
+      traceCount: reasoning.trim() ? 1 : 0,
+    },
+  )
+}
+
+function getThinkingSummaryLabel(breakdown: ReasoningBreakdown) {
+  const parts: string[] = []
+
+  if (breakdown.summaryCount > 0) {
+    parts.push(
+      breakdown.summaryCount === 1
+        ? '1 summary'
+        : `${breakdown.summaryCount} summaries`,
+    )
+  }
+
+  if (breakdown.traceCount > 0) {
+    parts.push(
+      breakdown.traceCount === 1 ? '1 trace' : `${breakdown.traceCount} traces`,
+    )
+  }
+
+  if (breakdown.encryptedCount > 0) {
+    parts.push(
+      breakdown.encryptedCount === 1
+        ? '1 encrypted block'
+        : `${breakdown.encryptedCount} encrypted blocks`,
+    )
+  }
+
+  return parts.join(' • ')
+}
+
 function RichMessageContent({
   attachments = [],
   audio = null,
@@ -218,6 +279,8 @@ function RichMessageContent({
   const visibleText = text.trim()
   const visibleReasoning = reasoning.trim()
   const visibleRefusal = refusal.trim()
+  const reasoningBreakdown = getReasoningBreakdown(visibleReasoning, reasoningDetails)
+  const thinkingSummaryLabel = getThinkingSummaryLabel(reasoningBreakdown)
 
   return (
     <div className="workspace-message-content">
@@ -248,6 +311,39 @@ function RichMessageContent({
             )
           })}
         </div>
+      ) : null}
+
+      {visibleReasoning || reasoningDetails.length > 0 ? (
+        <details className="workspace-thinking">
+          <summary>
+            <span className="workspace-thinking-summary-main">
+              <BrainCircuit size={16} />
+              <span>Thinking</span>
+            </span>
+            <span className="workspace-thinking-summary-meta">
+              {thinkingSummaryLabel ? (
+                <span className="workspace-thinking-pill">{thinkingSummaryLabel}</span>
+              ) : null}
+              <span className="workspace-thinking-toggle-copy">Click to expand</span>
+            </span>
+          </summary>
+
+          <div className="workspace-thinking-stack">
+            {visibleReasoning ? (
+              <article className="workspace-thinking-block">
+                <div className="workspace-thinking-label">
+                  <Sparkles size={14} />
+                  <span>Model reasoning</span>
+                </div>
+                <div className="workspace-markdown">
+                  <MarkdownBlock>{visibleReasoning}</MarkdownBlock>
+                </div>
+              </article>
+            ) : null}
+
+            {reasoningDetails.map((detail) => getReasoningNode(detail))}
+          </div>
+        </details>
       ) : null}
 
       {visibleText ? (
@@ -293,31 +389,6 @@ function RichMessageContent({
             <MarkdownBlock>{visibleRefusal}</MarkdownBlock>
           </div>
         </div>
-      ) : null}
-
-      {visibleReasoning || reasoningDetails.length > 0 ? (
-        <details className="workspace-thinking" open>
-          <summary>
-            <BrainCircuit size={16} />
-            <span>Thinking</span>
-          </summary>
-
-          <div className="workspace-thinking-stack">
-            {visibleReasoning ? (
-              <article className="workspace-thinking-block">
-                <div className="workspace-thinking-label">
-                  <Sparkles size={14} />
-                  <span>Model reasoning</span>
-                </div>
-                <div className="workspace-markdown">
-                  <MarkdownBlock>{visibleReasoning}</MarkdownBlock>
-                </div>
-              </article>
-            ) : null}
-
-            {reasoningDetails.map((detail) => getReasoningNode(detail))}
-          </div>
-        </details>
       ) : null}
     </div>
   )

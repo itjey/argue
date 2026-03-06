@@ -518,6 +518,13 @@ function getReasoningRequest(
   }
 }
 
+function shouldIncludeReasoning(
+  profile: OpenRouterModelCapabilityProfile | null,
+  reasoningEffort: OpenRouterReasoningEffort,
+) {
+  return Boolean(profile?.supportsReasoning && reasoningEffort !== 'none')
+}
+
 function getAudioPayload(data: { data?: string; transcript?: string } | null) {
   if (!data) {
     return null
@@ -791,6 +798,10 @@ function ChatWorkspace({
     try {
       const assistantReply = await createOpenRouterChatCompletion({
         apiKey: savedApiKey,
+        includeReasoning: shouldIncludeReasoning(
+          selectedModelProfile,
+          reasoningEffort,
+        ),
         messages: nextMessages.map((message) => message.request),
         model: selectedModelId,
         modalities: getRequestedModalities(
@@ -812,6 +823,7 @@ function ChatWorkspace({
           assistantReply.contentParts.length > 0
             ? assistantReply.contentParts
             : assistantReply.text || null,
+        reasoning: assistantReply.reasoning || undefined,
         reasoning_details:
           assistantReply.reasoningDetails.length > 0
             ? assistantReply.reasoningDetails

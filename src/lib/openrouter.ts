@@ -117,6 +117,7 @@ type OpenRouterAssistantAudio = {
 type OpenRouterChatMessage = {
   role: OpenRouterChatRole
   content?: string | OpenRouterChatContentPart[] | null
+  reasoning?: string | null
   reasoning_details?: OpenRouterReasoningDetail[]
   images?: OpenRouterAssistantImage[]
   audio?: OpenRouterAssistantAudio
@@ -167,6 +168,7 @@ type CreateOpenRouterChatCompletionOptions = {
   apiKey: string
   messages: OpenRouterChatMessage[]
   model: string
+  includeReasoning?: boolean
   modalities?: OpenRouterOutputModality[]
   reasoning?: {
     effort?: OpenRouterReasoningEffort
@@ -301,6 +303,7 @@ async function fetchOpenRouterModels() {
 
 async function createOpenRouterChatCompletion({
   apiKey,
+  includeReasoning,
   messages,
   model,
   modalities,
@@ -313,6 +316,7 @@ async function createOpenRouterChatCompletion({
     body: JSON.stringify({
       model,
       messages,
+      include_reasoning: includeReasoning,
       modalities,
       reasoning,
       image_config: imageConfig,
