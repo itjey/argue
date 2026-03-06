@@ -44,6 +44,7 @@ import {
   X,
 } from 'lucide-react'
 import { AuthDialog, type AuthMode } from './components/AuthDialog'
+import { ChatWorkspace } from './components/ChatWorkspace'
 import {
   auth,
   getProviderLabels,
@@ -724,6 +725,7 @@ function App() {
   const providerLabels = getProviderLabels(currentUser)
   const canAddPassword = Boolean(currentUser?.email && !hasPasswordProvider(currentUser))
   const isVerified = currentUser?.emailVerified ?? false
+  const workspaceVisible = Boolean(currentUser)
 
   return (
     <div className="app-shell">
@@ -770,10 +772,20 @@ function App() {
         </a>
 
         <nav className="nav" aria-label="Primary navigation">
-          <a href="#concept">Concept</a>
-          <a href="#workflow">Workflow</a>
-          <a href="#interface">Interface</a>
-          <a href="#trust">Trust</a>
+          {workspaceVisible ? (
+            <>
+              <a href="#chat">Chat</a>
+              <a href="#models">Models</a>
+              <a href="#account">Account</a>
+            </>
+          ) : (
+            <>
+              <a href="#concept">Concept</a>
+              <a href="#workflow">Workflow</a>
+              <a href="#interface">Interface</a>
+              <a href="#trust">Trust</a>
+            </>
+          )}
         </nav>
 
         <button
@@ -801,7 +813,15 @@ function App() {
         </button>
       </header>
 
-      <main className="page" id="top">
+      <main className={`page${workspaceVisible ? ' page-workspace' : ''}`} id="top">
+        {workspaceVisible ? (
+          <ChatWorkspace
+            currentUser={currentUser!}
+            isVerified={isVerified}
+            onOpenAccount={() => openAuthDialog('sign-in')}
+          />
+        ) : (
+          <>
         <section className="hero section" id="concept">
           <div className="hero-copy">
             <div className="hero-type-line">
@@ -1132,6 +1152,8 @@ function App() {
             </div>
           </div>
         </section>
+          </>
+        )}
       </main>
 
       <AuthDialog
