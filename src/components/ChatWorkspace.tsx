@@ -5,12 +5,15 @@ import {
   useState,
   type ChangeEvent,
   type KeyboardEvent,
+  type ReactNode,
 } from 'react'
 import type { User } from 'firebase/auth'
+import type { LucideIcon } from 'lucide-react'
 import {
   AudioLines,
   Bot,
   BrainCircuit,
+  ChevronDown,
   Code2,
   FileText,
   Film,
@@ -104,6 +107,15 @@ type ThreadUsageTotals = {
 
 type ResponseMode = 'auto' | 'text' | 'text-image'
 
+type CollapsibleWorkspacePanelProps = {
+  children: ReactNode
+  defaultOpen?: boolean
+  icon: LucideIcon
+  kicker: string
+  title: string
+  note?: string
+}
+
 const OPENROUTER_KEY_STORAGE = 'argue-openrouter-api-key'
 const OPENROUTER_MODEL_STORAGE = 'argue-openrouter-model'
 const CODE_FILE_EXTENSIONS = new Set([
@@ -175,6 +187,32 @@ const reasoningEffortOptions: Array<{
   { id: 'medium', label: 'Balanced' },
   { id: 'high', label: 'Deep' },
 ]
+
+function CollapsibleWorkspacePanel({
+  children,
+  defaultOpen = false,
+  icon: Icon,
+  kicker,
+  title,
+  note,
+}: CollapsibleWorkspacePanelProps) {
+  return (
+    <details className="control-card workspace-collapsible-panel" open={defaultOpen}>
+      <summary className="workspace-collapsible-summary">
+        <div className="workspace-collapsible-copy">
+          <p className="panel-label">{kicker}</p>
+          <h3>{title}</h3>
+          {note ? <p className="workspace-collapsible-note">{note}</p> : null}
+        </div>
+        <div className="workspace-collapsible-meta">
+          <Icon size={18} />
+          <ChevronDown className="workspace-collapsible-chevron" size={16} />
+        </div>
+      </summary>
+      <div className="workspace-collapsible-content">{children}</div>
+    </details>
+  )
+}
 
 function createId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -1311,15 +1349,12 @@ function ChatWorkspace({
             <p className="workspace-inline-note">{keyStatus}</p>
           </div>
 
-          <div className="control-card">
-            <div className="control-card-header">
-              <div>
-                <p className="panel-label">Newest on OpenRouter</p>
-                <h3>Recent models worth testing first</h3>
-              </div>
-              <Sparkles size={18} />
-            </div>
-
+          <CollapsibleWorkspacePanel
+            icon={Sparkles}
+            kicker="Newest on OpenRouter"
+            note="A tighter shortlist for quickly switching models."
+            title="Recent models worth testing first"
+          >
             <div className="workspace-model-spotlight-grid">
               {recentModels.map((model) => {
                 const modelStats = resolveOpenRouterModelStats(statsSnapshot, model)
@@ -1363,17 +1398,14 @@ function ChatWorkspace({
                 )
               })}
             </div>
-          </div>
+          </CollapsibleWorkspacePanel>
 
-          <div className="control-card">
-            <div className="control-card-header">
-              <div>
-                <p className="panel-label">Model library</p>
-                <h3>All current OpenRouter models</h3>
-              </div>
-              <LibraryBig size={18} />
-            </div>
-
+          <CollapsibleWorkspacePanel
+            icon={LibraryBig}
+            kicker="Model library"
+            note="Open the full catalog only when you need deeper browsing."
+            title="All current OpenRouter models"
+          >
             <label className="workspace-search-field">
               <Search size={16} />
               <input
@@ -1459,7 +1491,7 @@ function ChatWorkspace({
                 )
               })}
             </div>
-          </div>
+          </CollapsibleWorkspacePanel>
         </aside>
 
         <div className="workspace-chat-column">
@@ -1576,18 +1608,24 @@ function ChatWorkspace({
               })}
             </div>
 
-            <div className="workspace-suggestion-row">
-              {promptSuggestions.map((prompt) => (
-                <button
-                  className="workspace-suggestion-chip"
-                  key={prompt}
-                  onClick={() => handlePromptSuggestion(prompt)}
-                  type="button"
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
+            <details className="workspace-inline-disclosure">
+              <summary className="workspace-inline-disclosure-summary">
+                <span>Starter prompts</span>
+                <ChevronDown className="workspace-collapsible-chevron" size={16} />
+              </summary>
+              <div className="workspace-inline-disclosure-content workspace-suggestion-row">
+                {promptSuggestions.map((prompt) => (
+                  <button
+                    className="workspace-suggestion-chip"
+                    key={prompt}
+                    onClick={() => handlePromptSuggestion(prompt)}
+                    type="button"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </details>
 
             <input
               accept={attachmentAccept}
@@ -1816,72 +1854,92 @@ function ChatWorkspace({
                   </div>
                 </div>
 
-                {selectedModelProfile.canOutputImage ? (
-                  <div className="workspace-setting-card">
-                    <div className="workspace-setting-copy">
-                      <p className="panel-label">Output mode</p>
-                      <h4>Control whether image-capable models return pictures.</h4>
-                    </div>
-                    <div className="workspace-setting-pill-row">
-                      {responseModeOptions.map((option) => (
-                        <button
-                          className={`workspace-setting-pill ${
-                            responseMode === option.id
-                              ? 'workspace-setting-pill-active'
-                              : ''
-                          }`}
-                          key={option.id}
-                          onClick={() => setResponseMode(option.id)}
-                          type="button"
-                        >
-                          <strong>{option.label}</strong>
-                          <span>{option.description}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
+                {selectedModelProfile.canOutputImage ||
+                selectedModelProfile.supportsReasoning ? (
+                  <details className="workspace-inline-disclosure">
+                    <summary className="workspace-inline-disclosure-summary">
+                      <span>Advanced controls</span>
+                      <ChevronDown className="workspace-collapsible-chevron" size={16} />
+                    </summary>
+                    <div className="workspace-inline-disclosure-content workspace-inline-stack">
+                      {selectedModelProfile.canOutputImage ? (
+                        <div className="workspace-setting-card">
+                          <div className="workspace-setting-copy">
+                            <p className="panel-label">Output mode</p>
+                            <h4>Control whether image-capable models return pictures.</h4>
+                          </div>
+                          <div className="workspace-setting-pill-row">
+                            {responseModeOptions.map((option) => (
+                              <button
+                                className={`workspace-setting-pill ${
+                                  responseMode === option.id
+                                    ? 'workspace-setting-pill-active'
+                                    : ''
+                                }`}
+                                key={option.id}
+                                onClick={() => setResponseMode(option.id)}
+                                type="button"
+                              >
+                                <strong>{option.label}</strong>
+                                <span>{option.description}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
 
-                {selectedModelProfile.supportsReasoning ? (
-                  <div className="workspace-setting-card">
-                    <div className="workspace-setting-copy">
-                      <p className="panel-label">Thinking depth</p>
-                      <h4>Ask reasoning-capable models to expose more of their trace.</h4>
-                      <p className="workspace-setting-detail">
-                        {selectedModelProfile.reasoningExposure.detail}
-                      </p>
-                    </div>
-                    <div className="workspace-setting-pill-row workspace-setting-pill-row-compact">
-                      {reasoningEffortOptions.map((option) => (
-                        <button
-                          className={`workspace-setting-pill ${
-                            reasoningEffort === option.id
-                              ? 'workspace-setting-pill-active'
-                              : ''
-                          }`}
-                          key={option.id}
-                          onClick={() => setReasoningEffort(option.id)}
-                          type="button"
-                        >
-                          <strong>{option.label}</strong>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
+                      {selectedModelProfile.supportsReasoning ? (
+                        <div className="workspace-setting-card">
+                          <div className="workspace-setting-copy">
+                            <p className="panel-label">Thinking depth</p>
+                            <h4>Ask reasoning-capable models to expose more of their trace.</h4>
+                            <p className="workspace-setting-detail">
+                              {selectedModelProfile.reasoningExposure.detail}
+                            </p>
+                          </div>
+                          <div className="workspace-setting-pill-row workspace-setting-pill-row-compact">
+                            {reasoningEffortOptions.map((option) => (
+                              <button
+                                className={`workspace-setting-pill ${
+                                  reasoningEffort === option.id
+                                    ? 'workspace-setting-pill-active'
+                                    : ''
+                                }`}
+                                key={option.id}
+                                onClick={() => setReasoningEffort(option.id)}
+                                type="button"
+                              >
+                                <strong>{option.label}</strong>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
 
-                <p className="workspace-inline-note">{composerHint}</p>
+                      <p className="workspace-inline-note">{composerHint}</p>
+                    </div>
+                  </details>
+                ) : (
+                  <p className="workspace-inline-note">{composerHint}</p>
+                )}
               </>
             ) : null}
           </div>
 
-          <ModelStatsPanel
-            modelName={selectedModel?.name ?? 'Selected model'}
-            snapshotRefreshedAt={statsSnapshot?.refreshedAt ?? null}
-            statsEntry={selectedModelStats}
-            statsError={statsError}
-            statsLoading={statsLoading}
-          />
+          <CollapsibleWorkspacePanel
+            icon={Sparkles}
+            kicker="OpenRouter stats"
+            note="Expanded only when you want the longer benchmark and usage view."
+            title="Model performance snapshot"
+          >
+            <ModelStatsPanel
+              modelName={selectedModel?.name ?? 'Selected model'}
+              snapshotRefreshedAt={statsSnapshot?.refreshedAt ?? null}
+              statsEntry={selectedModelStats}
+              statsError={statsError}
+              statsLoading={statsLoading}
+            />
+          </CollapsibleWorkspacePanel>
         </aside>
       </div>
     </section>
