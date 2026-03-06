@@ -26,7 +26,6 @@ import {
   RefreshCcw,
   Search,
   Send,
-  ShieldCheck,
   Sparkles,
   Trash2,
   X,
@@ -843,9 +842,7 @@ function ChatWorkspace({
   const shouldAutoScrollRef = useRef(true)
   const [draftApiKey, setDraftApiKey] = useState('')
   const [savedApiKey, setSavedApiKey] = useState('')
-  const [keyStatus, setKeyStatus] = useState(
-    'Stored locally in this browser only.',
-  )
+  const [keyStatus, setKeyStatus] = useState('Local only.')
   const [models, setModels] = useState<OpenRouterModel[]>([])
   const [modelsLoading, setModelsLoading] = useState(true)
   const [modelsError, setModelsError] = useState('')
@@ -972,18 +969,18 @@ function ChatWorkspace({
 
     if (trimmedKey) {
       window.localStorage.setItem(OPENROUTER_KEY_STORAGE, trimmedKey)
-      setKeyStatus('OpenRouter key saved locally in this browser.')
+      setKeyStatus('Saved locally.')
       return
     }
 
     window.localStorage.removeItem(OPENROUTER_KEY_STORAGE)
-    setKeyStatus('OpenRouter key cleared from this browser.')
+    setKeyStatus('Removed from this browser.')
   }
 
   function handleClearApiKey() {
     setDraftApiKey('')
     setSavedApiKey('')
-    setKeyStatus('OpenRouter key cleared from this browser.')
+    setKeyStatus('Removed from this browser.')
     window.localStorage.removeItem(OPENROUTER_KEY_STORAGE)
   }
 
@@ -1232,7 +1229,7 @@ function ChatWorkspace({
     setMessages([])
     setAttachments([])
     setChatError('')
-    setChatStatus('Started a new thread.')
+    setChatStatus('New thread.')
   }
 
   const recentModels = getRecentOpenRouterModels(models, 8)
@@ -1252,8 +1249,8 @@ function ChatWorkspace({
     ? getModelCapabilityProfile(selectedModel, selectedModelStats)
     : null
   const catalogCountLabel = modelsLoading
-    ? 'Refreshing the live OpenRouter catalog.'
-    : `${models.length} models are available from the current OpenRouter index.`
+    ? 'Refreshing catalog.'
+    : `${models.length} live models.`
   const attachmentAccept = getAttachmentAccept(selectedModelProfile)
   const composerHint = selectedModelProfile
     ? getAttachmentSupportHint(selectedModelProfile)
@@ -1270,11 +1267,9 @@ function ChatWorkspace({
       <div className="workspace-home-header">
         <div>
           <p className="section-kicker">Workspace</p>
-          <h1>Connect OpenRouter, choose any live model, and start chatting.</h1>
+          <h1>Connect OpenRouter and start.</h1>
           <p className="workspace-home-copy">
-            Argue reads OpenRouter&apos;s live catalog at runtime, then shapes the
-            workspace around each model&apos;s real input, output, and reasoning
-            support.
+            Live catalog, local key storage, model-aware controls.
           </p>
         </div>
       </div>
@@ -1287,21 +1282,20 @@ function ChatWorkspace({
                 <p className="panel-label">Signed in</p>
                 <h2>{currentUser.email ?? 'Argue account'}</h2>
               </div>
-              <div className="status-pill">
-                {isVerified ? <ShieldCheck size={16} /> : <KeyRound size={16} />}
-                {isVerified ? 'Verified' : 'Verification pending'}
-              </div>
+              {!isVerified ? (
+                <div className="status-pill status-pill-warning">Unverified account</div>
+              ) : null}
             </div>
             <p className="workspace-account-copy">
-              Your Firebase login unlocks the workspace. Your OpenRouter key stays
-              local to this browser unless you choose to reuse it elsewhere.
+              Firebase controls access. Your OpenRouter key stays local to this
+              browser.
             </p>
             <button
               className="button button-secondary"
               onClick={onOpenAccount}
               type="button"
             >
-              Manage account
+              Account
             </button>
           </div>
 
@@ -1309,7 +1303,7 @@ function ChatWorkspace({
             <div className="control-card-header">
               <div>
                 <p className="panel-label">OpenRouter key</p>
-                <h3>Attach your API access</h3>
+                <h3>Local key storage</h3>
               </div>
               <KeyRound size={18} />
             </div>
@@ -1352,8 +1346,8 @@ function ChatWorkspace({
           <CollapsibleWorkspacePanel
             icon={Sparkles}
             kicker="Newest on OpenRouter"
-            note="A tighter shortlist for quickly switching models."
-            title="Recent models worth testing first"
+            note="Quick shortlist."
+            title="Recent additions"
           >
             <div className="workspace-model-spotlight-grid">
               {recentModels.map((model) => {
@@ -1403,8 +1397,8 @@ function ChatWorkspace({
           <CollapsibleWorkspacePanel
             icon={LibraryBig}
             kicker="Model library"
-            note="Open the full catalog only when you need deeper browsing."
-            title="All current OpenRouter models"
+            note="Open only when you need the full list."
+            title="Browse live models"
           >
             <label className="workspace-search-field">
               <Search size={16} />
@@ -1499,7 +1493,7 @@ function ChatWorkspace({
             <div className="workspace-chat-header">
               <div>
                 <p className="panel-label">Chat</p>
-                <h3>Direct conversation with the model you selected</h3>
+                <h3>Thread</h3>
               </div>
               <button
                 className="button button-secondary"
@@ -1547,11 +1541,8 @@ function ChatWorkspace({
                 <div className="workspace-empty-state">
                   <Bot size={20} />
                   <div>
-                    <h4>Start with one of these prompts.</h4>
-                    <p>
-                      Save your OpenRouter key, choose a model, and send text, code,
-                      or supported attachments.
-                    </p>
+                    <h4>Try a prompt.</h4>
+                    <p>Add a key, pick a model, and send text or files.</p>
                   </div>
                 </div>
               ) : null}
@@ -1734,7 +1725,7 @@ function ChatWorkspace({
                 className="workspace-textarea"
                 onChange={(event) => setDraftMessage(event.target.value)}
                 onKeyDown={handleComposerKeyDown}
-                placeholder="Ask the selected model anything, attach files it can understand, or request an image from image-capable models..."
+                placeholder="Message the selected model or attach files..."
                 spellCheck={false}
                 value={draftMessage}
               />
@@ -1866,7 +1857,7 @@ function ChatWorkspace({
                         <div className="workspace-setting-card">
                           <div className="workspace-setting-copy">
                             <p className="panel-label">Output mode</p>
-                            <h4>Control whether image-capable models return pictures.</h4>
+                            <h4>Choose whether image-capable models return images.</h4>
                           </div>
                           <div className="workspace-setting-pill-row">
                             {responseModeOptions.map((option) => (
@@ -1892,7 +1883,7 @@ function ChatWorkspace({
                         <div className="workspace-setting-card">
                           <div className="workspace-setting-copy">
                             <p className="panel-label">Thinking depth</p>
-                            <h4>Ask reasoning-capable models to expose more of their trace.</h4>
+                            <h4>Choose how much reasoning to expose.</h4>
                             <p className="workspace-setting-detail">
                               {selectedModelProfile.reasoningExposure.detail}
                             </p>

@@ -28,6 +28,7 @@
   --line: rgba(255, 255, 255, 0.08);
   --line-strong: rgba(255, 255, 255, 0.16);
   --shadow-xl: 0 28px 80px rgba(0, 0, 0, 0.38);
+  --warning: #ff8a3d;
 }
 
 *,

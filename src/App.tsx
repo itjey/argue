@@ -39,7 +39,6 @@ import {
   ShieldCheck,
   Sigma,
   SlidersHorizontal,
-  User as UserIcon,
   Workflow,
   X,
 } from 'lucide-react'
@@ -789,18 +788,19 @@ function App() {
         </nav>
 
         <button
-          className="topbar-cta topbar-account-button"
+          className={`topbar-cta topbar-account-button${
+            currentUser && isVerified ? ' topbar-account-button-minimal' : ''
+          }`}
           onClick={() => openAuthDialog('sign-in')}
           type="button"
         >
           {currentUser ? (
-            <>
-              {isVerified ? <ShieldCheck size={16} /> : <UserIcon size={16} />}
-              <span className="topbar-account-copy">
-                <strong>{currentUser.email ?? 'Account'}</strong>
-                <small>{isVerified ? 'Verified account' : 'Verification needed'}</small>
-              </span>
-            </>
+            <span className="topbar-account-copy">
+              <strong>{currentUser.email ?? 'Account'}</strong>
+              {!isVerified ? (
+                <small className="topbar-account-warning">Unverified account</small>
+              ) : null}
+            </span>
           ) : (
             <>
               <LogIn size={16} />
