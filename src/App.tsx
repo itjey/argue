@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FirebaseError } from 'firebase/app'
 import {
   applyActionCode,
@@ -262,6 +262,7 @@ const thread: Message[] = [
 ]
 
 function App() {
+  const lastScrollYRef = useRef(0)
   const [authDialogOpen, setAuthDialogOpen] = useState(false)
   const [authMode, setAuthMode] = useState<AuthMode>('sign-in')
   const [authEmail, setAuthEmail] = useState('')
@@ -284,6 +285,7 @@ function App() {
   const [passwordResetComplete, setPasswordResetComplete] = useState(false)
   const [passwordResetMessage, setPasswordResetMessage] = useState('')
   const [passwordResetError, setPasswordResetError] = useState('')
+  const [topbarHidden, setTopbarHidden] = useState(false)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
@@ -296,6 +298,31 @@ function App() {
     })
 
     return unsubscribe
+  }, [])
+
+  useEffect(() => {
+    lastScrollYRef.current = window.scrollY
+
+    const handleScroll = () => {
+      const nextScrollY = window.scrollY
+      const delta = nextScrollY - lastScrollYRef.current
+
+      if (nextScrollY <= 48) {
+        setTopbarHidden(false)
+      } else if (delta >= 8) {
+        setTopbarHidden(true)
+      } else if (delta <= -8) {
+        setTopbarHidden(false)
+      }
+
+      lastScrollYRef.current = nextScrollY
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+    }
   }, [])
 
   useEffect(() => {
@@ -732,7 +759,7 @@ function App() {
       <div className="ambient ambient-two" />
       <div className="ambient ambient-three" />
 
-      <header className="topbar">
+      <header className={`topbar${topbarHidden ? ' topbar-hidden' : ''}`}>
         <a className="brand" href="#top" aria-label="Argue home">
           <span className="brand-mark">
             <span className="brand-fan" aria-hidden="true">
