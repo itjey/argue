@@ -1783,10 +1783,12 @@
 }
 
 .workspace-send-icon {
+  box-sizing: border-box;
   position: absolute;
   right: 0.3rem;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 0;
+  bottom: 0;
+  margin: auto 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1807,7 +1809,7 @@
 .workspace-send-icon:hover:not(:disabled) {
   border-color: rgba(255, 255, 255, 0.2);
   background: rgba(255, 255, 255, 0.08);
-  transform: translateY(-50%) scale(1.05);
+  transform: scale(1.03);
 }
 
 .workspace-send-icon:disabled {
