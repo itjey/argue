@@ -1459,6 +1459,7 @@
 }
 
 .workspace-inline-disclosure {
+  display: none;
   padding: 0.9rem 0.95rem;
   border: 0;
   border-radius: 0;
@@ -1626,6 +1627,7 @@
 }
 
 .workspace-chat-header {
+  display: none;
   padding-bottom: 0.55rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.035);
 }
@@ -1648,6 +1650,7 @@
 }
 
 .workspace-empty-state {
+  display: none;
   padding: 1rem 1.05rem;
   border: 0;
   border-radius: 0;
@@ -1759,7 +1762,7 @@
   width: 100%;
   min-height: 6.4rem;
   padding: 0;
-  border: 0;
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 0;
   color: var(--ink-strong);
   background: transparent;
