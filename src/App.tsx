@@ -203,7 +203,7 @@ function App() {
                   d="M2 7L25 2V12L2 7Z"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="2.6"
+                  strokeWidth="2.4"
                   strokeLinejoin="round"
                 />
               </svg>
@@ -212,7 +212,7 @@ function App() {
                   d="M2 7L25 2V12L2 7Z"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="2.6"
+                  strokeWidth="2.4"
                   strokeLinejoin="round"
                 />
               </svg>
@@ -221,7 +221,7 @@ function App() {
                   d="M2 7L25 2V12L2 7Z"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="2.6"
+                  strokeWidth="2.4"
                   strokeLinejoin="round"
                 />
               </svg>
