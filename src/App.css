@@ -404,6 +404,7 @@
 
 .auth-tab,
 .auth-provider-button,
+.auth-primary-button,
 .auth-secondary-button {
   color: var(--ink-strong);
   background: transparent;
@@ -411,26 +412,34 @@
 
 .auth-provider-button:hover,
 .auth-provider-button:focus-visible,
+.auth-primary-button:hover,
+.auth-primary-button:focus-visible,
 .auth-secondary-button:hover,
 .auth-secondary-button:focus-visible {
-  border-color: rgba(255, 255, 255, 0.42);
-  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.02);
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.08),
-    0 0 18px rgba(255, 255, 255, 0.08);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 10px 24px rgba(255, 255, 255, 0.03);
 }
 
 .auth-tab:hover,
 .auth-tab:focus-visible {
-  border-color: rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.025);
 }
 
 .auth-tab-active,
 .auth-primary-button {
-  color: #050505;
-  background: linear-gradient(180deg, #ffffff 0%, #d9d9d9 100%);
-  border-color: rgba(255, 255, 255, 0.56);
+  color: var(--ink-strong);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.auth-tab-active {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.025);
 }
 
 .auth-provider-button,
@@ -675,6 +684,9 @@
     border-color 180ms ease,
     background-color 180ms ease,
     color 180ms ease;
+  color: var(--ink-strong);
+  background: transparent;
+  box-shadow: none;
 }
 
 .button:hover,
@@ -682,13 +694,15 @@
 .topbar-cta:hover,
 .topbar-cta:focus-visible {
   transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.02);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 10px 24px rgba(255, 255, 255, 0.03);
 }
 
 .button-primary {
-  color: #050607;
-  border-color: rgba(255, 255, 255, 0.26);
-  background: linear-gradient(180deg, #f5f5f2 0%, #c7c7c2 100%);
-  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.28);
+  color: var(--ink-strong);
 }
 
 .button-secondary {
@@ -700,11 +714,20 @@
 .button-secondary:focus-visible,
 .topbar-cta:hover,
 .topbar-cta:focus-visible {
-  border-color: rgba(255, 255, 255, 0.42);
-  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.018);
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.08),
-    0 0 18px rgba(255, 255, 255, 0.08);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 8px 20px rgba(255, 255, 255, 0.025);
+}
+
+.button-primary:hover,
+.button-primary:focus-visible {
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.028);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 12px 28px rgba(255, 255, 255, 0.035);
 }
 
 .metric-grid {
@@ -1163,11 +1186,6 @@
   margin-bottom: 0.4rem;
 }
 
-.workspace-home-header > div,
-.workspace-library-column {
-  position: relative;
-}
-
 .workspace-home-header h1 {
   margin: 0.55rem 0 0;
   font-family: var(--font-display);
@@ -1221,12 +1239,13 @@
 
 .workspace-home-grid {
   grid-template-columns:
-    clamp(13.5rem, 14vw, 17.5rem)
+    clamp(12.75rem, 13vw, 15.75rem)
+    clamp(2.4rem, 3vw, 4rem)
     minmax(0, 2.05fr)
     clamp(14.5rem, 15vw, 19rem);
   align-items: start;
   margin-top: 1.3rem;
-  gap: clamp(1.8rem, 2.8vw, 3.5rem);
+  gap: clamp(0.9rem, 1.4vw, 1.5rem);
 }
 
 .workspace-library-column,
@@ -1247,8 +1266,17 @@
   align-self: start;
 }
 
+.workspace-library-column {
+  grid-column: 1;
+}
+
 .workspace-chat-column {
+  grid-column: 3;
   min-width: 0;
+}
+
+.workspace-detail-column {
+  grid-column: 4;
 }
 
 .workspace-inline-actions,
@@ -1811,12 +1839,13 @@
   display: grid;
   gap: 0.25rem;
   padding: 0.8rem 0.9rem;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid transparent;
   border-radius: 0.22rem;
   text-align: left;
   color: var(--ink-soft);
-  background: rgba(255, 255, 255, 0.01);
+  background: transparent;
   transition:
+    box-shadow 180ms ease,
     border-color 180ms ease,
     background-color 180ms ease,
     transform 180ms ease;
@@ -1835,8 +1864,11 @@
 .workspace-setting-pill:hover,
 .workspace-setting-pill:focus-visible,
 .workspace-setting-pill-active {
-  border-color: var(--workspace-border-strong-soft);
-  background: rgba(255, 255, 255, 0.022);
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.018);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 8px 20px rgba(255, 255, 255, 0.02);
 }
 
 .workspace-setting-pill-row-compact .workspace-setting-pill {
@@ -1927,16 +1959,18 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid transparent;
   border-radius: 0.18rem;
   color: var(--ink-soft);
-  background: rgba(255, 255, 255, 0.01);
+  background: transparent;
 }
 
 .workspace-draft-attachment-remove:hover,
 .workspace-draft-attachment-remove:focus-visible {
   color: var(--ink-strong);
-  border-color: var(--line-strong);
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.016);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
 }
 
 .workspace-composer-note {
@@ -2574,6 +2608,12 @@
   .workspace-shell-hero {
     transform: none;
   }
+
+  .workspace-library-column,
+  .workspace-chat-column,
+  .workspace-detail-column {
+    grid-column: auto;
+  }
 }
 
 @media (min-width: 1600px) {
@@ -2583,7 +2623,8 @@
 
   .workspace-home-grid {
     grid-template-columns:
-      clamp(13rem, 13vw, 16rem)
+      clamp(12rem, 12vw, 15rem)
+      clamp(2.8rem, 3.4vw, 4.6rem)
       minmax(0, 2.25fr)
       clamp(14rem, 14vw, 18rem);
   }
@@ -2595,20 +2636,6 @@
   .workspace-message-stack {
     min-height: 42rem;
     max-height: calc(100vh - 21.5rem);
-  }
-}
-
-@media (min-width: 1101px) {
-  .workspace-home-header > div,
-  .workspace-library-column {
-    left: clamp(-2.25rem, -1.2vw, -1rem);
-  }
-}
-
-@media (min-width: 1600px) {
-  .workspace-home-header > div,
-  .workspace-library-column {
-    left: clamp(-3.25rem, -1.7vw, -1.6rem);
   }
 }
 
