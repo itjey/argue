@@ -775,7 +775,9 @@ function App() {
             <>
               <a href="#chat">Chat</a>
               <a href="#models">Models</a>
-              <a href="#account">Account</a>
+              <button className="nav-link-button" onClick={() => openAuthDialog('sign-in')} type="button">
+                Account
+              </button>
             </>
           ) : (
             <>
@@ -815,11 +817,7 @@ function App() {
 
       <main className={`page${workspaceVisible ? ' page-workspace' : ''}`} id="top">
         {workspaceVisible ? (
-          <ChatWorkspace
-            currentUser={currentUser!}
-            isVerified={isVerified}
-            onOpenAccount={() => openAuthDialog('sign-in')}
-          />
+          <ChatWorkspace currentUser={currentUser!} />
         ) : (
           <>
         <section className="hero section" id="concept">

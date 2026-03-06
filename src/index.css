@@ -1,33 +1,29 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
   font-family: var(--font-sans);
   line-height: 1.5;
   font-weight: 400;
   color-scheme: dark;
-  color: #f5f5f2;
-  background:
-    radial-gradient(circle at 12% 14%, rgba(255, 255, 255, 0.07), transparent 22%),
-    radial-gradient(circle at 86% 8%, rgba(255, 255, 255, 0.05), transparent 18%),
-    radial-gradient(circle at 50% 120%, rgba(255, 255, 255, 0.06), transparent 32%),
-    linear-gradient(180deg, #060708 0%, #0a0c10 52%, #050607 100%);
+  color: #d4d4d4;
+  background: #000;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  --font-sans: 'Space Grotesk', sans-serif;
-  --font-display: 'Space Grotesk', sans-serif;
-  --font-mono: 'IBM Plex Mono', monospace;
-  --surface: #0d1014;
-  --surface-soft: #12161b;
-  --surface-muted: #1a1f26;
-  --ink-strong: #f7f5ef;
-  --ink-muted: #cbc7bb;
-  --ink-soft: #948f84;
-  --ink-inverse: #050505;
-  --line: rgba(255, 255, 255, 0.08);
-  --line-strong: rgba(255, 255, 255, 0.16);
-  --shadow-xl: 0 28px 80px rgba(0, 0, 0, 0.38);
+  --font-sans: 'Outfit', sans-serif;
+  --font-display: 'Outfit', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --surface: #080808;
+  --surface-soft: #0e0e0e;
+  --surface-muted: #161616;
+  --ink-strong: #e8e8e8;
+  --ink-muted: #999;
+  --ink-soft: #555;
+  --ink-inverse: #000;
+  --line: rgba(255, 255, 255, 0.06);
+  --line-strong: rgba(255, 255, 255, 0.12);
+  --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.6);
   --warning: #ff8a3d;
 }
 
@@ -49,9 +45,9 @@ body {
   background: transparent;
 }
 
-body::selection {
-  background: rgba(255, 255, 255, 0.18);
-  color: var(--ink-strong);
+::selection {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
 }
 
 body,

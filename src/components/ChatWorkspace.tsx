@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useDeferredValue,
   useEffect,
   useRef,
@@ -22,6 +23,10 @@ import {
   LibraryBig,
   Lightbulb,
   LoaderCircle,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   Paperclip,
   RefreshCcw,
   Search,
@@ -67,8 +72,6 @@ import { ModelStatsPanel } from './ModelStatsPanel'
 
 type ChatWorkspaceProps = {
   currentUser: User
-  isVerified: boolean
-  onOpenAccount: () => void
 }
 
 type WorkspaceAttachment = RichMessageAttachment & {
@@ -832,11 +835,7 @@ function buildAssistantRequestFromReply(assistantReply: {
   } satisfies OpenRouterChatMessage
 }
 
-function ChatWorkspace({
-  currentUser,
-  isVerified,
-  onOpenAccount,
-}: ChatWorkspaceProps) {
+function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
   const attachmentInputRef = useRef<HTMLInputElement | null>(null)
   const messageStackRef = useRef<HTMLDivElement | null>(null)
   const shouldAutoScrollRef = useRef(true)
@@ -863,6 +862,58 @@ function ChatWorkspace({
   const [chatStatus, setChatStatus] = useState('')
   const [isSending, setIsSending] = useState(false)
   const deferredModelSearch = useDeferredValue(modelSearch)
+
+  const [leftCollapsed, setLeftCollapsed] = useState(false)
+  const [rightCollapsed, setRightCollapsed] = useState(false)
+  const [leftWidth, setLeftWidth] = useState(() => {
+    const stored = window.localStorage.getItem('argue-left-panel-width')
+    return stored ? Number(stored) : 260
+  })
+  const [rightWidth, setRightWidth] = useState(() => {
+    const stored = window.localStorage.getItem('argue-right-panel-width')
+    return stored ? Number(stored) : 300
+  })
+  const gridRef = useRef<HTMLDivElement | null>(null)
+  const draggingRef = useRef<'left' | 'right' | null>(null)
+  const startXRef = useRef(0)
+  const startWidthRef = useRef(0)
+
+  const handlePointerDown = useCallback(
+    (side: 'left' | 'right', event: React.PointerEvent) => {
+      event.preventDefault()
+      draggingRef.current = side
+      startXRef.current = event.clientX
+      startWidthRef.current = side === 'left' ? leftWidth : rightWidth
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+
+      const handlePointerMove = (moveEvent: PointerEvent) => {
+        const delta = moveEvent.clientX - startXRef.current
+        const dir = draggingRef.current === 'left' ? 1 : -1
+        const next = Math.max(180, Math.min(600, startWidthRef.current + delta * dir))
+
+        if (draggingRef.current === 'left') {
+          setLeftWidth(next)
+          window.localStorage.setItem('argue-left-panel-width', String(next))
+        } else {
+          setRightWidth(next)
+          window.localStorage.setItem('argue-right-panel-width', String(next))
+        }
+      }
+
+      const handlePointerUp = () => {
+        draggingRef.current = null
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+        window.removeEventListener('pointermove', handlePointerMove)
+        window.removeEventListener('pointerup', handlePointerUp)
+      }
+
+      window.addEventListener('pointermove', handlePointerMove)
+      window.addEventListener('pointerup', handlePointerUp)
+    },
+    [leftWidth, rightWidth],
+  )
 
   useEffect(() => {
     const storedKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
@@ -1274,30 +1325,19 @@ function ChatWorkspace({
         </div>
       </div>
 
-      <div className="workspace-home-grid">
-        <aside className="workspace-library-column" id="models">
-          <div className="workspace-account-card" id="account">
-            <div className="workspace-account-header">
-              <div>
-                <p className="panel-label">Signed in</p>
-                <h2>{currentUser.email ?? 'Argue account'}</h2>
-              </div>
-              {!isVerified ? (
-                <div className="status-pill status-pill-warning">Unverified account</div>
-              ) : null}
-            </div>
-            <p className="workspace-account-copy">
-              Firebase auth. Your OpenRouter key stays in this browser.
-            </p>
-            <button
-              className="button button-secondary"
-              onClick={onOpenAccount}
-              type="button"
-            >
-              Account
-            </button>
-          </div>
-
+      <div
+        className="workspace-home-grid"
+        ref={gridRef}
+        style={{
+          '--left-width': leftCollapsed ? '0px' : `${leftWidth}px`,
+          '--right-width': rightCollapsed ? '0px' : `${rightWidth}px`,
+        } as React.CSSProperties}
+      >
+        <aside
+          className={`workspace-library-column${leftCollapsed ? ' workspace-panel-collapsed' : ''}`}
+          id="models"
+          style={leftCollapsed ? undefined : { width: leftWidth }}
+        >
           <div className="control-card">
             <div className="control-card-header">
               <div>
@@ -1486,6 +1526,23 @@ function ChatWorkspace({
             </div>
           </CollapsibleWorkspacePanel>
         </aside>
+
+        <div className="workspace-resize-gutter workspace-resize-gutter-left">
+          <button
+            aria-label={leftCollapsed ? 'Expand left panel' : 'Collapse left panel'}
+            className="workspace-collapse-toggle"
+            onClick={() => setLeftCollapsed((c) => !c)}
+            type="button"
+          >
+            {leftCollapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
+          </button>
+          {!leftCollapsed && (
+            <div
+              className="workspace-resize-handle"
+              onPointerDown={(e) => handlePointerDown('left', e)}
+            />
+          )}
+        </div>
 
         <div className="workspace-chat-column">
           <div className="control-card workspace-chat-card">
@@ -1742,7 +1799,27 @@ function ChatWorkspace({
           </div>
         </div>
 
-        <aside className="workspace-detail-column">
+        <div className="workspace-resize-gutter workspace-resize-gutter-right">
+          <button
+            aria-label={rightCollapsed ? 'Expand right panel' : 'Collapse right panel'}
+            className="workspace-collapse-toggle"
+            onClick={() => setRightCollapsed((c) => !c)}
+            type="button"
+          >
+            {rightCollapsed ? <PanelRightOpen size={14} /> : <PanelRightClose size={14} />}
+          </button>
+          {!rightCollapsed && (
+            <div
+              className="workspace-resize-handle"
+              onPointerDown={(e) => handlePointerDown('right', e)}
+            />
+          )}
+        </div>
+
+        <aside
+          className={`workspace-detail-column${rightCollapsed ? ' workspace-panel-collapsed' : ''}`}
+          style={rightCollapsed ? undefined : { width: rightWidth }}
+        >
           <div className="control-card workspace-selected-model-card">
             <div className="control-card-header">
               <div>
