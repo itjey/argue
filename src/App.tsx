@@ -824,6 +824,12 @@ function App() {
           <>
         <section className="hero section" id="concept">
           <div className="hero-copy">
+            <div className="hero-overline-row">
+              <span className="hero-overline-pill">Private multi-model workspace</span>
+              <span className="hero-overline-pill hero-overline-pill-muted">
+                Live reasoning, metrics, and role-based debate
+              </span>
+            </div>
             <div className="hero-type-line">
               <span className="hero-typewriter" aria-label="argue.">
                 argue.
@@ -835,6 +841,9 @@ function App() {
               want sharper thinking, not louder software. Choose the models,
               assign the roles, paste your own API keys, and let specialists
               challenge each other across programming, math, research, and planning.
+            </p>
+            <p className="hero-subtext">
+              Built for people who want a command room, not a toy box.
             </p>
 
             <div className="hero-actions">
@@ -864,7 +873,7 @@ function App() {
           </div>
 
           <div className="hero-visual">
-            <div className="workspace-shell">
+            <div className="workspace-shell workspace-shell-hero">
               <div className="workspace-header">
                 <div>
                   <p className="workspace-label">Live session</p>
