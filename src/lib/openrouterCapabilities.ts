@@ -29,6 +29,11 @@ type OpenRouterModelCapabilityProfile = {
   canOutputAudio: boolean
   isMultimodal: boolean
   supportsReasoning: boolean
+  reasoningExposure: {
+    badge: string
+    detail: string
+    kind: 'trace' | 'hybrid' | 'protected' | 'provider' | 'none'
+  }
   supportsStructuredOutputs: boolean
   supportsTools: boolean
   smartness: OpenRouterSmartnessProfile
@@ -204,6 +209,67 @@ function getSmartnessProfile(
   } satisfies OpenRouterSmartnessProfile
 }
 
+function getReasoningExposure(model: OpenRouterModel, supportsReasoning: boolean) {
+  if (!supportsReasoning) {
+    return {
+      badge: 'No thinking',
+      detail: 'This model does not advertise provider reasoning support in the OpenRouter catalog.',
+      kind: 'none',
+    } as const
+  }
+
+  const searchableId = `${model.id} ${model.canonical_slug ?? ''} ${model.name}`.toLowerCase()
+
+  if (
+    searchableId.includes('deepseek-r1') ||
+    searchableId.includes('kimi') ||
+    searchableId.includes('thinking') ||
+    searchableId.includes('minimax/m2') ||
+    searchableId.includes('intellect') ||
+    searchableId.includes('nemotron') ||
+    searchableId.includes('mimo') ||
+    searchableId.includes('glm 4.5') ||
+    searchableId.includes('glm-4.5')
+  ) {
+    return {
+      badge: 'Trace COT',
+      detail: 'This family usually exposes visible step-by-step reasoning text through OpenRouter.',
+      kind: 'trace',
+    } as const
+  }
+
+  if (searchableId.startsWith('anthropic/') || searchableId.includes('claude')) {
+    return {
+      badge: 'Hybrid thinking',
+      detail: 'This family often returns a mix of summaries, text traces, or protected reasoning blocks depending on the model version.',
+      kind: 'hybrid',
+    } as const
+  }
+
+  if (
+    searchableId.startsWith('openai/') ||
+    searchableId.includes('/o1') ||
+    searchableId.includes('/o3') ||
+    searchableId.includes('gpt-5') ||
+    searchableId.startsWith('google/') ||
+    searchableId.includes('gemini') ||
+    searchableId.startsWith('x-ai/') ||
+    searchableId.includes('grok')
+  ) {
+    return {
+      badge: 'Protected thinking',
+      detail: 'This family usually exposes summaries or protected reasoning blocks rather than a raw chain-of-thought transcript.',
+      kind: 'protected',
+    } as const
+  }
+
+  return {
+    badge: 'Provider thinking',
+    detail: 'This model supports reasoning, but the provider may expose live traces, summaries, or encrypted blocks depending on the backend.',
+    kind: 'provider',
+  } as const
+}
+
 function getModelCapabilityProfile(
   model: OpenRouterModel,
   statsEntry: OpenRouterModelStatsEntry | null,
@@ -213,6 +279,10 @@ function getModelCapabilityProfile(
   )
   const inputModalities = normalizeInputModalities(model)
   const outputModalities = normalizeOutputModalities(model)
+  const supportsReasoning =
+    supportedParameters.has('reasoning') ||
+    supportedParameters.has('include_reasoning') ||
+    supportedParameters.has('reasoning_effort')
 
   const capabilityProfile = {
     inputModalities,
@@ -226,10 +296,8 @@ function getModelCapabilityProfile(
     canOutputImage: outputModalities.includes('image'),
     canOutputAudio: outputModalities.includes('audio'),
     isMultimodal: inputModalities.length > 1 || outputModalities.length > 1,
-    supportsReasoning:
-      supportedParameters.has('reasoning') ||
-      supportedParameters.has('include_reasoning') ||
-      supportedParameters.has('reasoning_effort'),
+    supportsReasoning,
+    reasoningExposure: getReasoningExposure(model, supportsReasoning),
     supportsStructuredOutputs:
       supportedParameters.has('structured_outputs') ||
       supportedParameters.has('response_format'),

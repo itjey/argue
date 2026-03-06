@@ -140,6 +140,27 @@ type OpenRouterChatChoice = {
   }
 }
 
+type OpenRouterChatDelta = {
+  content?: string | OpenRouterChatContentPart[] | null
+  reasoning?: string | null
+  reasoning_details?: OpenRouterReasoningDetail[]
+  images?: OpenRouterAssistantImage[]
+  audio?: OpenRouterAssistantAudio
+  refusal?: string | null
+  phase?: string | null
+}
+
+type OpenRouterChatStreamChunk = {
+  choices?: Array<{
+    delta?: OpenRouterChatDelta
+    finish_reason?: string | null
+  }>
+  usage?: OpenRouterChatResponse['usage']
+  error?: {
+    message?: string
+  }
+}
+
 type OpenRouterChatResponse = {
   choices?: OpenRouterChatChoice[]
   usage?: {
@@ -176,6 +197,11 @@ type CreateOpenRouterChatCompletionOptions = {
   }
   imageConfig?: Record<string, number | string | Array<unknown>>
 }
+
+type CreateOpenRouterChatCompletionStreamOptions =
+  CreateOpenRouterChatCompletionOptions & {
+    onProgress?: (reply: OpenRouterAssistantReply) => void
+  }
 
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models'
 const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions'
@@ -280,6 +306,199 @@ function extractAssistantReply(response: OpenRouterChatResponse) {
   } satisfies OpenRouterAssistantReply
 }
 
+function appendUniqueStrings(currentValues: string[], nextValues: string[]) {
+  const seenValues = new Set(currentValues)
+  const mergedValues = [...currentValues]
+
+  for (const value of nextValues) {
+    if (!value || seenValues.has(value)) {
+      continue
+    }
+
+    seenValues.add(value)
+    mergedValues.push(value)
+  }
+
+  return mergedValues
+}
+
+function mergeTextFragments(previousValue: string, nextValue?: string | null) {
+  const trimmedNext = nextValue?.trim() ?? ''
+
+  if (!trimmedNext) {
+    return previousValue
+  }
+
+  if (!previousValue) {
+    return trimmedNext
+  }
+
+  if (trimmedNext.startsWith(previousValue)) {
+    return trimmedNext
+  }
+
+  if (previousValue.endsWith(trimmedNext)) {
+    return previousValue
+  }
+
+  return `${previousValue}${trimmedNext}`
+}
+
+function getReasoningDetailKey(detail: OpenRouterReasoningDetail) {
+  return detail.id ?? `${detail.type}:${detail.index ?? 'na'}:${detail.format ?? 'na'}`
+}
+
+function mergeReasoningDetail(
+  previousDetail: OpenRouterReasoningDetail,
+  nextDetail: OpenRouterReasoningDetail,
+): OpenRouterReasoningDetail {
+  if (
+    previousDetail.type === 'reasoning.summary' &&
+    nextDetail.type === 'reasoning.summary'
+  ) {
+    return {
+      ...previousDetail,
+      ...nextDetail,
+      summary: mergeTextFragments(previousDetail.summary, nextDetail.summary),
+    }
+  }
+
+  if (
+    previousDetail.type === 'reasoning.text' &&
+    nextDetail.type === 'reasoning.text'
+  ) {
+    return {
+      ...previousDetail,
+      ...nextDetail,
+      text: mergeTextFragments(previousDetail.text?.trim() ?? '', nextDetail.text),
+      signature: nextDetail.signature ?? previousDetail.signature,
+    }
+  }
+
+  if (
+    previousDetail.type === 'reasoning.encrypted' &&
+    nextDetail.type === 'reasoning.encrypted'
+  ) {
+    return {
+      ...previousDetail,
+      ...nextDetail,
+      data: mergeTextFragments(previousDetail.data, nextDetail.data),
+    }
+  }
+
+  return nextDetail
+}
+
+function mergeReasoningDetails(
+  currentDetails: OpenRouterReasoningDetail[],
+  nextDetails: OpenRouterReasoningDetail[] | undefined,
+) {
+  if (!nextDetails || nextDetails.length === 0) {
+    return currentDetails
+  }
+
+  const mergedDetails = [...currentDetails]
+  const detailIndexes = new Map<string, number>()
+
+  mergedDetails.forEach((detail, index) => {
+    detailIndexes.set(getReasoningDetailKey(detail), index)
+  })
+
+  for (const nextDetail of nextDetails) {
+    const detailKey = getReasoningDetailKey(nextDetail)
+    const existingIndex = detailIndexes.get(detailKey)
+
+    if (existingIndex == null) {
+      detailIndexes.set(detailKey, mergedDetails.length)
+      mergedDetails.push(nextDetail)
+      continue
+    }
+
+    mergedDetails[existingIndex] = mergeReasoningDetail(
+      mergedDetails[existingIndex],
+      nextDetail,
+    )
+  }
+
+  return mergedDetails.sort((left, right) => (left.index ?? 0) - (right.index ?? 0))
+}
+
+function createEmptyAssistantReply(): OpenRouterAssistantReply {
+  return {
+    text: '',
+    contentParts: [],
+    images: [],
+    audio: null,
+    reasoning: '',
+    reasoningDetails: [],
+    refusal: '',
+    phase: null,
+    usage: null,
+  } satisfies OpenRouterAssistantReply
+}
+
+function getTextDelta(content: string | OpenRouterChatContentPart[] | null | undefined) {
+  if (typeof content === 'string') {
+    return content
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => (part.type === 'text' ? part.text ?? '' : ''))
+      .join('')
+  }
+
+  return ''
+}
+
+function applyStreamDelta(
+  currentReply: OpenRouterAssistantReply,
+  delta: OpenRouterChatDelta,
+  usage: OpenRouterChatResponse['usage'] | undefined,
+) {
+  const nextText = `${currentReply.text}${getTextDelta(delta.content)}`
+
+  return {
+    text: nextText,
+    contentParts: nextText
+      ? [
+          {
+            type: 'text',
+            text: nextText,
+          },
+        ]
+      : [],
+    images: appendUniqueStrings(
+      currentReply.images,
+      (delta.images ?? [])
+        .map((entry) => entry.image_url?.url?.trim() ?? '')
+        .filter(Boolean),
+    ),
+    audio: delta.audio ?? currentReply.audio,
+    reasoning: `${currentReply.reasoning}${delta.reasoning ?? ''}`.trim(),
+    reasoningDetails: mergeReasoningDetails(
+      currentReply.reasoningDetails,
+      delta.reasoning_details,
+    ),
+    refusal: `${currentReply.refusal}${delta.refusal ?? ''}`.trim(),
+    phase: delta.phase ?? currentReply.phase,
+    usage: usage ?? currentReply.usage,
+  } satisfies OpenRouterAssistantReply
+}
+
+function extractSsePayload(rawEvent: string) {
+  const dataLines = rawEvent
+    .split('\n')
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => line.slice(5).trim())
+
+  if (dataLines.length === 0) {
+    return null
+  }
+
+  return dataLines.join('\n')
+}
+
 async function fetchOpenRouterModels() {
   const response = await fetch(OPENROUTER_MODELS_URL, {
     headers: requestHeaders(),
@@ -334,6 +553,131 @@ async function createOpenRouterChatCompletion({
   return extractAssistantReply(payload)
 }
 
+async function createOpenRouterChatCompletionStream({
+  apiKey,
+  includeReasoning,
+  messages,
+  model,
+  modalities,
+  onProgress,
+  reasoning,
+  imageConfig,
+}: CreateOpenRouterChatCompletionStreamOptions) {
+  const response = await fetch(OPENROUTER_CHAT_URL, {
+    method: 'POST',
+    headers: requestHeaders(apiKey),
+    body: JSON.stringify({
+      model,
+      stream: true,
+      messages,
+      include_reasoning: includeReasoning,
+      modalities,
+      reasoning,
+      image_config: imageConfig,
+    }),
+  })
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(async () => ({
+      error: {
+        message: await response.text(),
+      },
+    }))) as OpenRouterChatResponse
+
+    throw new Error(
+      payload.error?.message ?? 'OpenRouter rejected the streaming chat request.',
+    )
+  }
+
+  if (!response.body) {
+    throw new Error('The browser could not read the streaming chat response.')
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let aggregatedReply = createEmptyAssistantReply()
+  let streamFinished = false
+
+  function processEvent(rawEvent: string) {
+    const normalizedEvent = rawEvent.replace(/\r\n/g, '\n').trim()
+
+    if (!normalizedEvent) {
+      return
+    }
+
+    const payload = extractSsePayload(normalizedEvent)
+
+    if (!payload) {
+      return
+    }
+
+    if (payload === '[DONE]') {
+      streamFinished = true
+      return
+    }
+
+    const chunk = JSON.parse(payload) as OpenRouterChatStreamChunk
+
+    if (chunk.error?.message) {
+      throw new Error(chunk.error.message)
+    }
+
+    const delta = chunk.choices?.[0]?.delta
+
+    if (!delta) {
+      if (chunk.usage) {
+        aggregatedReply = {
+          ...aggregatedReply,
+          usage: chunk.usage,
+        }
+      }
+      return
+    }
+
+    aggregatedReply = applyStreamDelta(aggregatedReply, delta, chunk.usage)
+    onProgress?.(aggregatedReply)
+  }
+
+  while (!streamFinished) {
+    const { done, value } = await reader.read()
+
+    if (done) {
+      buffer += decoder.decode()
+      break
+    }
+
+    buffer += decoder.decode(value, { stream: true })
+
+    let separatorIndex = buffer.indexOf('\n\n')
+
+    while (separatorIndex >= 0) {
+      const rawEvent = buffer.slice(0, separatorIndex)
+      buffer = buffer.slice(separatorIndex + 2)
+      processEvent(rawEvent)
+      separatorIndex = buffer.indexOf('\n\n')
+    }
+  }
+
+  if (buffer.trim()) {
+    processEvent(buffer)
+  }
+
+  if (
+    !aggregatedReply.text &&
+    aggregatedReply.images.length === 0 &&
+    !aggregatedReply.audio?.data &&
+    !aggregatedReply.audio?.transcript &&
+    !aggregatedReply.reasoning &&
+    aggregatedReply.reasoningDetails.length === 0 &&
+    !aggregatedReply.refusal
+  ) {
+    throw new Error('The selected model returned an empty response.')
+  }
+
+  return aggregatedReply
+}
+
 function getRecentOpenRouterModels(models: OpenRouterModel[], limit = 12) {
   return [...models]
     .sort((left, right) => (right.created ?? 0) - (left.created ?? 0))
@@ -371,6 +715,7 @@ function formatModelDate(unixTimestamp?: number) {
 
 export {
   createOpenRouterChatCompletion,
+  createOpenRouterChatCompletionStream,
   fetchOpenRouterModels,
   formatModelDate,
   formatOpenRouterPrice,

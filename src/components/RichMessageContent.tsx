@@ -34,6 +34,7 @@ type RichMessageContentProps = {
   attachments?: RichMessageAttachment[]
   audio?: RichMessageAudio | null
   images?: string[]
+  isStreaming?: boolean
   reasoning?: string
   reasoningDetails?: OpenRouterReasoningDetail[]
   refusal?: string
@@ -271,6 +272,7 @@ function RichMessageContent({
   attachments = [],
   audio = null,
   images = [],
+  isStreaming = false,
   reasoning = '',
   reasoningDetails = [],
   refusal = '',
@@ -281,9 +283,21 @@ function RichMessageContent({
   const visibleRefusal = refusal.trim()
   const reasoningBreakdown = getReasoningBreakdown(visibleReasoning, reasoningDetails)
   const thinkingSummaryLabel = getThinkingSummaryLabel(reasoningBreakdown)
+  const hasRenderableContent =
+    attachments.length > 0 ||
+    Boolean(visibleText) ||
+    images.length > 0 ||
+    Boolean(audio?.src || audio?.transcript) ||
+    Boolean(visibleRefusal) ||
+    Boolean(visibleReasoning) ||
+    reasoningDetails.length > 0
 
   return (
     <div className="workspace-message-content">
+      {isStreaming && !hasRenderableContent ? (
+        <p className="workspace-thinking-note">Waiting for live thinking…</p>
+      ) : null}
+
       {attachments.length > 0 ? (
         <div className="workspace-attachment-list">
           {attachments.map((attachment) => {
@@ -324,7 +338,9 @@ function RichMessageContent({
               {thinkingSummaryLabel ? (
                 <span className="workspace-thinking-pill">{thinkingSummaryLabel}</span>
               ) : null}
-              <span className="workspace-thinking-toggle-copy">Click to expand</span>
+              <span className="workspace-thinking-toggle-copy">
+                {isStreaming ? 'Streaming live' : 'Click to expand'}
+              </span>
             </span>
           </summary>
 

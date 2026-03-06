@@ -30,6 +30,7 @@ import {
 } from 'lucide-react'
 import {
   createOpenRouterChatCompletion,
+  createOpenRouterChatCompletionStream,
   fetchOpenRouterModels,
   formatModelDate,
   formatOpenRouterPrice,
@@ -75,6 +76,7 @@ type WorkspaceAttachment = RichMessageAttachment & {
 type WorkspaceMessage = {
   id: string
   role: 'user' | 'assistant'
+  isStreaming?: boolean
   text: string
   images: string[]
   audio: RichMessageAudio | null
@@ -525,6 +527,16 @@ function shouldIncludeReasoning(
   return Boolean(profile?.supportsReasoning && reasoningEffort !== 'none')
 }
 
+function shouldStreamAssistantResponse(
+  modalities: OpenRouterOutputModality[] | undefined,
+) {
+  if (!modalities || modalities.length === 0) {
+    return true
+  }
+
+  return !modalities.includes('image') && !modalities.includes('audio')
+}
+
 function getAudioPayload(data: { data?: string; transcript?: string } | null) {
   if (!data) {
     return null
@@ -563,6 +575,58 @@ function buildChatStatus(
   return parts.length > 0
     ? `OpenRouter returned ${parts.join(', ')}.`
     : 'Response returned from OpenRouter.'
+}
+
+function buildStreamingChatStatus(
+  text: string,
+  reasoningCount: number,
+  hasRefusal: boolean,
+) {
+  if (reasoningCount > 0 && !text.trim()) {
+    return 'Streaming thinking from OpenRouter.'
+  }
+
+  if (reasoningCount > 0 && text.trim()) {
+    return 'Streaming thinking and answer from OpenRouter.'
+  }
+
+  if (hasRefusal) {
+    return 'Streaming provider refusal details.'
+  }
+
+  return 'Streaming response from OpenRouter.'
+}
+
+function buildAssistantRequestFromReply(assistantReply: {
+  audio: { data?: string; transcript?: string } | null
+  contentParts: OpenRouterChatContentPart[]
+  images: string[]
+  phase: string | null
+  reasoning: string
+  reasoningDetails: OpenRouterReasoningDetail[]
+  text: string
+}) {
+  const assistantImages = assistantReply.images.map((imageUrl) => ({
+    image_url: {
+      url: imageUrl,
+    },
+  }))
+
+  return {
+    role: 'assistant',
+    content:
+      assistantReply.contentParts.length > 0
+        ? assistantReply.contentParts
+        : assistantReply.text || null,
+    reasoning: assistantReply.reasoning || undefined,
+    reasoning_details:
+      assistantReply.reasoningDetails.length > 0
+        ? assistantReply.reasoningDetails
+        : undefined,
+    images: assistantImages.length > 0 ? assistantImages : undefined,
+    audio: assistantReply.audio ?? undefined,
+    phase: assistantReply.phase,
+  } satisfies OpenRouterChatMessage
 }
 
 function ChatWorkspace({
@@ -772,6 +836,23 @@ function ChatWorkspace({
       role: 'user',
       content: buildMessageContent(trimmedMessage, nextUserAttachments),
     } satisfies OpenRouterChatMessage
+    const assistantMessageId = createId()
+    const assistantPlaceholder = {
+      id: assistantMessageId,
+      role: 'assistant',
+      isStreaming: true,
+      text: '',
+      images: [],
+      audio: null,
+      reasoning: '',
+      reasoningDetails: [],
+      refusal: '',
+      attachments: [],
+      request: {
+        role: 'assistant',
+        content: null,
+      },
+    } satisfies WorkspaceMessage
     const nextMessages: WorkspaceMessage[] = [
       ...messages,
       {
@@ -786,6 +867,7 @@ function ChatWorkspace({
         attachments: nextUserAttachments,
         request: userRequest,
       },
+      assistantPlaceholder,
     ]
 
     setMessages(nextMessages)
@@ -796,56 +878,73 @@ function ChatWorkspace({
     setIsSending(true)
 
     try {
-      const assistantReply = await createOpenRouterChatCompletion({
+      const requestedModalities = getRequestedModalities(
+        trimmedMessage,
+        selectedModelProfile,
+        responseMode,
+      )
+      const requestOptions = {
         apiKey: savedApiKey,
         includeReasoning: shouldIncludeReasoning(
           selectedModelProfile,
           reasoningEffort,
         ),
-        messages: nextMessages.map((message) => message.request),
+        messages: nextMessages
+          .filter((message) => !message.isStreaming)
+          .map((message) => message.request),
         model: selectedModelId,
-        modalities: getRequestedModalities(
-          trimmedMessage,
-          selectedModelProfile,
-          responseMode,
-        ),
+        modalities: requestedModalities,
         reasoning: getReasoningRequest(selectedModelProfile, reasoningEffort),
-      })
+      }
+      const assistantReply = shouldStreamAssistantResponse(requestedModalities)
+        ? await createOpenRouterChatCompletionStream({
+            ...requestOptions,
+            onProgress: (partialReply) => {
+              setMessages((currentMessages) =>
+                currentMessages.map((message) =>
+                  message.id === assistantMessageId
+                    ? {
+                        ...message,
+                        text: partialReply.text,
+                        images: partialReply.images,
+                        audio: getAudioPayload(partialReply.audio),
+                        reasoning: partialReply.reasoning,
+                        reasoningDetails: partialReply.reasoningDetails,
+                        refusal: partialReply.refusal,
+                        request: buildAssistantRequestFromReply(partialReply),
+                      }
+                    : message,
+                ),
+              )
+              setChatStatus(
+                buildStreamingChatStatus(
+                  partialReply.text,
+                  partialReply.reasoningDetails.length +
+                    (partialReply.reasoning ? 1 : 0),
+                  Boolean(partialReply.refusal),
+                ),
+              )
+            },
+          })
+        : await createOpenRouterChatCompletion(requestOptions)
 
-      const assistantImages = assistantReply.images.map((imageUrl) => ({
-        image_url: {
-          url: imageUrl,
-        },
-      }))
-      const assistantRequest = {
-        role: 'assistant',
-        content:
-          assistantReply.contentParts.length > 0
-            ? assistantReply.contentParts
-            : assistantReply.text || null,
-        reasoning: assistantReply.reasoning || undefined,
-        reasoning_details:
-          assistantReply.reasoningDetails.length > 0
-            ? assistantReply.reasoningDetails
-            : undefined,
-        images: assistantImages.length > 0 ? assistantImages : undefined,
-        audio: assistantReply.audio ?? undefined,
-        phase: assistantReply.phase,
-      } satisfies OpenRouterChatMessage
       const assistantMessage = {
-        id: createId(),
-        role: 'assistant',
+        ...assistantPlaceholder,
+        isStreaming: false,
         text: assistantReply.text,
         images: assistantReply.images,
         audio: getAudioPayload(assistantReply.audio),
         reasoning: assistantReply.reasoning,
         reasoningDetails: assistantReply.reasoningDetails,
         refusal: assistantReply.refusal,
-        attachments: [],
-        request: assistantRequest,
+        request: buildAssistantRequestFromReply(assistantReply),
       } satisfies WorkspaceMessage
 
-      setMessages([...nextMessages, assistantMessage])
+      setMessages((currentMessages) =>
+        currentMessages.map((message) =>
+          message.id === assistantMessageId ? assistantMessage : message,
+        ),
+      )
       setChatStatus(
         buildChatStatus(
           assistantReply.text,
@@ -856,6 +955,9 @@ function ChatWorkspace({
         ),
       )
     } catch (error) {
+      setMessages((currentMessages) =>
+        currentMessages.filter((message) => message.id !== assistantMessageId),
+      )
       setChatError(
         error instanceof Error ? error.message : 'The chat request failed.',
       )
@@ -1028,6 +1130,11 @@ function ChatWorkspace({
                         ) : (
                           <span className="workspace-compact-tag">Text</span>
                         )}
+                        {profile.supportsReasoning ? (
+                          <span className="workspace-compact-tag">
+                            {profile.reasoningExposure.badge}
+                          </span>
+                        ) : null}
                         {profile.canOutputImage ? (
                           <span className="workspace-compact-tag">Image out</span>
                         ) : null}
@@ -1115,7 +1222,9 @@ function ChatWorkspace({
                         </div>
                         <div className="workspace-compact-tag-row">
                           {profile.supportsReasoning ? (
-                            <span className="workspace-compact-tag">Thinking</span>
+                            <span className="workspace-compact-tag">
+                              {profile.reasoningExposure.badge}
+                            </span>
                           ) : null}
                           {profile.isMultimodal ? (
                             <span className="workspace-compact-tag">Multimodal</span>
@@ -1198,7 +1307,9 @@ function ChatWorkspace({
                           <span className="workspace-capability-chip">Multimodal</span>
                         ) : null}
                         {selectedModelProfile.supportsReasoning ? (
-                          <span className="workspace-capability-chip">Thinking mode</span>
+                          <span className="workspace-capability-chip">
+                            {selectedModelProfile.reasoningExposure.badge}
+                          </span>
                         ) : null}
                         {selectedModelProfile.supportsTools ? (
                           <span className="workspace-capability-chip">Tools</span>
@@ -1265,6 +1376,9 @@ function ChatWorkspace({
                     <div className="workspace-setting-copy">
                       <p className="panel-label">Thinking depth</p>
                       <h4>Ask reasoning-capable models to expose more of their trace.</h4>
+                      <p className="workspace-setting-detail">
+                        {selectedModelProfile.reasoningExposure.detail}
+                      </p>
                     </div>
                     <div className="workspace-setting-pill-row workspace-setting-pill-row-compact">
                       {reasoningEffortOptions.map((option) => (
@@ -1348,6 +1462,7 @@ function ChatWorkspace({
                     attachments={message.attachments}
                     audio={message.audio}
                     images={message.images}
+                    isStreaming={Boolean(message.isStreaming)}
                     reasoning={message.reasoning}
                     reasoningDetails={message.reasoningDetails}
                     refusal={message.refusal}
@@ -1355,19 +1470,6 @@ function ChatWorkspace({
                   />
                 </article>
               ))}
-
-              {isSending ? (
-                <div className="workspace-message workspace-message-assistant">
-                  <div className="workspace-message-meta">
-                    <strong>Model</strong>
-                    <span>{selectedModel?.name ?? 'OpenRouter'}</span>
-                  </div>
-                  <p className="workspace-loading-line">
-                    <LoaderCircle className="spin" size={16} />
-                    Thinking...
-                  </p>
-                </div>
-              ) : null}
 
               <div ref={messageEndRef} />
             </div>

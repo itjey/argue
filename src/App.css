@@ -1516,7 +1516,8 @@
 }
 
 .workspace-smartness-card p,
-.workspace-setting-copy h4 {
+.workspace-setting-copy h4,
+.workspace-setting-copy p {
   margin: 0;
 }
 
@@ -1533,6 +1534,12 @@
   color: var(--ink-strong);
   font-size: 0.96rem;
   font-weight: 600;
+}
+
+.workspace-setting-detail {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  line-height: 1.65;
 }
 
 .workspace-setting-pill {
