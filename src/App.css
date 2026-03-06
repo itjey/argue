@@ -1765,8 +1765,8 @@
 
 .workspace-textarea {
   width: 100%;
-  min-height: 3rem;
-  padding: 0.65rem 3.5rem 0.65rem 1.1rem;
+  min-height: 2.6rem;
+  padding: 0.45rem 3.2rem 0.45rem 1rem;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 999px;
   color: var(--ink-strong);
@@ -1774,7 +1774,7 @@
   overflow: hidden;
   resize: none;
   font-size: 1rem;
-  line-height: 1.65;
+  line-height: 1.5;
   transition:
     border-color 180ms ease,
     background-color 180ms ease;
@@ -1782,14 +1782,14 @@
 
 .workspace-send-icon {
   position: absolute;
-  right: 0.35rem;
+  right: 0.3rem;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.3rem;
-  height: 2.3rem;
+  width: 2rem;
+  height: 2rem;
   padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 999px;
