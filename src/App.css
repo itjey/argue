@@ -447,7 +447,7 @@
 
 .auth-form-grid + .auth-primary-button,
 .auth-form-grid + .auth-secondary-button {
-  margin-top: 0.95rem;
+  margin-top: 1.35rem;
 }
 
 .auth-field {
@@ -466,7 +466,7 @@
   width: 100%;
   min-height: 3rem;
   padding: 0.8rem 0.9rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 0.24rem;
   color: var(--ink-strong);
   background: rgba(255, 255, 255, 0.02);
@@ -477,7 +477,7 @@
 
 .auth-input:focus {
   outline: none;
-  border-color: rgba(255, 255, 255, 0.26);
+  border-color: rgba(255, 255, 255, 0.34);
   background: rgba(255, 255, 255, 0.03);
 }
 
