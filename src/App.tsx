@@ -14,7 +14,6 @@ import {
   Layers3,
   LockKeyhole,
   MessagesSquare,
-  Orbit,
   ScrollText,
   ShieldCheck,
   Sigma,
@@ -199,7 +198,11 @@ function App() {
       <header className="topbar">
         <a className="brand" href="#top" aria-label="Argue home">
           <span className="brand-mark">
-            <Orbit size={18} />
+            <span className="brand-fan" aria-hidden="true">
+              <span className="brand-blade brand-blade-left" />
+              <span className="brand-blade brand-blade-center" />
+              <span className="brand-blade brand-blade-right" />
+            </span>
           </span>
           <span className="brand-wordmark">Argue</span>
         </a>
