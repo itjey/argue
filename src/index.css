@@ -7,8 +7,8 @@
   color-scheme: dark;
   color: #f5f5f2;
   background:
-    radial-gradient(circle at 12% 14%, rgba(209, 188, 129, 0.12), transparent 22%),
-    radial-gradient(circle at 86% 8%, rgba(136, 152, 196, 0.12), transparent 18%),
+    radial-gradient(circle at 12% 14%, rgba(255, 255, 255, 0.07), transparent 22%),
+    radial-gradient(circle at 86% 8%, rgba(255, 255, 255, 0.05), transparent 18%),
     radial-gradient(circle at 50% 120%, rgba(255, 255, 255, 0.06), transparent 32%),
     linear-gradient(180deg, #060708 0%, #0a0c10 52%, #050607 100%);
   font-synthesis: none;
@@ -27,9 +27,6 @@
   --ink-inverse: #050505;
   --line: rgba(255, 255, 255, 0.08);
   --line-strong: rgba(255, 255, 255, 0.16);
-  --accent: #d1bc81;
-  --accent-soft: rgba(209, 188, 129, 0.14);
-  --accent-cool: #8d9ccc;
   --shadow-xl: 0 28px 80px rgba(0, 0, 0, 0.38);
 }
 
@@ -52,7 +49,7 @@ body {
 }
 
 body::selection {
-  background: rgba(209, 188, 129, 0.28);
+  background: rgba(255, 255, 255, 0.18);
   color: var(--ink-strong);
 }
 
