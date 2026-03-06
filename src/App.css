@@ -56,8 +56,8 @@
 }
 
 .brand-mark {
-  width: 1.95rem;
-  height: 1.2rem;
+  width: 2rem;
+  height: 1.25rem;
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
@@ -65,70 +65,56 @@
 
 .brand-fan {
   position: relative;
-  width: 1.8rem;
-  height: 1.1rem;
-}
-
-.brand-fan::before {
-  content: '';
-  position: absolute;
-  left: 0.06rem;
-  top: 50%;
-  width: 1px;
-  height: 0.92rem;
-  background: rgba(255, 255, 255, 0.25);
-  transform: translateY(-50%);
+  width: 1.86rem;
+  height: 1.04rem;
 }
 
 .brand-blade {
   position: absolute;
-  left: 0.18rem;
+  left: 0;
   top: 50%;
-  width: 1.18rem;
-  height: 0.46rem;
-  clip-path: polygon(0 50%, 100% 0, 100% 100%);
+  width: 1.62rem;
+  height: 0.82rem;
   transform-origin: 0% 50%;
   transition:
     transform 240ms ease,
     opacity 240ms ease,
     filter 240ms ease;
   filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.28));
+  color: var(--ink-strong);
 }
 
 .brand-blade-left {
   z-index: 1;
-  opacity: 0.82;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.92), rgba(198, 198, 198, 0.76));
+  opacity: 0.78;
   transform: translateY(-50%) rotate(-30deg);
 }
 
 .brand-blade-center {
   z-index: 3;
   opacity: 1;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 1), rgba(216, 216, 216, 0.92));
   transform: translateY(-50%) rotate(0deg);
 }
 
 .brand-blade-right {
   z-index: 2;
-  opacity: 0.88;
-  background: linear-gradient(90deg, rgba(244, 244, 244, 0.94), rgba(172, 172, 172, 0.74));
+  opacity: 0.86;
   transform: translateY(-50%) rotate(30deg);
 }
 
 .brand:hover .brand-blade-left,
 .brand:focus-visible .brand-blade-left {
-  transform: translateY(-50%) rotate(0deg) translateX(0.04rem);
+  transform: translateY(-50%) rotate(0deg) translateX(0.02rem);
 }
 
 .brand:hover .brand-blade-center,
 .brand:focus-visible .brand-blade-center {
-  transform: translateY(-50%) rotate(0deg) translateX(0.16rem);
+  transform: translateY(-50%) rotate(0deg) translateX(0.14rem);
 }
 
 .brand:hover .brand-blade-right,
 .brand:focus-visible .brand-blade-right {
-  transform: translateY(-50%) rotate(0deg) translateX(0.28rem);
+  transform: translateY(-50%) rotate(0deg) translateX(0.26rem);
 }
 
 .brand:hover .brand-blade,
@@ -186,35 +172,10 @@
   padding-top: clamp(3.4rem, 7vw, 6rem);
 }
 
-.eyebrow-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1.2rem;
-}
-
-.eyebrow-pill,
-.eyebrow-subtle {
-  display: inline-flex;
-  align-items: center;
-  min-height: 2rem;
-  padding: 0.35rem 0.65rem;
-  border: 1px solid var(--line);
-  border-radius: 0.16rem;
-  color: var(--ink-soft);
-  font-size: 0.74rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.eyebrow-subtle {
-  background: rgba(255, 255, 255, 0.015);
-}
-
 .hero-type-line {
-  margin-bottom: 1.05rem;
+  margin-top: -0.15rem;
+  margin-bottom: 0.85rem;
+  padding-bottom: 0.25rem;
 }
 
 .hero-typewriter {
@@ -223,11 +184,12 @@
   overflow: hidden;
   white-space: nowrap;
   padding-right: 0.08rem;
+  padding-bottom: 0.12em;
   border-right: 2px solid rgba(255, 255, 255, 0.9);
   font-family: var(--font-mono);
   font-size: clamp(2.9rem, 7vw, 6.2rem);
   font-weight: 500;
-  line-height: 0.92;
+  line-height: 1.05;
   letter-spacing: -0.08em;
   color: var(--ink-strong);
   animation:

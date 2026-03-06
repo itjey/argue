@@ -198,9 +198,33 @@ function App() {
         <a className="brand" href="#top" aria-label="Argue home">
           <span className="brand-mark">
             <span className="brand-fan" aria-hidden="true">
-              <span className="brand-blade brand-blade-left" />
-              <span className="brand-blade brand-blade-center" />
-              <span className="brand-blade brand-blade-right" />
+              <svg className="brand-blade brand-blade-left" viewBox="0 0 28 14">
+                <path
+                  d="M2 7L25 2V12L2 7Z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.6"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <svg className="brand-blade brand-blade-center" viewBox="0 0 28 14">
+                <path
+                  d="M2 7L25 2V12L2 7Z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.6"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <svg className="brand-blade brand-blade-right" viewBox="0 0 28 14">
+                <path
+                  d="M2 7L25 2V12L2 7Z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.6"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </span>
           </span>
           <span className="brand-wordmark">argue</span>
@@ -227,11 +251,6 @@ function App() {
       <main className="page" id="top">
         <section className="hero section" id="concept">
           <div className="hero-copy">
-            <div className="eyebrow-row">
-              <span className="eyebrow-pill">Private multi-model debates</span>
-              <span className="eyebrow-subtle">A monochrome concept for serious work</span>
-            </div>
-
             <div className="hero-type-line">
               <span className="hero-typewriter" aria-label="argue.">
                 argue.
