@@ -26,7 +26,6 @@ import {
   RefreshCcw,
   Search,
   Send,
-  ShieldCheck,
   Sparkles,
   Trash2,
   X,
@@ -68,8 +67,6 @@ import { ModelStatsPanel } from './ModelStatsPanel'
 
 type ChatWorkspaceProps = {
   currentUser: User
-  isVerified: boolean
-  onOpenAccount: () => void
 }
 
 type WorkspaceAttachment = RichMessageAttachment & {
@@ -833,11 +830,7 @@ function buildAssistantRequestFromReply(assistantReply: {
   } satisfies OpenRouterChatMessage
 }
 
-function ChatWorkspace({
-  currentUser,
-  isVerified,
-  onOpenAccount,
-}: ChatWorkspaceProps) {
+function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
   const attachmentInputRef = useRef<HTMLInputElement | null>(null)
   const messageStackRef = useRef<HTMLDivElement | null>(null)
   const shouldAutoScrollRef = useRef(true)
@@ -1281,30 +1274,6 @@ function ChatWorkspace({
 
       <div className="workspace-home-grid">
         <aside className="workspace-library-column" id="models">
-          <div className="workspace-account-card" id="account">
-            <div className="workspace-account-header">
-              <div>
-                <p className="panel-label">Signed in</p>
-                <h2>{currentUser.email ?? 'Argue account'}</h2>
-              </div>
-              <div className="status-pill">
-                {isVerified ? <ShieldCheck size={16} /> : <KeyRound size={16} />}
-                {isVerified ? 'Verified' : 'Verification pending'}
-              </div>
-            </div>
-            <p className="workspace-account-copy">
-              Your Firebase login unlocks the workspace. Your OpenRouter key stays
-              local to this browser unless you choose to reuse it elsewhere.
-            </p>
-            <button
-              className="button button-secondary"
-              onClick={onOpenAccount}
-              type="button"
-            >
-              Manage account
-            </button>
-          </div>
-
           <div className="control-card">
             <div className="control-card-header">
               <div>
