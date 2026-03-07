@@ -15,7 +15,7 @@
 
 .topbar {
   position: sticky;
-  top: 0;
+  top: 0.55rem;
   z-index: 40;
   margin-top: 0;
   padding: calc(0.48rem + env(safe-area-inset-top)) 1.15rem 0.88rem;
