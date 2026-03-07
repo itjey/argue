@@ -17,9 +17,7 @@ import {
   ImagePlus,
   LoaderCircle,
   Paperclip,
-  RefreshCcw,
   Search,
-  Trash2,
   X,
 } from 'lucide-react'
 import {
@@ -576,7 +574,7 @@ function buildAssistantRequestFromReply(assistantReply: {
   } satisfies OpenRouterChatMessage
 }
 
-function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
+function ChatWorkspace({ currentUser: _currentUser }: ChatWorkspaceProps) {
   const attachmentInputRef = useRef<HTMLInputElement | null>(null)
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const messageStackRef = useRef<HTMLDivElement | null>(null)
@@ -958,12 +956,6 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
     }
   }
 
-  function handleClearThread() {
-    setMessages([])
-    setAttachments([])
-    setChatError('')
-  }
-
   const hasModelSearch = deferredModelSearch.trim().length > 0
   const filteredModels = hasModelSearch
     ? models.filter((model) => {
@@ -983,7 +975,6 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
   const hasSavedApiKey = savedApiKey.trim().length > 0
   const canOutputImage = Boolean(selectedModelProfile?.canOutputImage)
   const supportsReasoning = Boolean(selectedModelProfile?.supportsReasoning)
-  const accountEmail = currentUser.email ?? 'Signed in user'
 
   useEffect(() => {
     if (!supportsReasoning && reasoningEffort !== 'none') {
@@ -1011,22 +1002,6 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                   value={modelSearch}
                 />
               </label>
-
-              <div className="workspace-inline-actions">
-                <button
-                  className="button button-secondary"
-                  disabled={modelsLoading}
-                  onClick={() => void loadModels()}
-                  type="button"
-                >
-                  {modelsLoading ? (
-                    <LoaderCircle className="spin" size={16} />
-                  ) : (
-                    <RefreshCcw size={16} />
-                  )}
-                  Refresh
-                </button>
-              </div>
 
               {modelsError ? <p className="workspace-error">{modelsError}</p> : null}
 
@@ -1157,29 +1132,6 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
 
         <div className="workspace-chat-column">
           <div className="workspace-chat-card">
-            <div className="workspace-chat-header">
-              <div className="workspace-chat-header-actions">
-                <button
-                  className="button button-secondary"
-                  onClick={handleClearThread}
-                  type="button"
-                >
-                  <Trash2 size={16} />
-                  New chat
-                </button>
-                <div className="workspace-chat-heading workspace-chat-heading-top-right">
-                  <strong>{accountEmail}</strong>
-                  {hasSavedApiKey ? (
-                    <span>API key ready</span>
-                  ) : (
-                    <span className="workspace-api-warning">
-                      Add API key in Settings to start chatting.
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
             {chatError ? <p className="workspace-error">{chatError}</p> : null}
 
             <div

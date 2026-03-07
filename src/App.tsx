@@ -91,6 +91,8 @@ type PendingGoogleLink = {
   email: string
 }
 
+const OPENROUTER_KEY_STORAGE = 'argue-openrouter-api-key'
+
 function buildVerificationUrl() {
   return `${window.location.origin}${import.meta.env.BASE_URL}`
 }
@@ -288,6 +290,7 @@ function App() {
   const [passwordResetMessage, setPasswordResetMessage] = useState('')
   const [passwordResetError, setPasswordResetError] = useState('')
   const [topbarHidden, setTopbarHidden] = useState(false)
+  const [hasSavedApiKey, setHasSavedApiKey] = useState(false)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
@@ -364,6 +367,33 @@ function App() {
       window.removeEventListener('keydown', handleEscape)
     }
   }, [authDialogOpen])
+
+  useEffect(() => {
+    const syncSavedApiKey = () => {
+      const storedKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
+      setHasSavedApiKey(storedKey.trim().length > 0)
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncSavedApiKey()
+      }
+    }
+
+    syncSavedApiKey()
+
+    window.addEventListener('argue-openrouter-key-changed', syncSavedApiKey)
+    window.addEventListener('focus', syncSavedApiKey)
+    window.addEventListener('storage', syncSavedApiKey)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('argue-openrouter-key-changed', syncSavedApiKey)
+      window.removeEventListener('focus', syncSavedApiKey)
+      window.removeEventListener('storage', syncSavedApiKey)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
 
   function clearFeedback() {
     setStatusMessage('')
@@ -848,7 +878,11 @@ function App() {
           {currentUser ? (
             <span className="topbar-account-copy">
               <strong>{currentUser.email ?? 'Account'}</strong>
-              {!isVerified ? (
+              {!hasSavedApiKey ? (
+                <small className="topbar-api-key-warning">
+                  Add API key in Settings to start chatting.
+                </small>
+              ) : !isVerified ? (
                 <small className="topbar-account-warning">Unverified account</small>
               ) : null}
             </span>
