@@ -581,7 +581,6 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const messageStackRef = useRef<HTMLDivElement | null>(null)
   const shouldAutoScrollRef = useRef(true)
-  const [draftApiKey, setDraftApiKey] = useState('')
   const [savedApiKey, setSavedApiKey] = useState('')
   const [models, setModels] = useState<OpenRouterModel[]>([])
   const [modelsLoading, setModelsLoading] = useState(true)
@@ -608,9 +607,31 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
     const storedModel =
       window.localStorage.getItem(OPENROUTER_MODEL_STORAGE) ?? ''
 
-    setDraftApiKey(storedKey)
     setSavedApiKey(storedKey)
     setSelectedModelId(storedModel)
+  }, [])
+
+  useEffect(() => {
+    const syncSavedKey = () => {
+      const storedKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
+      setSavedApiKey(storedKey)
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncSavedKey()
+      }
+    }
+
+    window.addEventListener('argue-openrouter-key-changed', syncSavedKey)
+    window.addEventListener('focus', syncSavedKey)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('argue-openrouter-key-changed', syncSavedKey)
+      window.removeEventListener('focus', syncSavedKey)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [])
 
   useEffect(() => {
@@ -710,24 +731,6 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
     } finally {
       setStatsLoading(false)
     }
-  }
-
-  function handleSaveApiKey() {
-    const trimmedKey = draftApiKey.trim()
-    setSavedApiKey(trimmedKey)
-
-    if (trimmedKey) {
-      window.localStorage.setItem(OPENROUTER_KEY_STORAGE, trimmedKey)
-      return
-    }
-
-    window.localStorage.removeItem(OPENROUTER_KEY_STORAGE)
-  }
-
-  function handleClearApiKey() {
-    setDraftApiKey('')
-    setSavedApiKey('')
-    window.localStorage.removeItem(OPENROUTER_KEY_STORAGE)
   }
 
   function handleSelectModel(modelId: string) {
@@ -991,56 +994,9 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
     <section className="workspace-home section" id="chat">
       <div className="workspace-chat-shell">
         <div className="workspace-utility-grid" id="models">
-          <details className="workspace-utility-panel" open={!hasSavedApiKey}>
+          <details className="workspace-utility-panel workspace-utility-panel-wide" open>
             <summary className="workspace-utility-summary">
-              <strong>Settings</strong>
-              <ChevronDown className="workspace-collapsible-chevron" size={16} />
-            </summary>
-            <div className="workspace-utility-body workspace-inline-stack">
-              <div className="workspace-settings-account">
-                <span className="workspace-settings-email">{accountEmail}</span>
-                <span
-                  className={`workspace-settings-status${
-                    hasSavedApiKey
-                      ? ' workspace-settings-status-ok'
-                      : ' workspace-settings-status-missing'
-                  }`}
-                >
-                  {hasSavedApiKey ? 'API key saved' : 'API key missing'}
-                </span>
-              </div>
-              <input
-                autoComplete="off"
-                className="auth-input"
-                onChange={(event) => setDraftApiKey(event.target.value)}
-                placeholder="sk-or-v1-..."
-                spellCheck={false}
-                type="password"
-                value={draftApiKey}
-              />
-
-              <div className="workspace-inline-actions">
-                <button
-                  className="button button-primary"
-                  onClick={handleSaveApiKey}
-                  type="button"
-                >
-                  Save key
-                </button>
-                <button
-                  className="button button-secondary"
-                  onClick={handleClearApiKey}
-                  type="button"
-                >
-                  Clear
-                </button>
-              </div>
-            </div>
-          </details>
-
-          <details className="workspace-utility-panel workspace-utility-panel-wide">
-            <summary className="workspace-utility-summary">
-              <strong>{selectedModel?.name ?? 'Search model'}</strong>
+              <strong>Search and pick a model</strong>
               <ChevronDown className="workspace-collapsible-chevron" size={16} />
             </summary>
             <div className="workspace-utility-body workspace-inline-stack">
@@ -1120,52 +1076,54 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
               <ChevronDown className="workspace-collapsible-chevron" size={16} />
             </summary>
             <div className="workspace-utility-body workspace-inline-stack">
-              <div className="workspace-setting-card">
-                <h4>Response mode</h4>
-                <div className="workspace-setting-pill-row">
-                  {responseModeOptions.map((option) => (
-                    <button
-                      className={`workspace-setting-pill ${
-                        responseMode === option.id ? 'workspace-setting-pill-active' : ''
-                      }`}
-                      disabled={option.id === 'text-image' && !canOutputImage}
-                      key={option.id}
-                      onClick={() => setResponseMode(option.id)}
-                      type="button"
-                    >
-                      <strong>{option.label}</strong>
-                    </button>
-                  ))}
+              <div className="workspace-controls-grid">
+                <div className="workspace-setting-card">
+                  <h4>Response mode</h4>
+                  <div className="workspace-setting-pill-row">
+                    {responseModeOptions.map((option) => (
+                      <button
+                        className={`workspace-setting-pill ${
+                          responseMode === option.id ? 'workspace-setting-pill-active' : ''
+                        }`}
+                        disabled={option.id === 'text-image' && !canOutputImage}
+                        key={option.id}
+                        onClick={() => setResponseMode(option.id)}
+                        type="button"
+                      >
+                        <strong>{option.label}</strong>
+                      </button>
+                    ))}
+                  </div>
+                  {!canOutputImage ? (
+                    <p className="workspace-inline-note">
+                      This model outputs text only.
+                    </p>
+                  ) : null}
                 </div>
-                {!canOutputImage ? (
-                  <p className="workspace-inline-note">
-                    This model outputs text only.
-                  </p>
-                ) : null}
-              </div>
 
-              <div className="workspace-setting-card">
-                <h4>Thinking</h4>
-                <div className="workspace-setting-pill-row workspace-setting-pill-row-compact">
-                  {reasoningEffortOptions.map((option) => (
-                    <button
-                      className={`workspace-setting-pill ${
-                        reasoningEffort === option.id ? 'workspace-setting-pill-active' : ''
-                      }`}
-                      disabled={!supportsReasoning && option.id !== 'none'}
-                      key={option.id}
-                      onClick={() => setReasoningEffort(option.id)}
-                      type="button"
-                    >
-                      <strong>{option.label}</strong>
-                    </button>
-                  ))}
+                <div className="workspace-setting-card">
+                  <h4>Thinking</h4>
+                  <div className="workspace-setting-pill-row workspace-setting-pill-row-compact">
+                    {reasoningEffortOptions.map((option) => (
+                      <button
+                        className={`workspace-setting-pill ${
+                          reasoningEffort === option.id ? 'workspace-setting-pill-active' : ''
+                        }`}
+                        disabled={!supportsReasoning && option.id !== 'none'}
+                        key={option.id}
+                        onClick={() => setReasoningEffort(option.id)}
+                        type="button"
+                      >
+                        <strong>{option.label}</strong>
+                      </button>
+                    ))}
+                  </div>
+                  {!supportsReasoning ? (
+                    <p className="workspace-inline-note">
+                      This model does not expose reasoning controls.
+                    </p>
+                  ) : null}
                 </div>
-                {!supportsReasoning ? (
-                  <p className="workspace-inline-note">
-                    This model does not expose reasoning controls.
-                  </p>
-                ) : null}
               </div>
             </div>
           </details>

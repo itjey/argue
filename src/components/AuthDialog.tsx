@@ -1,8 +1,10 @@
+import { useEffect, useState } from 'react'
 import type { User } from 'firebase/auth'
 import {
   KeyRound,
   Link2,
   LoaderCircle,
+  Settings,
   LogIn,
   LogOut,
   MailCheck,
@@ -12,6 +14,7 @@ import {
 } from 'lucide-react'
 
 type AuthMode = 'sign-in' | 'sign-up'
+const OPENROUTER_KEY_STORAGE = 'argue-openrouter-api-key'
 
 type AuthDialogProps = {
   busyAction: string | null
@@ -74,6 +77,41 @@ function AuthDialog({
   onResendVerification,
   onSignOut,
 }: AuthDialogProps) {
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [apiKeyDraft, setApiKeyDraft] = useState('')
+  const [hasSavedApiKey, setHasSavedApiKey] = useState(false)
+
+  useEffect(() => {
+    if (!open) {
+      setSettingsOpen(false)
+      return
+    }
+
+    const storedKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
+    setApiKeyDraft(storedKey)
+    setHasSavedApiKey(storedKey.trim().length > 0)
+  }, [open])
+
+  function applyApiKey(nextValue: string) {
+    if (nextValue) {
+      window.localStorage.setItem(OPENROUTER_KEY_STORAGE, nextValue)
+    } else {
+      window.localStorage.removeItem(OPENROUTER_KEY_STORAGE)
+    }
+
+    setApiKeyDraft(nextValue)
+    setHasSavedApiKey(nextValue.trim().length > 0)
+    window.dispatchEvent(new Event('argue-openrouter-key-changed'))
+  }
+
+  function handleSaveApiKey() {
+    applyApiKey(apiKeyDraft.trim())
+  }
+
+  function handleClearApiKey() {
+    applyApiKey('')
+  }
+
   if (!open) {
     return null
   }
@@ -151,6 +189,58 @@ function AuthDialog({
                 ))}
               </div>
             </div>
+
+            <button
+              className="auth-secondary-button auth-settings-toggle"
+              onClick={() => setSettingsOpen((isOpen) => !isOpen)}
+              type="button"
+            >
+              <Settings size={16} />
+              {settingsOpen ? 'Close settings' : 'Settings'}
+            </button>
+
+            {settingsOpen ? (
+              <div className="auth-card auth-settings-card">
+                <p className="auth-label">OpenRouter API key</p>
+                <label className="auth-field">
+                  <span>API key</span>
+                  <input
+                    autoComplete="off"
+                    className="auth-input"
+                    onChange={(event) => setApiKeyDraft(event.target.value)}
+                    placeholder="sk-or-v1-..."
+                    spellCheck={false}
+                    type="password"
+                    value={apiKeyDraft}
+                  />
+                </label>
+                <div className="auth-inline-actions">
+                  <button
+                    className="auth-primary-button"
+                    onClick={handleSaveApiKey}
+                    type="button"
+                  >
+                    Save key
+                  </button>
+                  <button
+                    className="auth-secondary-button"
+                    onClick={handleClearApiKey}
+                    type="button"
+                  >
+                    Clear
+                  </button>
+                </div>
+                <p
+                  className={`auth-settings-status${
+                    hasSavedApiKey
+                      ? ' auth-settings-status-ok'
+                      : ' auth-settings-status-missing'
+                  }`}
+                >
+                  {hasSavedApiKey ? 'API key saved' : 'API key missing'}
+                </p>
+              </div>
+            ) : null}
 
             {showVerificationActions ? (
               <div className="auth-card">
