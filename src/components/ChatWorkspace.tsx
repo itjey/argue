@@ -10,21 +10,15 @@ import type { User } from 'firebase/auth'
 import {
   ArrowUp,
   AudioLines,
-  Bot,
-  BrainCircuit,
   ChevronDown,
   Code2,
   FileText,
   Film,
   ImagePlus,
-  KeyRound,
-  LibraryBig,
-  Lightbulb,
   LoaderCircle,
   Paperclip,
   RefreshCcw,
   Search,
-  Sparkles,
   Trash2,
   X,
 } from 'lucide-react'
@@ -32,8 +26,6 @@ import {
   createOpenRouterChatCompletion,
   createOpenRouterChatCompletionStream,
   fetchOpenRouterModels,
-  formatModelDate,
-  getRecentOpenRouterModels,
   type OpenRouterChatContentPart,
   type OpenRouterChatMessage,
   type OpenRouterModel,
@@ -43,10 +35,7 @@ import {
   type OpenRouterUsage,
 } from '../lib/openrouter'
 import {
-  getAttachmentSupportHint,
-  getInputCapabilityLabels,
   getModelCapabilityProfile,
-  getOutputCapabilityLabels,
   looksLikeImageGenerationPrompt,
   type OpenRouterModelCapabilityProfile,
 } from '../lib/openrouterCapabilities'
@@ -60,7 +49,6 @@ import {
   type RichMessageAttachment,
   type RichMessageAudio,
 } from './RichMessageContent'
-import { ModelStatsPanel } from './ModelStatsPanel'
 
 type ChatWorkspaceProps = {
   currentUser: User
@@ -87,16 +75,6 @@ type WorkspaceMessage = {
   estimatedCost?: number | null
   attachments: WorkspaceAttachment[]
   request: OpenRouterChatMessage
-}
-
-type ThreadUsageTotals = {
-  hasEstimatedCost: boolean
-  hasReasoningTokens: boolean
-  promptTokens: number
-  completionTokens: number
-  totalTokens: number
-  reasoningTokens: number
-  estimatedCost: number
 }
 
 type ResponseMode = 'auto' | 'text' | 'text-image'
@@ -133,13 +111,6 @@ const CODE_FILE_EXTENSIONS = new Set([
   '.yml',
 ])
 const CODE_FILE_ACCEPT = [...CODE_FILE_EXTENSIONS].join(',')
-
-const promptSuggestions = [
-  'Explain the core tradeoffs in using multiple models together.',
-  'Help me debug a React component that rerenders too often.',
-  'Design a schema for storing collaborative AI conversations.',
-  'Summarize the newest OpenRouter models worth testing first.',
-]
 
 const responseModeOptions: Array<{
   id: ResponseMode
@@ -181,70 +152,6 @@ function createId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
-function formatLargeNumber(value?: number) {
-  if (!value) {
-    return 'n/a'
-  }
-
-  return new Intl.NumberFormat('en-US', {
-    notation: 'compact',
-    maximumFractionDigits: 1,
-  }).format(value)
-}
-
-function formatTokenCount(value?: number | null) {
-  if (value == null || !Number.isFinite(value)) {
-    return 'n/a'
-  }
-
-  return new Intl.NumberFormat('en-US').format(value)
-}
-
-function getTokenDetailValue(
-  usage: OpenRouterUsage | null | undefined,
-  bucket: 'prompt_tokens_details' | 'completion_tokens_details',
-  detailName: string,
-) {
-  const detailValue = usage?.[bucket]?.[detailName]
-  return typeof detailValue === 'number' && Number.isFinite(detailValue)
-    ? detailValue
-    : null
-}
-
-function getReasoningTokenUsage(usage: OpenRouterUsage | null | undefined) {
-  const promptReasoningTokens = getTokenDetailValue(
-    usage,
-    'prompt_tokens_details',
-    'reasoning_tokens',
-  )
-  const completionReasoningTokens = getTokenDetailValue(
-    usage,
-    'completion_tokens_details',
-    'reasoning_tokens',
-  )
-  const hasReasoningTokens =
-    promptReasoningTokens != null || completionReasoningTokens != null
-
-  return {
-    hasReasoningTokens,
-    value: (promptReasoningTokens ?? 0) + (completionReasoningTokens ?? 0),
-  }
-}
-
-function getTotalTokenUsage(usage: OpenRouterUsage | null | undefined) {
-  if (!usage) {
-    return null
-  }
-
-  if (typeof usage.total_tokens === 'number' && Number.isFinite(usage.total_tokens)) {
-    return usage.total_tokens
-  }
-
-  const promptTokens = usage.prompt_tokens ?? 0
-  const completionTokens = usage.completion_tokens ?? 0
-  return promptTokens + completionTokens
-}
-
 function parseOpenRouterPrice(value?: string) {
   if (!value) {
     return null
@@ -284,63 +191,6 @@ function estimateUsageCost(
   const totalCost = promptCost + completionCost
 
   return Number.isFinite(totalCost) ? totalCost : null
-}
-
-function formatEstimatedCost(value?: number | null) {
-  if (value == null || !Number.isFinite(value)) {
-    return 'n/a'
-  }
-
-  if (value === 0) {
-    return '$0.00'
-  }
-
-  if (value < 0.0001) {
-    return `$${value.toFixed(6)}`
-  }
-
-  if (value < 0.01) {
-    return `$${value.toFixed(4)}`
-  }
-
-  return `$${value.toFixed(2)}`
-}
-
-function getThreadUsageTotals(messages: WorkspaceMessage[]): ThreadUsageTotals {
-  return messages.reduce<ThreadUsageTotals>(
-    (totals, message) => {
-      if (message.role !== 'assistant' || !message.usage) {
-        return totals
-      }
-
-      totals.promptTokens += message.usage.prompt_tokens ?? 0
-      totals.completionTokens += message.usage.completion_tokens ?? 0
-      totals.totalTokens += getTotalTokenUsage(message.usage) ?? 0
-
-      const reasoningUsage = getReasoningTokenUsage(message.usage)
-
-      if (reasoningUsage.hasReasoningTokens) {
-        totals.hasReasoningTokens = true
-        totals.reasoningTokens += reasoningUsage.value
-      }
-
-      if (message.estimatedCost != null && Number.isFinite(message.estimatedCost)) {
-        totals.hasEstimatedCost = true
-        totals.estimatedCost += message.estimatedCost
-      }
-
-      return totals
-    },
-    {
-      hasEstimatedCost: false,
-      hasReasoningTokens: false,
-      promptTokens: 0,
-      completionTokens: 0,
-      totalTokens: 0,
-      reasoningTokens: 0,
-      estimatedCost: 0,
-    },
-  )
 }
 
 function formatBytes(value: number) {
@@ -587,23 +437,6 @@ async function createAttachmentFromFile(
   )
 }
 
-function createLightbulbIcons(
-  bulbs: number,
-  prefix: string,
-  mutedCount = 5,
-) {
-  return Array.from({ length: mutedCount }, (_, index) => (
-    <span
-      className={`workspace-lightbulb ${
-        index < bulbs ? 'workspace-lightbulb-active' : ''
-      }`}
-      key={`${prefix}-${index}`}
-    >
-      <Lightbulb size={14} />
-    </span>
-  ))
-}
-
 function buildMessageContent(
   message: string,
   attachments: WorkspaceAttachment[],
@@ -711,55 +544,6 @@ function getAudioPayload(data: { data?: string; transcript?: string } | null) {
   } satisfies RichMessageAudio
 }
 
-function buildChatStatus(
-  text: string,
-  imageCount: number,
-  reasoningCount: number,
-  audioPresent: boolean,
-) {
-  const parts: string[] = []
-
-  if (text.trim()) {
-    parts.push('text')
-  }
-
-  if (imageCount > 0) {
-    parts.push(imageCount === 1 ? '1 image' : `${imageCount} images`)
-  }
-
-  if (audioPresent) {
-    parts.push('audio')
-  }
-
-  if (reasoningCount > 0) {
-    parts.push('thinking details')
-  }
-
-  return parts.length > 0
-    ? `OpenRouter returned ${parts.join(', ')}.`
-    : 'Response returned from OpenRouter.'
-}
-
-function buildStreamingChatStatus(
-  text: string,
-  reasoningCount: number,
-  hasRefusal: boolean,
-) {
-  if (reasoningCount > 0 && !text.trim()) {
-    return 'Streaming thinking from OpenRouter.'
-  }
-
-  if (reasoningCount > 0 && text.trim()) {
-    return 'Streaming thinking and answer from OpenRouter.'
-  }
-
-  if (hasRefusal) {
-    return 'Streaming provider refusal details.'
-  }
-
-  return 'Streaming response from OpenRouter.'
-}
-
 function buildAssistantRequestFromReply(assistantReply: {
   audio: { data?: string; transcript?: string } | null
   contentParts: OpenRouterChatContentPart[]
@@ -792,16 +576,14 @@ function buildAssistantRequestFromReply(assistantReply: {
   } satisfies OpenRouterChatMessage
 }
 
-function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
+function ChatWorkspace({ currentUser: _currentUser }: ChatWorkspaceProps) {
   const attachmentInputRef = useRef<HTMLInputElement | null>(null)
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const messageStackRef = useRef<HTMLDivElement | null>(null)
   const shouldAutoScrollRef = useRef(true)
   const [draftApiKey, setDraftApiKey] = useState('')
   const [savedApiKey, setSavedApiKey] = useState('')
-  const [keyStatus, setKeyStatus] = useState(
-    'Stored locally in this browser only.',
-  )
+  const [, setKeyStatus] = useState('Stored locally in this browser only.')
   const [models, setModels] = useState<OpenRouterModel[]>([])
   const [modelsLoading, setModelsLoading] = useState(true)
   const [modelsError, setModelsError] = useState('')
@@ -810,8 +592,8 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
   const [statsSnapshot, setStatsSnapshot] = useState<OpenRouterStatsSnapshot | null>(
     null,
   )
-  const [statsLoading, setStatsLoading] = useState(true)
-  const [statsError, setStatsError] = useState('')
+  const [, setStatsLoading] = useState(true)
+  const [, setStatsError] = useState('')
   const [messages, setMessages] = useState<WorkspaceMessage[]>([])
   const [draftMessage, setDraftMessage] = useState('')
   const [attachments, setAttachments] = useState<WorkspaceAttachment[]>([])
@@ -819,7 +601,6 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
   const [reasoningEffort, setReasoningEffort] =
     useState<OpenRouterReasoningEffort>('medium')
   const [chatError, setChatError] = useState('')
-  const [chatStatus, setChatStatus] = useState('')
   const [isSending, setIsSending] = useState(false)
   const deferredModelSearch = useDeferredValue(modelSearch)
 
@@ -895,8 +676,7 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
       if (storedModel && nextModels.some((model) => model.id === storedModel)) {
         setSelectedModelId(storedModel)
       } else {
-        const newestModel = getRecentOpenRouterModels(nextModels, 1)[0]
-        const fallbackModelId = newestModel?.id ?? nextModels[0]?.id ?? ''
+        const fallbackModelId = nextModels[0]?.id ?? ''
 
         setSelectedModelId(fallbackModelId)
 
@@ -958,10 +738,6 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
     setSelectedModelId(modelId)
     setChatError('')
     window.localStorage.setItem(OPENROUTER_MODEL_STORAGE, modelId)
-  }
-
-  function handlePromptSuggestion(prompt: string) {
-    setDraftMessage(prompt)
   }
 
   function handleRemoveAttachment(attachmentId: string) {
@@ -1086,7 +862,6 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
     }
     setAttachments([])
     setChatError('')
-    setChatStatus('')
     setIsSending(true)
 
     try {
@@ -1133,14 +908,6 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                     : message,
                 ),
               )
-              setChatStatus(
-                buildStreamingChatStatus(
-                  partialReply.text,
-                  partialReply.reasoningDetails.length +
-                    (partialReply.reasoning ? 1 : 0),
-                  Boolean(partialReply.refusal),
-                ),
-              )
             },
           })
         : await createOpenRouterChatCompletion(requestOptions)
@@ -1169,15 +936,6 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
           message.id === assistantMessageId ? assistantMessage : message,
         ),
       )
-      setChatStatus(
-        buildChatStatus(
-          assistantReply.text,
-          assistantReply.images.length,
-          assistantReply.reasoningDetails.length +
-            (assistantReply.reasoning ? 1 : 0),
-          Boolean(assistantReply.audio?.data || assistantReply.audio?.transcript),
-        ),
-      )
     } catch (error) {
       setMessages((currentMessages) =>
         currentMessages.filter((message) => message.id !== assistantMessageId),
@@ -1204,10 +962,8 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
     setMessages([])
     setAttachments([])
     setChatError('')
-    setChatStatus('Started a new thread.')
   }
 
-  const recentModels = getRecentOpenRouterModels(models, 8)
   const filteredModels = models.filter((model) => {
     if (!deferredModelSearch.trim()) {
       return true
@@ -1218,84 +974,33 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
   })
 
   const selectedModel =
-    models.find((model) => model.id === selectedModelId) ?? recentModels[0] ?? null
+    models.find((model) => model.id === selectedModelId) ?? models[0] ?? null
   const selectedModelStats = resolveOpenRouterModelStats(statsSnapshot, selectedModel)
   const selectedModelProfile = selectedModel
     ? getModelCapabilityProfile(selectedModel, selectedModelStats)
     : null
-  const catalogCountLabel = modelsLoading
-    ? 'Refreshing the live OpenRouter catalog.'
-    : `${models.length} models are available from the current OpenRouter index.`
   const attachmentAccept = getAttachmentAccept(selectedModelProfile)
-  const composerHint = selectedModelProfile
-    ? getAttachmentSupportHint(selectedModelProfile)
-    : 'Choose a model to see which inputs it accepts.'
   const hasSavedApiKey = savedApiKey.trim().length > 0
-  const responseModeSummary = selectedModelProfile?.canOutputImage
-    ? responseMode === 'text-image'
-      ? 'Text + image'
-      : responseMode === 'text'
-        ? 'Text only'
-        : 'Auto image'
-    : 'Text only'
-  const reasoningSummary = selectedModelProfile?.supportsReasoning
-    ? reasoningEffort === 'none'
-      ? 'Thinking off'
-      : `Thinking ${reasoningEffort}`
-    : 'Standard response'
-  const selectedModelSummary = selectedModelProfile
-    ? `${selectedModelProfile.smartness.label}. ${selectedModelProfile.smartness.detail}`
-    : 'Open the model drawer to choose one.'
-  const compactComposerHint = hasSavedApiKey
-    ? composerHint
-    : 'Add your OpenRouter key in Setup before sending.'
-  const threadUsageTotals = getThreadUsageTotals(messages)
-  const hasThreadUsageTotals =
-    threadUsageTotals.promptTokens > 0 ||
-    threadUsageTotals.completionTokens > 0 ||
-    threadUsageTotals.totalTokens > 0 ||
-    threadUsageTotals.hasReasoningTokens
 
   return (
     <section className="workspace-home section" id="chat">
-      <div className="workspace-home-header workspace-home-header-compact">
-        <div>
-          <p className="section-kicker">OpenRouter chat</p>
-          <h1>Centered chat. Everything else stays tucked away.</h1>
-          <p className="workspace-home-copy">
-            Setup, model browsing, and advanced controls now live in compact drawers
-            above the thread instead of permanent side rails.
-          </p>
-        </div>
-      </div>
-
       <div className="workspace-chat-shell">
         <div className="workspace-utility-grid" id="models">
           <details className="workspace-utility-panel" open={!hasSavedApiKey}>
             <summary className="workspace-utility-summary">
-              <div className="workspace-utility-copy">
-                <p className="panel-label">Setup</p>
-                <strong>{hasSavedApiKey ? 'Key connected' : 'Add API key'}</strong>
-              </div>
-              <div className="workspace-utility-meta">
-                <span>{hasSavedApiKey ? 'Stored locally' : 'Required to send'}</span>
-                <KeyRound size={16} />
-                <ChevronDown className="workspace-collapsible-chevron" size={16} />
-              </div>
+              <strong>{hasSavedApiKey ? 'API key' : 'Add API key'}</strong>
+              <ChevronDown className="workspace-collapsible-chevron" size={16} />
             </summary>
             <div className="workspace-utility-body workspace-inline-stack">
-              <label className="auth-field">
-                <span>API key</span>
-                <input
-                  autoComplete="off"
-                  className="auth-input"
-                  onChange={(event) => setDraftApiKey(event.target.value)}
-                  placeholder="sk-or-v1-..."
-                  spellCheck={false}
-                  type="password"
-                  value={draftApiKey}
-                />
-              </label>
+              <input
+                autoComplete="off"
+                className="auth-input"
+                onChange={(event) => setDraftApiKey(event.target.value)}
+                placeholder="sk-or-v1-..."
+                spellCheck={false}
+                type="password"
+                value={draftApiKey}
+              />
 
               <div className="workspace-inline-actions">
                 <button
@@ -1313,41 +1018,21 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                   Clear
                 </button>
               </div>
-
-              <p className="workspace-inline-note">{keyStatus}</p>
             </div>
           </details>
 
           <details className="workspace-utility-panel workspace-utility-panel-wide">
             <summary className="workspace-utility-summary">
-              <div className="workspace-utility-copy">
-                <p className="panel-label">Model</p>
-                <strong>{selectedModel?.name ?? 'Choose a model'}</strong>
-              </div>
-              <div className="workspace-utility-meta">
-                <span>
-                  {selectedModel
-                    ? `${formatLargeNumber(selectedModel.context_length)} ctx`
-                    : 'Live catalog'}
-                </span>
-                <LibraryBig size={16} />
-                <ChevronDown className="workspace-collapsible-chevron" size={16} />
-              </div>
+              <strong>{selectedModel?.name ?? 'Choose model'}</strong>
+              <ChevronDown className="workspace-collapsible-chevron" size={16} />
             </summary>
             <div className="workspace-utility-body workspace-inline-stack">
-              {selectedModel ? (
-                <div className="workspace-chat-header-note">
-                  <strong>{selectedModel.name}</strong>
-                  <p>{selectedModel.description}</p>
-                </div>
-              ) : null}
-
               <label className="workspace-search-field">
                 <Search size={16} />
                 <input
                   className="auth-input"
                   onChange={(event) => setModelSearch(event.target.value)}
-                  placeholder={`Search ${models.length || 0} models`}
+                  placeholder="Search models"
                   type="search"
                   value={modelSearch}
                 />
@@ -1365,56 +1050,11 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                   ) : (
                     <RefreshCcw size={16} />
                   )}
-                  Refresh catalog
+                  Refresh
                 </button>
               </div>
 
-              <p className="workspace-inline-note">{catalogCountLabel}</p>
               {modelsError ? <p className="workspace-error">{modelsError}</p> : null}
-
-              <div className="workspace-model-spotlight-grid workspace-model-spotlight-grid-inline">
-                {recentModels.map((model) => {
-                  const modelStats = resolveOpenRouterModelStats(statsSnapshot, model)
-                  const profile = getModelCapabilityProfile(model, modelStats)
-
-                  return (
-                    <button
-                      className={`workspace-model-card ${
-                        selectedModelId === model.id ? 'workspace-model-card-active' : ''
-                      }`}
-                      key={model.id}
-                      onClick={() => handleSelectModel(model.id)}
-                      type="button"
-                    >
-                      <div className="workspace-model-card-top">
-                        <strong>{model.name}</strong>
-                        <span>{formatModelDate(model.created)}</span>
-                      </div>
-                      <p>{model.id}</p>
-                      <div className="workspace-model-card-meta">
-                        <div className="workspace-lightbulb-row">
-                          {createLightbulbIcons(profile.smartness.bulbs, model.id)}
-                        </div>
-                        <div className="workspace-compact-tag-row">
-                          {profile.isMultimodal ? (
-                            <span className="workspace-compact-tag">Multimodal</span>
-                          ) : (
-                            <span className="workspace-compact-tag">Text</span>
-                          )}
-                          {profile.supportsReasoning ? (
-                            <span className="workspace-compact-tag">
-                              {profile.reasoningExposure.badge}
-                            </span>
-                          ) : null}
-                          {profile.canOutputImage ? (
-                            <span className="workspace-compact-tag">Image out</span>
-                          ) : null}
-                        </div>
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
 
               <div className="workspace-library-scroller">
                 <div className="workspace-library-list">
@@ -1433,9 +1073,6 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                   ) : null}
 
                   {filteredModels.map((model) => {
-                    const modelStats = resolveOpenRouterModelStats(statsSnapshot, model)
-                    const profile = getModelCapabilityProfile(model, modelStats)
-
                     return (
                       <button
                         className={`workspace-library-item ${
@@ -1449,30 +1086,7 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                       >
                         <div className="workspace-library-copy">
                           <strong>{model.name}</strong>
-                          <p>{model.id}</p>
-                          <div className="workspace-library-support">
-                            <div className="workspace-lightbulb-row">
-                              {createLightbulbIcons(
-                                profile.smartness.bulbs,
-                                `${model.id}-list`,
-                              )}
-                            </div>
-                            <div className="workspace-compact-tag-row">
-                              {profile.supportsReasoning ? (
-                                <span className="workspace-compact-tag">
-                                  {profile.reasoningExposure.badge}
-                                </span>
-                              ) : null}
-                              {profile.isMultimodal ? (
-                                <span className="workspace-compact-tag">Multimodal</span>
-                              ) : null}
-                              {profile.canOutputImage ? (
-                                <span className="workspace-compact-tag">Image out</span>
-                              ) : null}
-                            </div>
-                          </div>
                         </div>
-                        <span>{formatLargeNumber(model.context_length)} ctx</span>
                       </button>
                     )
                   })}
@@ -1483,53 +1097,15 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
 
           <details className="workspace-utility-panel">
             <summary className="workspace-utility-summary">
-              <div className="workspace-utility-copy">
-                <p className="panel-label">Controls</p>
-                <strong>{reasoningSummary}</strong>
-              </div>
-              <div className="workspace-utility-meta">
-                <span>{responseModeSummary}</span>
-                <Sparkles size={16} />
-                <ChevronDown className="workspace-collapsible-chevron" size={16} />
-              </div>
+              <strong>Controls</strong>
+              <ChevronDown className="workspace-collapsible-chevron" size={16} />
             </summary>
             <div className="workspace-utility-body workspace-inline-stack">
               {selectedModel && selectedModelProfile ? (
                 <>
-                  <div className="workspace-setting-card">
-                    <div className="workspace-setting-copy">
-                      <p className="panel-label">Selected model</p>
-                      <h4>{selectedModel.name}</h4>
-                      <p className="workspace-setting-detail">
-                        {selectedModelSummary}
-                      </p>
-                    </div>
-                    <div className="workspace-lightbulb-row workspace-lightbulb-row-large">
-                      {createLightbulbIcons(
-                        selectedModelProfile.smartness.bulbs,
-                        `${selectedModel.id}-selected`,
-                      )}
-                    </div>
-                    <div className="workspace-capability-chip-row">
-                      {getInputCapabilityLabels(selectedModelProfile).map((label) => (
-                        <span className="workspace-capability-chip" key={`input-${label}`}>
-                          {label}
-                        </span>
-                      ))}
-                      {getOutputCapabilityLabels(selectedModelProfile).map((label) => (
-                        <span className="workspace-capability-chip" key={`output-${label}`}>
-                          {label}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
                   {selectedModelProfile.canOutputImage ? (
                     <div className="workspace-setting-card">
-                      <div className="workspace-setting-copy">
-                        <p className="panel-label">Output mode</p>
-                        <h4>Keep image-capable models on the output you want.</h4>
-                      </div>
+                      <h4>Images</h4>
                       <div className="workspace-setting-pill-row">
                         {responseModeOptions.map((option) => (
                           <button
@@ -1543,7 +1119,6 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                             type="button"
                           >
                             <strong>{option.label}</strong>
-                            <span>{option.description}</span>
                           </button>
                         ))}
                       </div>
@@ -1552,13 +1127,7 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
 
                   {selectedModelProfile.supportsReasoning ? (
                     <div className="workspace-setting-card">
-                      <div className="workspace-setting-copy">
-                        <p className="panel-label">Thinking depth</p>
-                        <h4>Expose as much reasoning as you actually want to see.</h4>
-                        <p className="workspace-setting-detail">
-                          {selectedModelProfile.reasoningExposure.detail}
-                        </p>
-                      </div>
+                      <h4>Thinking</h4>
                       <div className="workspace-setting-pill-row workspace-setting-pill-row-compact">
                         {reasoningEffortOptions.map((option) => (
                           <button
@@ -1577,27 +1146,9 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                       </div>
                     </div>
                   ) : null}
-
-                  <details className="workspace-utility-subpanel">
-                    <summary className="workspace-utility-subpanel-summary">
-                      <span>Performance snapshot</span>
-                      <ChevronDown className="workspace-collapsible-chevron" size={16} />
-                    </summary>
-                    <div className="workspace-utility-subpanel-body">
-                      <ModelStatsPanel
-                        modelName={selectedModel.name}
-                        snapshotRefreshedAt={statsSnapshot?.refreshedAt ?? null}
-                        statsEntry={selectedModelStats}
-                        statsError={statsError}
-                        statsLoading={statsLoading}
-                      />
-                    </div>
-                  </details>
                 </>
               ) : (
-                <p className="workspace-inline-note">
-                  Choose a model to unlock output and reasoning controls.
-                </p>
+                <p className="workspace-inline-note">No extra controls.</p>
               )}
             </div>
           </details>
@@ -1606,31 +1157,7 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
         <div className="workspace-chat-column">
           <div className="workspace-chat-card">
             <div className="workspace-chat-header">
-              <div className="workspace-chat-header-main">
-                <p className="workspace-chat-kicker">Current model</p>
-                <div className="workspace-chat-heading">
-                  <strong>{selectedModel?.name ?? 'Choose a model'}</strong>
-                  <span>{selectedModelSummary}</span>
-                </div>
-              </div>
               <div className="workspace-chat-header-actions">
-                {hasThreadUsageTotals ? (
-                  <div className="workspace-thread-metrics" aria-label="Thread totals">
-                    <span className="workspace-message-metric workspace-message-metric-strong">
-                      Total {formatTokenCount(threadUsageTotals.totalTokens)}
-                    </span>
-                    {threadUsageTotals.hasReasoningTokens ? (
-                      <span className="workspace-message-metric">
-                        Thinking {formatTokenCount(threadUsageTotals.reasoningTokens)}
-                      </span>
-                    ) : null}
-                    {threadUsageTotals.hasEstimatedCost ? (
-                      <span className="workspace-message-metric">
-                        Cost {formatEstimatedCost(threadUsageTotals.estimatedCost)}
-                      </span>
-                    ) : null}
-                  </div>
-                ) : null}
                 <button
                   className="button button-secondary"
                   onClick={handleClearThread}
@@ -1642,7 +1169,6 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
               </div>
             </div>
 
-            {chatStatus ? <p className="workspace-status">{chatStatus}</p> : null}
             {chatError ? <p className="workspace-error">{chatError}</p> : null}
 
             <div
@@ -1652,84 +1178,23 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
               onScroll={handleMessageStackScroll}
               ref={messageStackRef}
             >
-              {messages.length === 0 ? (
-                <div className="workspace-empty-state">
-                  <span className="workspace-empty-mark">
-                    {selectedModel?.name ?? 'OpenRouter'}
-                  </span>
-                  <div className="workspace-empty-copy-compact">
-                    <h4>Ask anything.</h4>
-                    <p>
-                      {hasSavedApiKey
-                        ? 'Use the prompt bar below or start with one of these.'
-                        : 'Add your key above, then start typing.'}
-                    </p>
-                  </div>
-                  <div className="workspace-suggestion-row workspace-suggestion-row-inline">
-                    {promptSuggestions.map((prompt) => (
-                      <button
-                        className="workspace-suggestion-chip"
-                        key={prompt}
-                        onClick={() => handlePromptSuggestion(prompt)}
-                        type="button"
-                      >
-                        {prompt}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-
-              {messages.map((message) => {
-                const reasoningUsage = getReasoningTokenUsage(message.usage)
-
-                return (
-                  <article
-                    className={`workspace-message workspace-message-${message.role}`}
-                    key={message.id}
-                  >
-                    <div className="workspace-message-meta">
-                      <strong>{message.role === 'user' ? 'You' : 'Model'}</strong>
-                      <span>
-                        {message.role === 'assistant'
-                          ? message.modelName ?? 'Assistant'
-                          : currentUser.email ?? 'User'}
-                      </span>
-                    </div>
-                    <RichMessageContent
-                      attachments={message.attachments}
-                      audio={message.audio}
-                      images={message.images}
-                      isStreaming={Boolean(message.isStreaming)}
-                      reasoning={message.reasoning}
-                      reasoningDetails={message.reasoningDetails}
-                      refusal={message.refusal}
-                      text={message.text}
-                    />
-                    {message.role === 'assistant' && message.usage ? (
-                      <div className="workspace-message-metrics" aria-label="Response metrics">
-                        <span className="workspace-message-metric">
-                          Prompt {formatTokenCount(message.usage.prompt_tokens)}
-                        </span>
-                        <span className="workspace-message-metric">
-                          Completion {formatTokenCount(message.usage.completion_tokens)}
-                        </span>
-                        <span className="workspace-message-metric">
-                          Total {formatTokenCount(getTotalTokenUsage(message.usage))}
-                        </span>
-                        {reasoningUsage.hasReasoningTokens ? (
-                          <span className="workspace-message-metric">
-                            Reasoning {formatTokenCount(reasoningUsage.value)}
-                          </span>
-                        ) : null}
-                        <span className="workspace-message-metric workspace-message-metric-strong">
-                          Est. cost {formatEstimatedCost(message.estimatedCost)}
-                        </span>
-                      </div>
-                    ) : null}
-                  </article>
-                )
-              })}
+              {messages.map((message) => (
+                <article
+                  className={`workspace-message workspace-message-${message.role}`}
+                  key={message.id}
+                >
+                  <RichMessageContent
+                    attachments={message.attachments}
+                    audio={message.audio}
+                    images={message.images}
+                    isStreaming={Boolean(message.isStreaming)}
+                    reasoning={message.reasoning}
+                    reasoningDetails={message.reasoningDetails}
+                    refusal={message.refusal}
+                    text={message.text}
+                  />
+                </article>
+              ))}
             </div>
 
             <input
@@ -1742,40 +1207,6 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
             />
 
             <div className="workspace-composer">
-              <div className="workspace-composer-toolbar">
-                <div className="workspace-inline-actions">
-                  <button
-                    className="button button-secondary"
-                    onClick={() => attachmentInputRef.current?.click()}
-                    type="button"
-                  >
-                    <Paperclip size={16} />
-                    Attach
-                  </button>
-                </div>
-
-                <div className="workspace-composer-capabilities">
-                  <span className="workspace-compact-tag">
-                    <Bot size={14} />
-                    {selectedModel?.name ?? 'No model'}
-                  </span>
-                  <div className="workspace-composer-capability">
-                    <ImagePlus size={14} />
-                    <span>{responseModeSummary}</span>
-                  </div>
-                  <div className="workspace-composer-capability">
-                    <BrainCircuit size={14} />
-                    <span>{reasoningSummary}</span>
-                  </div>
-                  <div className="workspace-composer-capability">
-                    <FileText size={14} />
-                    <span>
-                      {selectedModelProfile?.canInputFile ? 'PDF ready' : 'Text + code'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
               {attachments.length > 0 ? (
                 <div className="workspace-draft-attachment-row">
                   {attachments.map((attachment) => {
@@ -1826,6 +1257,14 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
               ) : null}
 
               <div className="workspace-input-wrapper">
+                <button
+                  aria-label="Add attachment"
+                  className="workspace-attach-icon"
+                  onClick={() => attachmentInputRef.current?.click()}
+                  type="button"
+                >
+                  <Paperclip size={16} />
+                </button>
                 <textarea
                   className="workspace-textarea"
                   onChange={handleDraftMessageChange}
@@ -1846,7 +1285,6 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                   <ArrowUp size={18} />
                 </button>
               </div>
-              <p className="workspace-composer-note">{compactComposerHint}</p>
             </div>
           </div>
         </div>
