@@ -994,7 +994,7 @@ function ChatWorkspace({ currentUser: _currentUser }: ChatWorkspaceProps) {
                   className="auth-input"
                   onChange={(event) => setModelSearch(event.target.value)}
                   placeholder="Search and pick a model"
-                  type="search"
+                  type="text"
                   value={modelSearch}
                 />
               </label>
