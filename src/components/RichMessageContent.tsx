@@ -41,12 +41,6 @@ type RichMessageContentProps = {
   text?: string
 }
 
-type ReasoningBreakdown = {
-  encryptedCount: number
-  summaryCount: number
-  traceCount: number
-}
-
 const supportedLatexBlockEnvironments = new Set([
   'align',
   'align*',
@@ -94,7 +88,13 @@ function normalizeLatexSegment(segment: string) {
 
       return part.replace(
         /(^|\n)(\s*)(\\begin\{([A-Za-z*]+)\}[\s\S]*?\\end\{\4\})(\s*)(?=\n|$)/g,
-        (match, lineStart: string, leadingWhitespace: string, environmentBlock: string, environmentName: string) => {
+        (
+          match,
+          lineStart: string,
+          leadingWhitespace: string,
+          environmentBlock: string,
+          environmentName: string,
+        ) => {
           if (!supportedLatexBlockEnvironments.has(environmentName)) {
             return match
           }
@@ -213,61 +213,6 @@ function getReasoningNode(detail: OpenRouterReasoningDetail): ReactNode {
   )
 }
 
-function getReasoningBreakdown(
-  reasoning: string,
-  reasoningDetails: OpenRouterReasoningDetail[],
-): ReasoningBreakdown {
-  return reasoningDetails.reduce<ReasoningBreakdown>(
-    (counts, detail) => {
-      if (detail.type === 'reasoning.summary') {
-        counts.summaryCount += 1
-        return counts
-      }
-
-      if (detail.type === 'reasoning.text') {
-        counts.traceCount += 1
-        return counts
-      }
-
-      counts.encryptedCount += 1
-      return counts
-    },
-    {
-      encryptedCount: 0,
-      summaryCount: 0,
-      traceCount: reasoning.trim() ? 1 : 0,
-    },
-  )
-}
-
-function getThinkingSummaryLabel(breakdown: ReasoningBreakdown) {
-  const parts: string[] = []
-
-  if (breakdown.summaryCount > 0) {
-    parts.push(
-      breakdown.summaryCount === 1
-        ? '1 summary'
-        : `${breakdown.summaryCount} summaries`,
-    )
-  }
-
-  if (breakdown.traceCount > 0) {
-    parts.push(
-      breakdown.traceCount === 1 ? '1 trace' : `${breakdown.traceCount} traces`,
-    )
-  }
-
-  if (breakdown.encryptedCount > 0) {
-    parts.push(
-      breakdown.encryptedCount === 1
-        ? '1 encrypted block'
-        : `${breakdown.encryptedCount} encrypted blocks`,
-    )
-  }
-
-  return parts.join(' • ')
-}
-
 function RichMessageContent({
   attachments = [],
   audio = null,
@@ -281,8 +226,7 @@ function RichMessageContent({
   const visibleText = text.trim()
   const visibleReasoning = reasoning.trim()
   const visibleRefusal = refusal.trim()
-  const reasoningBreakdown = getReasoningBreakdown(visibleReasoning, reasoningDetails)
-  const thinkingSummaryLabel = getThinkingSummaryLabel(reasoningBreakdown)
+  const showThinking = Boolean(visibleReasoning || reasoningDetails.length > 0 || isStreaming)
   const hasRenderableContent =
     attachments.length > 0 ||
     Boolean(visibleText) ||
@@ -295,7 +239,7 @@ function RichMessageContent({
   return (
     <div className="workspace-message-content">
       {isStreaming && !hasRenderableContent ? (
-        <p className="workspace-thinking-note">Waiting for live thinking…</p>
+        <p className="workspace-thinking-note">Thinking</p>
       ) : null}
 
       {attachments.length > 0 ? (
@@ -327,38 +271,32 @@ function RichMessageContent({
         </div>
       ) : null}
 
-      {visibleReasoning || reasoningDetails.length > 0 ? (
-        <details className="workspace-thinking">
+      {showThinking ? (
+        <details className={`workspace-thinking${isStreaming ? ' workspace-thinking-live' : ''}`}>
           <summary>
             <span className="workspace-thinking-summary-main">
-              <BrainCircuit size={16} />
+              <span className="workspace-thinking-pulse" aria-hidden="true" />
               <span>Thinking</span>
-            </span>
-            <span className="workspace-thinking-summary-meta">
-              {thinkingSummaryLabel ? (
-                <span className="workspace-thinking-pill">{thinkingSummaryLabel}</span>
-              ) : null}
-              <span className="workspace-thinking-toggle-copy">
-                {isStreaming ? 'Streaming live' : 'Click to expand'}
-              </span>
             </span>
           </summary>
 
-          <div className="workspace-thinking-stack">
-            {visibleReasoning ? (
-              <article className="workspace-thinking-block">
-                <div className="workspace-thinking-label">
-                  <Sparkles size={14} />
-                  <span>Model reasoning</span>
-                </div>
-                <div className="workspace-markdown">
-                  <MarkdownBlock>{visibleReasoning}</MarkdownBlock>
-                </div>
-              </article>
-            ) : null}
+          {visibleReasoning || reasoningDetails.length > 0 ? (
+            <div className="workspace-thinking-stack">
+              {visibleReasoning ? (
+                <article className="workspace-thinking-block">
+                  <div className="workspace-thinking-label">
+                    <Sparkles size={14} />
+                    <span>Model reasoning</span>
+                  </div>
+                  <div className="workspace-markdown">
+                    <MarkdownBlock>{visibleReasoning}</MarkdownBlock>
+                  </div>
+                </article>
+              ) : null}
 
-            {reasoningDetails.map((detail) => getReasoningNode(detail))}
-          </div>
+              {reasoningDetails.map((detail) => getReasoningNode(detail))}
+            </div>
+          ) : null}
         </details>
       ) : null}
 

@@ -1481,12 +1481,33 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
         </aside>
 
         <div className="workspace-chat-column">
-          <div className="control-card workspace-chat-card">
+          <div className="workspace-chat-card">
             <div className="workspace-chat-header">
-              <div>
-                <p className="panel-label">Chat</p>
-                <h3>Direct conversation with the model you selected</h3>
-              </div>
+              {hasThreadUsageTotals ? (
+                <div className="workspace-thread-metrics" aria-label="Thread totals">
+                  <span className="workspace-message-metric workspace-message-metric-strong">
+                    Total {formatTokenCount(threadUsageTotals.totalTokens)}
+                  </span>
+                  <span className="workspace-message-metric">
+                    Prompt {formatTokenCount(threadUsageTotals.promptTokens)}
+                  </span>
+                  <span className="workspace-message-metric">
+                    Completion {formatTokenCount(threadUsageTotals.completionTokens)}
+                  </span>
+                  {threadUsageTotals.hasReasoningTokens ? (
+                    <span className="workspace-message-metric">
+                      Thinking {formatTokenCount(threadUsageTotals.reasoningTokens)}
+                    </span>
+                  ) : null}
+                  {threadUsageTotals.hasEstimatedCost ? (
+                    <span className="workspace-message-metric">
+                      Cost {formatEstimatedCost(threadUsageTotals.estimatedCost)}
+                    </span>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="workspace-chat-kicker">Thread</p>
+              )}
               <button
                 className="button button-secondary"
                 onClick={handleClearThread}
@@ -1496,30 +1517,6 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                 New thread
               </button>
             </div>
-
-            {hasThreadUsageTotals ? (
-              <div className="workspace-thread-metrics" aria-label="Thread totals">
-                <span className="workspace-message-metric workspace-message-metric-strong">
-                  Thread total {formatTokenCount(threadUsageTotals.totalTokens)}
-                </span>
-                <span className="workspace-message-metric">
-                  Prompt {formatTokenCount(threadUsageTotals.promptTokens)}
-                </span>
-                <span className="workspace-message-metric">
-                  Completion {formatTokenCount(threadUsageTotals.completionTokens)}
-                </span>
-                {threadUsageTotals.hasReasoningTokens ? (
-                  <span className="workspace-message-metric">
-                    Reasoning {formatTokenCount(threadUsageTotals.reasoningTokens)}
-                  </span>
-                ) : null}
-                {threadUsageTotals.hasEstimatedCost ? (
-                  <span className="workspace-message-metric workspace-message-metric-strong">
-                    Est. cost {formatEstimatedCost(threadUsageTotals.estimatedCost)}
-                  </span>
-                ) : null}
-              </div>
-            ) : null}
 
             {chatStatus ? <p className="workspace-status">{chatStatus}</p> : null}
             {chatError ? <p className="workspace-error">{chatError}</p> : null}
@@ -1531,13 +1528,21 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
             >
               {messages.length === 0 ? (
                 <div className="workspace-empty-state">
-                  <Bot size={20} />
                   <div>
-                    <h4>Start with one of these prompts.</h4>
-                    <p>
-                      Save your OpenRouter key, choose a model, and send text, code,
-                      or supported attachments.
-                    </p>
+                    <h4>Start typing.</h4>
+                    <p>Pick a model, add your key, and send a message.</p>
+                  </div>
+                  <div className="workspace-suggestion-row workspace-suggestion-row-inline">
+                    {promptSuggestions.map((prompt) => (
+                      <button
+                        className="workspace-suggestion-chip"
+                        key={prompt}
+                        onClick={() => handlePromptSuggestion(prompt)}
+                        type="button"
+                      >
+                        {prompt}
+                      </button>
+                    ))}
                   </div>
                 </div>
               ) : null}
@@ -1593,25 +1598,6 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                 )
               })}
             </div>
-
-            <details className="workspace-inline-disclosure">
-              <summary className="workspace-inline-disclosure-summary">
-                <span>Starter prompts</span>
-                <ChevronDown className="workspace-collapsible-chevron" size={16} />
-              </summary>
-              <div className="workspace-inline-disclosure-content workspace-suggestion-row">
-                {promptSuggestions.map((prompt) => (
-                  <button
-                    className="workspace-suggestion-chip"
-                    key={prompt}
-                    onClick={() => handlePromptSuggestion(prompt)}
-                    type="button"
-                  >
-                    {prompt}
-                  </button>
-                ))}
-              </div>
-            </details>
 
             <input
               accept={attachmentAccept}
