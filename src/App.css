@@ -6,7 +6,8 @@
   background: #000;
 }
 
-.page {
+.page,
+.topbar {
   position: relative;
   width: min(1180px, calc(100% - 2rem));
   margin: 0 auto;
@@ -16,16 +17,16 @@
   position: sticky;
   top: 0;
   z-index: 40;
-  width: 100%;
-  margin: 0;
-  padding: 0.8rem 1.15rem;
+  margin-top: 0;
+  padding: 0.9rem 1.15rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.92);
-  backdrop-filter: blur(12px);
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(16px);
   will-change: transform, opacity;
   transition:
     transform 140ms ease-out,
@@ -44,7 +45,7 @@
 
 .topbar-hidden {
   opacity: 0;
-  transform: translate3d(0, -100%, 0);
+  transform: translate3d(0, calc(-100% - 1rem), 0);
   pointer-events: none;
 }
 
