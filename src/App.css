@@ -2687,6 +2687,11 @@
   padding-top: 0.8rem;
 }
 
+.workspace-model-search-panel .workspace-utility-body {
+  border-top: 0;
+  padding-top: 0.85rem;
+}
+
 .workspace-settings-account {
   display: flex;
   align-items: baseline;

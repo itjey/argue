@@ -986,11 +986,7 @@ function ChatWorkspace({ currentUser: _currentUser }: ChatWorkspaceProps) {
     <section className="workspace-home section" id="chat">
       <div className="workspace-chat-shell">
         <div className="workspace-utility-grid" id="models">
-          <details className="workspace-utility-panel workspace-utility-panel-wide" open>
-            <summary className="workspace-utility-summary">
-              <strong>Search and pick a model</strong>
-              <ChevronDown className="workspace-collapsible-chevron" size={16} />
-            </summary>
+          <div className="workspace-utility-panel workspace-utility-panel-wide workspace-model-search-panel">
             <div className="workspace-utility-body workspace-inline-stack">
               <label className="workspace-search-field">
                 <Search size={16} />
@@ -1051,7 +1047,7 @@ function ChatWorkspace({ currentUser: _currentUser }: ChatWorkspaceProps) {
                 </div>
               </div>
             </div>
-          </details>
+          </div>
 
           <div className="workspace-controls-column">
             <button
