@@ -312,11 +312,11 @@ function App() {
       const delta = nextScrollY - lastScrollYRef.current
       let nextHidden = topbarHiddenRef.current
 
-      if (nextScrollY <= 48) {
+      if (nextScrollY <= 8) {
         nextHidden = false
-      } else if (delta >= 4) {
+      } else if (delta > 0) {
         nextHidden = true
-      } else if (delta <= -4) {
+      } else if (delta < 0) {
         nextHidden = false
       }
 
