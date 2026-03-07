@@ -24,7 +24,8 @@ OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 APP_ORIGIN = "https://itjey.github.io/argue/"
 APP_TITLE = "Argue"
 VISIBLE_REASONING_KINDS = {"trace", "hybrid", "provider"}
-DEFAULT_PROBE_MODELS = [
+PREFERRED_VISIBLE_REASONING_KINDS = ("trace", "hybrid")
+LEGACY_PROTECTED_PROBE_MODELS = [
 	"openai/gpt-5",
 	"google/gemini-2.5-pro",
 	"google/gemini-2.5-flash",
@@ -36,6 +37,14 @@ DEFAULT_PROMPT = (
 	"Return the final answer as a single integer."
 )
 
+try:
+	if hasattr(sys.stdout, "reconfigure"):
+		sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+	if hasattr(sys.stderr, "reconfigure"):
+		sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except OSError:
+	pass
+
 
 @dataclass(frozen=True)
 class Participant:
@@ -44,7 +53,45 @@ class Participant:
 	role: str
 
 
-DEFAULT_COLLAB_PARTICIPANTS = [
+@dataclass(frozen=True)
+class ParticipantBlueprint:
+	alias: str
+	role: str
+	model_candidates: tuple[str, ...]
+
+
+DEFAULT_VISIBLE_PROBE_BLUEPRINTS = [
+	ParticipantBlueprint(
+		alias="GPT-5.4",
+		role="reasoning probe",
+		model_candidates=(
+			"openai/gpt-5.4",
+			"openai/gpt-5.4-pro",
+			"openai/gpt-5.2-high",
+		),
+	),
+	ParticipantBlueprint(
+		alias="Gemini 3.1",
+		role="reasoning probe",
+		model_candidates=(
+			"google/gemini-3.1-pro-preview-customtools",
+			"google/gemini-3.1-pro-preview",
+			"google/gemini-3.1-flash-lite-preview",
+		),
+	),
+	ParticipantBlueprint(
+		alias="DeepSeek R1",
+		role="reasoning probe",
+		model_candidates=(
+			"deepseek/deepseek-r1-0528",
+			"deepseek/deepseek-r1",
+			"tngtech/deepseek-r1t2-chimera",
+		),
+	),
+]
+
+
+LEGACY_DEFAULT_COLLAB_PARTICIPANTS = [
 	Participant(
 		alias="GPT-5.4",
 		model="openai/gpt-5.4",
@@ -56,11 +103,51 @@ DEFAULT_COLLAB_PARTICIPANTS = [
 		role="alternative reasoner focused on different solution paths and hidden assumptions",
 	),
 	Participant(
-		alias="Grok 4",
-		model="x-ai/grok-4",
+		alias="DeepSeek R1",
+		model="deepseek/deepseek-r1-0528",
 		role="aggressive critic focused on finding flaws, contradictions, and missing evidence",
 	),
 ]
+
+
+DEFAULT_VISIBLE_COLLAB_BLUEPRINTS = [
+	ParticipantBlueprint(
+		alias="GPT-5.4",
+		role="formal verifier focused on rigor, edge cases, and final synthesis quality",
+		model_candidates=(
+			"openai/gpt-5.4",
+			"openai/gpt-5.4-pro",
+			"openai/gpt-5.2-high",
+		),
+	),
+	ParticipantBlueprint(
+		alias="Gemini 3.1",
+		role="alternative reasoner focused on different solution paths and hidden assumptions",
+		model_candidates=(
+			"google/gemini-3.1-pro-preview-customtools",
+			"google/gemini-3.1-pro-preview",
+			"google/gemini-3.1-flash-lite-preview",
+		),
+	),
+	ParticipantBlueprint(
+		alias="DeepSeek R1",
+		role="aggressive critic focused on finding flaws, contradictions, and missing evidence",
+		model_candidates=(
+			"deepseek/deepseek-r1-0528",
+			"deepseek/deepseek-r1",
+			"tngtech/deepseek-r1t2-chimera",
+		),
+	),
+]
+
+DEFAULT_JUDGE_MODEL_CANDIDATES = (
+	"openai/gpt-5.4",
+	"openai/gpt-5.4-pro",
+	"google/gemini-3.1-pro-preview-customtools",
+	"google/gemini-3.1-pro-preview",
+	"deepseek/deepseek-r1-0528",
+	"anthropic/claude-opus-4.6",
+)
 
 
 def sanitize_stream_text(value: str) -> str:
@@ -71,7 +158,11 @@ def emit_live_line(fragment: str) -> None:
 	clean_fragment = sanitize_stream_text(fragment)
 	if not clean_fragment:
 		return
-	sys.stdout.write(f"{clean_fragment} ")
+	stdout_encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+	safe_fragment = clean_fragment.encode(stdout_encoding, errors="replace").decode(
+		stdout_encoding, errors="replace"
+	)
+	sys.stdout.write(f"{safe_fragment} ")
 	sys.stdout.flush()
 
 
@@ -209,6 +300,123 @@ def format_context_length(value: int | None) -> str:
 	if value is None:
 		return "-"
 	return f"{value:,}"
+
+
+def fetch_described_models() -> list[dict[str, Any]]:
+	return [describe_model(model) for model in fetch_openrouter_models()]
+
+
+def build_model_index(models: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+	return {
+		str(model.get("id", "")): model
+		for model in models
+		if isinstance(model, dict) and model.get("id")
+	}
+
+
+def reasoning_kind_rank(kind: str) -> int:
+	if kind == "trace":
+		return 0
+	if kind == "hybrid":
+		return 1
+	if kind == "provider":
+		return 2
+	if kind == "protected":
+		return 3
+	return 4
+
+
+def describe_reasoning_badge(model_id: str, model_index: dict[str, dict[str, Any]]) -> str:
+	model = model_index.get(model_id)
+	if not model:
+		return "Unknown visibility"
+	exposure = model.get("reasoning_exposure", {})
+	if not isinstance(exposure, dict):
+		return "Unknown visibility"
+	return str(exposure.get("badge", "Unknown visibility"))
+
+
+def pick_candidate_from_preferences(
+	model_index: dict[str, dict[str, Any]],
+	candidate_ids: tuple[str, ...],
+	used_ids: set[str],
+) -> str | None:
+	for preferred_kind in PREFERRED_VISIBLE_REASONING_KINDS:
+		for candidate_id in candidate_ids:
+			model = model_index.get(candidate_id)
+			if not model or candidate_id in used_ids:
+				continue
+			kind = str(model.get("reasoning_exposure", {}).get("kind", "none"))
+			if kind == preferred_kind:
+				return candidate_id
+
+	for candidate_id in candidate_ids:
+		model = model_index.get(candidate_id)
+		if not model or candidate_id in used_ids:
+			continue
+		kind = str(model.get("reasoning_exposure", {}).get("kind", "none"))
+		if kind in VISIBLE_REASONING_KINDS:
+			return candidate_id
+
+	for candidate_id in candidate_ids:
+		model = model_index.get(candidate_id)
+		if not model or candidate_id in used_ids:
+			continue
+		return candidate_id
+
+	return None
+
+
+def pick_best_remaining_visible_model(
+	models: list[dict[str, Any]],
+	used_ids: set[str],
+) -> str | None:
+	visible_models = [
+		model
+		for model in models
+		if str(model.get("id", "")) not in used_ids
+		and str(model.get("reasoning_exposure", {}).get("kind", "none")) in VISIBLE_REASONING_KINDS
+	]
+
+	if not visible_models:
+		return None
+
+	visible_models.sort(
+		key=lambda model: (
+			reasoning_kind_rank(str(model.get("reasoning_exposure", {}).get("kind", "none"))),
+			-(model.get("context_length") or 0),
+			str(model.get("id", "")).lower(),
+		)
+	)
+	return str(visible_models[0].get("id", "")) or None
+
+
+def resolve_default_probe_models(
+	models: list[dict[str, Any]],
+) -> tuple[list[str], list[str]]:
+	model_index = build_model_index(models)
+	used_ids: set[str] = set()
+	selected_ids: list[str] = []
+	resolution_notes: list[str] = []
+
+	for blueprint in DEFAULT_VISIBLE_PROBE_BLUEPRINTS:
+		selected_model_id = pick_candidate_from_preferences(
+			model_index=model_index,
+			candidate_ids=blueprint.model_candidates,
+			used_ids=used_ids,
+		)
+		if not selected_model_id:
+			selected_model_id = pick_best_remaining_visible_model(models, used_ids)
+		if not selected_model_id:
+			continue
+
+		used_ids.add(selected_model_id)
+		selected_ids.append(selected_model_id)
+		resolution_notes.append(
+			f"{blueprint.alias}: {selected_model_id} [{describe_reasoning_badge(selected_model_id, model_index)}]"
+		)
+
+	return selected_ids, resolution_notes
 
 
 def print_section(title: str, models: list[dict[str, Any]]) -> None:
@@ -556,8 +764,17 @@ def run_chat_with_strategies(
 	}
 
 
+def build_flexible_tag_pattern(tag: str) -> str:
+	return r"\s*_\s*".join(re.escape(part) for part in tag.split("_"))
+
+
 def extract_tag(text: str, tag: str) -> str:
-	match = re.search(rf"<{tag}>\s*(.*?)\s*</{tag}>", text, re.IGNORECASE | re.DOTALL)
+	pattern = build_flexible_tag_pattern(tag)
+	match = re.search(
+		rf"<\s*{pattern}\s*>\s*(.*?)\s*</\s*{pattern}\s*>",
+		text,
+		re.IGNORECASE | re.DOTALL,
+	)
 	if not match:
 		return ""
 	return match.group(1).strip()
@@ -593,19 +810,85 @@ def participant_system_prompt(participant: Participant) -> str:
 		"You are one participant in a three-model collaboration focused on maximum correctness. "
 		f"Your role is: {participant.role}. "
 		"Be willing to change your mind when the evidence is against you. "
-		"Follow the requested tags exactly. Keep claims explicit and check assumptions."
+		"Follow the requested tags exactly, with no spaces inside tag names. "
+		"Output only the requested tags, with no prose before or after them. "
+		"Keep claims explicit and check assumptions."
 	)
 
 
-def build_participants(model_ids: list[str] | None) -> list[Participant]:
-	if not model_ids:
-		return DEFAULT_COLLAB_PARTICIPANTS
-
-	default_by_model = {participant.model: participant for participant in DEFAULT_COLLAB_PARTICIPANTS}
+def build_default_participants(
+	models: list[dict[str, Any]],
+) -> tuple[list[Participant], list[str]]:
+	model_index = build_model_index(models)
+	used_ids: set[str] = set()
 	participants: list[Participant] = []
+	resolution_notes: list[str] = []
+
+	for blueprint in DEFAULT_VISIBLE_COLLAB_BLUEPRINTS:
+		selected_model_id = pick_candidate_from_preferences(
+			model_index=model_index,
+			candidate_ids=blueprint.model_candidates,
+			used_ids=used_ids,
+		)
+		if not selected_model_id:
+			selected_model_id = pick_best_remaining_visible_model(models, used_ids)
+		if not selected_model_id:
+			continue
+
+		used_ids.add(selected_model_id)
+		participants.append(
+			Participant(
+				alias=blueprint.alias,
+				model=selected_model_id,
+				role=blueprint.role,
+			)
+		)
+		resolution_notes.append(
+			f"{blueprint.alias}: {selected_model_id} [{describe_reasoning_badge(selected_model_id, model_index)}]"
+		)
+
+	if len(participants) < 3:
+		for participant in LEGACY_DEFAULT_COLLAB_PARTICIPANTS:
+			if participant.model in used_ids:
+				continue
+			participants.append(participant)
+			used_ids.add(participant.model)
+			resolution_notes.append(
+				f"{participant.alias}: fallback to {participant.model} [legacy protected-thinking default]"
+			)
+			if len(participants) >= 3:
+				break
+
+	return participants, resolution_notes
+
+
+def build_participants(
+	model_ids: list[str] | None,
+	models: list[dict[str, Any]] | None = None,
+) -> tuple[list[Participant], list[str]]:
+	if not model_ids:
+		if models:
+			return build_default_participants(models)
+		return (
+			LEGACY_DEFAULT_COLLAB_PARTICIPANTS,
+			[
+				f"{participant.alias}: fallback to {participant.model} [legacy protected-thinking default]"
+				for participant in LEGACY_DEFAULT_COLLAB_PARTICIPANTS
+			],
+		)
+
+	model_index = build_model_index(models or [])
+	legacy_by_model = {
+		participant.model: participant for participant in LEGACY_DEFAULT_COLLAB_PARTICIPANTS
+	}
+	participants: list[Participant] = []
+	resolution_notes: list[str] = []
 	for index, model_id in enumerate(model_ids, start=1):
-		if model_id in default_by_model:
-			participants.append(default_by_model[model_id])
+		if model_id in legacy_by_model:
+			participants.append(legacy_by_model[model_id])
+			resolution_notes.append(
+				f"{legacy_by_model[model_id].alias}: {model_id} [{describe_reasoning_badge(model_id, model_index)}]"
+			)
 			continue
 		alias = model_id.split("/", 1)[-1]
 		participants.append(
@@ -615,7 +898,26 @@ def build_participants(model_ids: list[str] | None) -> list[Participant]:
 				role="general debater focused on correctness and critical review",
 			)
 		)
-	return participants
+		resolution_notes.append(
+			f"Model {index}: {model_id} [{describe_reasoning_badge(model_id, model_index)}]"
+		)
+	return participants, resolution_notes
+
+
+def resolve_judge_model(
+	explicit_judge_model: str | None,
+	participants: list[Participant],
+	models: list[dict[str, Any]] | None = None,
+) -> tuple[str, str]:
+	if explicit_judge_model:
+		return explicit_judge_model, "user-specified judge model"
+
+	model_index = build_model_index(models or [])
+	for candidate in DEFAULT_JUDGE_MODEL_CANDIDATES:
+		if candidate in model_index:
+			return candidate, f"default judge preference [{describe_reasoning_badge(candidate, model_index)}]"
+
+	return participants[0].model, "fallback to first participant model"
 
 
 def build_independent_round_prompt(question: str) -> str:
@@ -624,6 +926,7 @@ Question:
 {question}
 
 Work independently first. Do not assume the other models are correct.
+If the task is quantitative, logical, or code-related, mentally verify the conclusion with a second route before locking your answer.
 
 Return exactly these tags:
 <draft_answer>the best answer you can currently justify</draft_answer>
@@ -741,6 +1044,7 @@ Peer feedback:
 {peer_bundle}
 
 Revise your answer for maximum correctness. Preserve good parts, remove bad parts, and resolve disagreements explicitly.
+Prefer a concrete, falsifiable answer over vague hedging. If uncertainty remains, state exactly what could still change the conclusion.
 
 Return exactly these tags:
 <revised_answer>your revised best answer</revised_answer>
@@ -790,6 +1094,8 @@ Audit every candidate independently. Score each one from 0 to 10 on:
 - completeness
 - robustness
 
+Be adversarial, not polite. Penalize unsupported claims, arithmetic mistakes, unhandled edge cases, and answers that sound plausible without actually proving the point.
+
 If you see a fatal flaw, say what it is. If not, use NONE.
 
 Return exactly these tags:
@@ -820,7 +1126,7 @@ Audit summary:
 Final votes:
 {vote_bundle}
 
-Produce the best final answer. Do not average weak answers together. Use the strongest supported reasoning, resolve conflicts, and be explicit if uncertainty remains.
+Produce the best final answer. Do not average weak answers together. Use the strongest supported reasoning, prefer answers backed by explicit checks, resolve conflicts directly, and be explicit if uncertainty remains.
 
 Return exactly these tags:
 <final_answer>best final answer for the user</final_answer>
@@ -885,7 +1191,12 @@ def summarize_round(round_name: str, records: list[dict[str, Any]], answer_key: 
 		parsed = record["parsed"]
 		answer = parsed.get(answer_key) or trim_preview(record.get("raw_output", ""), 180)
 		confidence = parsed.get("confidence") or parsed.get("confidence_after_self_critique") or "-"
-		print(f"- {participant.alias} | confidence={confidence} | {trim_preview(str(answer), 180)}")
+		classification = record.get("classification", "-")
+		visible_thinking = record.get("visible_thinking") or "[no separate thinking stream exposed]"
+		print(
+			f"- {participant.alias} | confidence={confidence} | thinking={classification} | {trim_preview(str(answer), 180)}"
+		)
+		print(f"  thought_preview: {trim_preview(str(visible_thinking), 180)}")
 	print()
 
 
@@ -947,6 +1258,47 @@ def determine_vote_winner(vote_records: list[dict[str, Any]]) -> tuple[str, dict
 
 
 def collab_command(args: argparse.Namespace) -> int:
+	described_models: list[dict[str, Any]] = []
+	if args.models is None or args.dry_run or not args.judge_model:
+		try:
+			described_models = fetch_described_models()
+		except urllib.error.URLError as error:
+			if args.dry_run:
+				print(f"Failed to reach OpenRouter while resolving defaults: {error}", file=sys.stderr)
+			described_models = []
+		except (ValueError, json.JSONDecodeError) as error:
+			if args.dry_run:
+				print(
+					f"Failed to parse OpenRouter model catalog while resolving defaults: {error}",
+					file=sys.stderr,
+				)
+			described_models = []
+
+	participants, resolution_notes = build_participants(args.models, described_models)
+	question = args.prompt
+	candidate_bundle_preview, candidate_map = build_candidate_bundle(
+		[{"participant": participant, "parsed": {"revised_answer": "[pending]"}, "raw_output": ""} for participant in participants],
+		"revised_answer",
+	)
+	_ = candidate_bundle_preview
+	judge_model, judge_reason = resolve_judge_model(args.judge_model, participants, described_models)
+	judge_participant = Participant(
+		alias="Final Judge",
+		model=judge_model,
+		role="final synthesis judge focused on selecting the most correct answer from the debate",
+	)
+
+	print("Participant Resolution")
+	print("----------------------")
+	for note in resolution_notes:
+		print(f"- {note}")
+	print(f"- Judge: {judge_model} [{judge_reason}]")
+	print()
+
+	if args.dry_run:
+		print("Dry run only. No live model calls were made.")
+		return 0
+
 	api_key = args.api_key or os.environ.get("OPENROUTER_API_KEY")
 	if not api_key:
 		print(
@@ -954,20 +1306,6 @@ def collab_command(args: argparse.Namespace) -> int:
 			file=sys.stderr,
 		)
 		return 1
-
-	participants = build_participants(args.models)
-	question = args.prompt
-	candidate_bundle_preview, candidate_map = build_candidate_bundle(
-		[{"participant": participant, "parsed": {"revised_answer": "[pending]"}, "raw_output": ""} for participant in participants],
-		"revised_answer",
-	)
-	_ = candidate_bundle_preview
-	judge_model = args.judge_model or participants[0].model
-	judge_participant = Participant(
-		alias="Final Judge",
-		model=judge_model,
-		role="final synthesis judge focused on selecting the most correct answer from the debate",
-	)
 
 	print("Collaboration Method")
 	print("--------------------")
@@ -1508,8 +1846,28 @@ def probe_models_command(args: argparse.Namespace) -> int:
 		)
 		return 1
 
-	models = args.models or DEFAULT_PROBE_MODELS
+	models = args.models
+	resolution_notes: list[str] = []
+	if not models:
+		try:
+			described_models = fetch_described_models()
+			models, resolution_notes = resolve_default_probe_models(described_models)
+		except urllib.error.URLError as error:
+			resolution_notes = [
+				f"Falling back to legacy protected-thinking defaults after catalog lookup error: {error}"
+			]
+			models = LEGACY_PROTECTED_PROBE_MODELS
+		except (ValueError, json.JSONDecodeError) as error:
+			resolution_notes = [
+				f"Falling back to legacy protected-thinking defaults after catalog parse error: {error}"
+			]
+			models = LEGACY_PROTECTED_PROBE_MODELS
+
 	print(f"Prompt: {args.prompt}")
+	if resolution_notes:
+		print("Resolved probe models:")
+		for note in resolution_notes:
+			print(f"- {note}")
 	print()
 	results = [probe_model(api_key=api_key, model=model, prompt=args.prompt) for model in models]
 
@@ -1536,7 +1894,29 @@ def live_models_command(args: argparse.Namespace) -> int:
 		)
 		return 1
 
-	models = args.models or DEFAULT_PROBE_MODELS
+	models = args.models
+	resolution_notes: list[str] = []
+	if not models:
+		try:
+			described_models = fetch_described_models()
+			models, resolution_notes = resolve_default_probe_models(described_models)
+		except urllib.error.URLError as error:
+			resolution_notes = [
+				f"Falling back to legacy protected-thinking defaults after catalog lookup error: {error}"
+			]
+			models = LEGACY_PROTECTED_PROBE_MODELS
+		except (ValueError, json.JSONDecodeError) as error:
+			resolution_notes = [
+				f"Falling back to legacy protected-thinking defaults after catalog parse error: {error}"
+			]
+			models = LEGACY_PROTECTED_PROBE_MODELS
+
+	if resolution_notes:
+		print("Resolved live models:")
+		for note in resolution_notes:
+			print(f"- {note}")
+		print()
+
 	results: list[dict[str, Any]] = []
 	for model in models:
 		result = live_model(api_key=api_key, model=model, prompt=args.prompt)
@@ -1571,7 +1951,7 @@ def parse_args() -> argparse.Namespace:
 	probe_parser.add_argument(
 		"--models",
 		nargs="+",
-		help="Specific models to probe. Defaults to a small GPT/Gemini/Grok set.",
+		help="Specific models to probe. Defaults to visible-thinking candidates instead of protected GPT/Gemini/Grok defaults.",
 	)
 	probe_parser.add_argument(
 		"--prompt",
@@ -1602,11 +1982,16 @@ def parse_args() -> argparse.Namespace:
 	collab_parser.add_argument(
 		"--models",
 		nargs="+",
-		help="Optional custom participant model IDs. Defaults to GPT-5.4, Gemini 3.1, and Grok 4.",
+		help="Optional custom participant model IDs. Defaults to visible-thinking participants such as DeepSeek R1, Kimi Thinking, and Claude Thinking when available.",
 	)
 	collab_parser.add_argument(
 		"--judge-model",
 		help="Optional final synthesis model. Defaults to the first participant model.",
+	)
+	collab_parser.add_argument(
+		"--dry-run",
+		action="store_true",
+		help="Resolve participant and judge models without making any live API calls.",
 	)
 	collab_parser.add_argument(
 		"--prompt",

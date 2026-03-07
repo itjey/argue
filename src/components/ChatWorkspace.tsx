@@ -574,7 +574,8 @@ function buildAssistantRequestFromReply(assistantReply: {
   } satisfies OpenRouterChatMessage
 }
 
-function ChatWorkspace({ currentUser: _currentUser }: ChatWorkspaceProps) {
+function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
+  void currentUser
   const attachmentInputRef = useRef<HTMLInputElement | null>(null)
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const messageStackRef = useRef<HTMLDivElement | null>(null)

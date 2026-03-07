@@ -9,6 +9,12 @@ type OpenRouterReasoningEffort =
   | 'minimal'
   | 'none'
 type OpenRouterReasoningSummary = 'auto' | 'concise' | 'detailed'
+type OpenRouterReasoningConfig = {
+  effort?: OpenRouterReasoningEffort
+  summary?: OpenRouterReasoningSummary
+  max_tokens?: number
+  exclude?: boolean
+}
 
 type OpenRouterModel = {
   id: string
@@ -202,11 +208,9 @@ type CreateOpenRouterChatCompletionOptions = {
   messages: OpenRouterChatMessage[]
   model: string
   includeReasoning?: boolean
+  maxTokens?: number
   modalities?: OpenRouterOutputModality[]
-  reasoning?: {
-    effort?: OpenRouterReasoningEffort
-    summary?: OpenRouterReasoningSummary
-  }
+  reasoning?: OpenRouterReasoningConfig
   imageConfig?: Record<string, number | string | Array<unknown>>
 }
 
@@ -535,6 +539,7 @@ async function fetchOpenRouterModels() {
 async function createOpenRouterChatCompletion({
   apiKey,
   includeReasoning,
+  maxTokens,
   messages,
   model,
   modalities,
@@ -548,6 +553,7 @@ async function createOpenRouterChatCompletion({
       model,
       messages,
       include_reasoning: includeReasoning,
+      max_tokens: maxTokens,
       modalities,
       reasoning,
       image_config: imageConfig,
@@ -568,6 +574,7 @@ async function createOpenRouterChatCompletion({
 async function createOpenRouterChatCompletionStream({
   apiKey,
   includeReasoning,
+  maxTokens,
   messages,
   model,
   modalities,
@@ -583,6 +590,7 @@ async function createOpenRouterChatCompletionStream({
       stream: true,
       messages,
       include_reasoning: includeReasoning,
+      max_tokens: maxTokens,
       modalities,
       reasoning,
       image_config: imageConfig,
@@ -745,6 +753,7 @@ export type {
   OpenRouterOutputModality,
   OpenRouterReasoningDetail,
   OpenRouterReasoningEffort,
+  OpenRouterReasoningConfig,
   OpenRouterTokenDetails,
   OpenRouterUsage,
 }
