@@ -2649,6 +2649,37 @@
   margin-top: 0;
 }
 
+.workspace-controls-column {
+  display: grid;
+  gap: 0.6rem;
+  align-self: start;
+}
+
+.workspace-controls-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 2.8rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.7rem;
+  color: var(--ink-strong);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.workspace-controls-toggle:hover,
+.workspace-controls-toggle:focus-visible {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.workspace-controls-panel .workspace-utility-body {
+  border-top: 0;
+  padding-top: 0.8rem;
+}
+
 .workspace-settings-account {
   display: flex;
   align-items: baseline;
@@ -2743,7 +2774,7 @@
 
 .workspace-chat-header {
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 0.75rem;
   padding: 0;
 }
@@ -2758,6 +2789,11 @@
   display: grid;
   gap: 0.28rem;
   min-width: 0;
+}
+
+.workspace-chat-heading-top-right {
+  justify-items: end;
+  text-align: right;
 }
 
 .workspace-chat-heading strong {
@@ -3000,6 +3036,10 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.55rem;
+}
+
+.workspace-collapsible-chevron-open {
+  transform: rotate(180deg);
 }
 
 .workspace-setting-pill {

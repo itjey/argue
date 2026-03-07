@@ -600,6 +600,7 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
     useState<OpenRouterReasoningEffort>('medium')
   const [chatError, setChatError] = useState('')
   const [isSending, setIsSending] = useState(false)
+  const [controlsOpen, setControlsOpen] = useState(false)
   const deferredModelSearch = useDeferredValue(modelSearch)
 
   useEffect(() => {
@@ -963,14 +964,14 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
     setChatError('')
   }
 
-  const filteredModels = models.filter((model) => {
-    if (!deferredModelSearch.trim()) {
-      return true
-    }
-
-    const searchableText = `${model.name} ${model.id} ${model.description}`.toLowerCase()
-    return searchableText.includes(deferredModelSearch.trim().toLowerCase())
-  })
+  const hasModelSearch = deferredModelSearch.trim().length > 0
+  const filteredModels = hasModelSearch
+    ? models.filter((model) => {
+        const searchableText =
+          `${model.name} ${model.id} ${model.description}`.toLowerCase()
+        return searchableText.includes(deferredModelSearch.trim().toLowerCase())
+      })
+    : []
 
   const selectedModel =
     models.find((model) => model.id === selectedModelId) ?? models[0] ?? null
@@ -1038,7 +1039,14 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                     </div>
                   ) : null}
 
-                  {!modelsLoading && filteredModels.length === 0 ? (
+                  {!modelsLoading && !hasModelSearch ? (
+                    <div className="workspace-library-empty">
+                      <Search size={16} />
+                      <span>Type to search models.</span>
+                    </div>
+                  ) : null}
+
+                  {!modelsLoading && hasModelSearch && filteredModels.length === 0 ? (
                     <div className="workspace-library-empty">
                       <Search size={16} />
                       <span>No models match the current search.</span>
@@ -1070,70 +1078,96 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
             </div>
           </details>
 
-          <details className="workspace-utility-panel">
-            <summary className="workspace-utility-summary">
-              <strong>Controls</strong>
-              <ChevronDown className="workspace-collapsible-chevron" size={16} />
-            </summary>
-            <div className="workspace-utility-body workspace-inline-stack">
-              <div className="workspace-controls-grid">
-                <div className="workspace-setting-card">
-                  <h4>Response mode</h4>
-                  <div className="workspace-setting-pill-row">
-                    {responseModeOptions.map((option) => (
-                      <button
-                        className={`workspace-setting-pill ${
-                          responseMode === option.id ? 'workspace-setting-pill-active' : ''
-                        }`}
-                        disabled={option.id === 'text-image' && !canOutputImage}
-                        key={option.id}
-                        onClick={() => setResponseMode(option.id)}
-                        type="button"
-                      >
-                        <strong>{option.label}</strong>
-                      </button>
-                    ))}
-                  </div>
-                  {!canOutputImage ? (
-                    <p className="workspace-inline-note">
-                      This model outputs text only.
-                    </p>
-                  ) : null}
-                </div>
+          <div className="workspace-controls-column">
+            <button
+              className="workspace-controls-toggle"
+              onClick={() => setControlsOpen((value) => !value)}
+              type="button"
+            >
+              <span>Controls</span>
+              <ChevronDown
+                className={`workspace-collapsible-chevron${
+                  controlsOpen ? ' workspace-collapsible-chevron-open' : ''
+                }`}
+                size={16}
+              />
+            </button>
 
-                <div className="workspace-setting-card">
-                  <h4>Thinking</h4>
-                  <div className="workspace-setting-pill-row workspace-setting-pill-row-compact">
-                    {reasoningEffortOptions.map((option) => (
-                      <button
-                        className={`workspace-setting-pill ${
-                          reasoningEffort === option.id ? 'workspace-setting-pill-active' : ''
-                        }`}
-                        disabled={!supportsReasoning && option.id !== 'none'}
-                        key={option.id}
-                        onClick={() => setReasoningEffort(option.id)}
-                        type="button"
-                      >
-                        <strong>{option.label}</strong>
-                      </button>
-                    ))}
+            {controlsOpen ? (
+              <div className="workspace-utility-panel workspace-controls-panel">
+                <div className="workspace-utility-body workspace-inline-stack">
+                  <div className="workspace-controls-grid">
+                    <div className="workspace-setting-card">
+                      <h4>Response mode</h4>
+                      <div className="workspace-setting-pill-row">
+                        {responseModeOptions.map((option) => (
+                          <button
+                            className={`workspace-setting-pill ${
+                              responseMode === option.id
+                                ? 'workspace-setting-pill-active'
+                                : ''
+                            }`}
+                            disabled={option.id === 'text-image' && !canOutputImage}
+                            key={option.id}
+                            onClick={() => setResponseMode(option.id)}
+                            type="button"
+                          >
+                            <strong>{option.label}</strong>
+                          </button>
+                        ))}
+                      </div>
+                      {!canOutputImage ? (
+                        <p className="workspace-inline-note">
+                          This model outputs text only.
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div className="workspace-setting-card">
+                      <h4>Thinking</h4>
+                      <div className="workspace-setting-pill-row workspace-setting-pill-row-compact">
+                        {reasoningEffortOptions.map((option) => (
+                          <button
+                            className={`workspace-setting-pill ${
+                              reasoningEffort === option.id
+                                ? 'workspace-setting-pill-active'
+                                : ''
+                            }`}
+                            disabled={!supportsReasoning && option.id !== 'none'}
+                            key={option.id}
+                            onClick={() => setReasoningEffort(option.id)}
+                            type="button"
+                          >
+                            <strong>{option.label}</strong>
+                          </button>
+                        ))}
+                      </div>
+                      {!supportsReasoning ? (
+                        <p className="workspace-inline-note">
+                          This model does not expose reasoning controls.
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
-                  {!supportsReasoning ? (
-                    <p className="workspace-inline-note">
-                      This model does not expose reasoning controls.
-                    </p>
-                  ) : null}
                 </div>
               </div>
-            </div>
-          </details>
+            ) : null}
+          </div>
         </div>
 
         <div className="workspace-chat-column">
           <div className="workspace-chat-card">
             <div className="workspace-chat-header">
-              <div className="workspace-chat-header-main">
-                <div className="workspace-chat-heading">
+              <div className="workspace-chat-header-actions">
+                <button
+                  className="button button-secondary"
+                  onClick={handleClearThread}
+                  type="button"
+                >
+                  <Trash2 size={16} />
+                  New chat
+                </button>
+                <div className="workspace-chat-heading workspace-chat-heading-top-right">
                   <strong>{accountEmail}</strong>
                   {hasSavedApiKey ? (
                     <span>API key ready</span>
@@ -1143,16 +1177,6 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                     </span>
                   )}
                 </div>
-              </div>
-              <div className="workspace-chat-header-actions">
-                <button
-                  className="button button-secondary"
-                  onClick={handleClearThread}
-                  type="button"
-                >
-                  <Trash2 size={16} />
-                  New thread
-                </button>
               </div>
             </div>
 
@@ -1256,11 +1280,7 @@ function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                   className="workspace-textarea"
                   onChange={handleDraftMessageChange}
                   onKeyDown={handleComposerKeyDown}
-                  placeholder={
-                    hasSavedApiKey
-                      ? 'Ask anything'
-                      : 'Add API key in Settings to start chatting'
-                  }
+                  placeholder="Ask anything"
                   ref={composerTextareaRef}
                   rows={1}
                   spellCheck={false}
