@@ -18,7 +18,7 @@
   top: 0;
   z-index: 40;
   margin-top: 0;
-  padding: 0.9rem 1.15rem;
+  padding: calc(0.48rem + env(safe-area-inset-top)) 1.15rem 0.88rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -61,7 +61,7 @@
 
 .brand-mark {
   width: 2rem;
-  height: 1.25rem;
+  height: 1.35rem;
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
@@ -70,7 +70,7 @@
 .brand-fan {
   position: relative;
   width: 1.86rem;
-  height: 1.04rem;
+  height: 1.12rem;
   transition: transform 240ms ease;
 }
 
