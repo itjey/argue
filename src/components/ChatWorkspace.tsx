@@ -576,14 +576,13 @@ function buildAssistantRequestFromReply(assistantReply: {
   } satisfies OpenRouterChatMessage
 }
 
-function ChatWorkspace({ currentUser: _currentUser }: ChatWorkspaceProps) {
+function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
   const attachmentInputRef = useRef<HTMLInputElement | null>(null)
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const messageStackRef = useRef<HTMLDivElement | null>(null)
   const shouldAutoScrollRef = useRef(true)
   const [draftApiKey, setDraftApiKey] = useState('')
   const [savedApiKey, setSavedApiKey] = useState('')
-  const [, setKeyStatus] = useState('Stored locally in this browser only.')
   const [models, setModels] = useState<OpenRouterModel[]>([])
   const [modelsLoading, setModelsLoading] = useState(true)
   const [modelsError, setModelsError] = useState('')
@@ -719,18 +718,15 @@ function ChatWorkspace({ currentUser: _currentUser }: ChatWorkspaceProps) {
 
     if (trimmedKey) {
       window.localStorage.setItem(OPENROUTER_KEY_STORAGE, trimmedKey)
-      setKeyStatus('OpenRouter key saved locally in this browser.')
       return
     }
 
     window.localStorage.removeItem(OPENROUTER_KEY_STORAGE)
-    setKeyStatus('OpenRouter key cleared from this browser.')
   }
 
   function handleClearApiKey() {
     setDraftApiKey('')
     setSavedApiKey('')
-    setKeyStatus('OpenRouter key cleared from this browser.')
     window.localStorage.removeItem(OPENROUTER_KEY_STORAGE)
   }
 
@@ -981,6 +977,15 @@ function ChatWorkspace({ currentUser: _currentUser }: ChatWorkspaceProps) {
     : null
   const attachmentAccept = getAttachmentAccept(selectedModelProfile)
   const hasSavedApiKey = savedApiKey.trim().length > 0
+  const canOutputImage = Boolean(selectedModelProfile?.canOutputImage)
+  const supportsReasoning = Boolean(selectedModelProfile?.supportsReasoning)
+  const accountEmail = currentUser.email ?? 'Signed in user'
+
+  useEffect(() => {
+    if (!supportsReasoning && reasoningEffort !== 'none') {
+      setReasoningEffort('none')
+    }
+  }, [reasoningEffort, supportsReasoning])
 
   return (
     <section className="workspace-home section" id="chat">
@@ -988,10 +993,22 @@ function ChatWorkspace({ currentUser: _currentUser }: ChatWorkspaceProps) {
         <div className="workspace-utility-grid" id="models">
           <details className="workspace-utility-panel" open={!hasSavedApiKey}>
             <summary className="workspace-utility-summary">
-              <strong>{hasSavedApiKey ? 'API key' : 'Add API key'}</strong>
+              <strong>Settings</strong>
               <ChevronDown className="workspace-collapsible-chevron" size={16} />
             </summary>
             <div className="workspace-utility-body workspace-inline-stack">
+              <div className="workspace-settings-account">
+                <span className="workspace-settings-email">{accountEmail}</span>
+                <span
+                  className={`workspace-settings-status${
+                    hasSavedApiKey
+                      ? ' workspace-settings-status-ok'
+                      : ' workspace-settings-status-missing'
+                  }`}
+                >
+                  {hasSavedApiKey ? 'API key saved' : 'API key missing'}
+                </span>
+              </div>
               <input
                 autoComplete="off"
                 className="auth-input"
@@ -1023,7 +1040,7 @@ function ChatWorkspace({ currentUser: _currentUser }: ChatWorkspaceProps) {
 
           <details className="workspace-utility-panel workspace-utility-panel-wide">
             <summary className="workspace-utility-summary">
-              <strong>{selectedModel?.name ?? 'Choose model'}</strong>
+              <strong>{selectedModel?.name ?? 'Search model'}</strong>
               <ChevronDown className="workspace-collapsible-chevron" size={16} />
             </summary>
             <div className="workspace-utility-body workspace-inline-stack">
@@ -1032,7 +1049,7 @@ function ChatWorkspace({ currentUser: _currentUser }: ChatWorkspaceProps) {
                 <input
                   className="auth-input"
                   onChange={(event) => setModelSearch(event.target.value)}
-                  placeholder="Search models"
+                  placeholder="Search and pick a model"
                   type="search"
                   value={modelSearch}
                 />
@@ -1086,7 +1103,9 @@ function ChatWorkspace({ currentUser: _currentUser }: ChatWorkspaceProps) {
                       >
                         <div className="workspace-library-copy">
                           <strong>{model.name}</strong>
+                          <p>{model.id}</p>
                         </div>
+                        {selectedModelId === model.id ? <span>Selected</span> : null}
                       </button>
                     )
                   })}
@@ -1101,55 +1120,53 @@ function ChatWorkspace({ currentUser: _currentUser }: ChatWorkspaceProps) {
               <ChevronDown className="workspace-collapsible-chevron" size={16} />
             </summary>
             <div className="workspace-utility-body workspace-inline-stack">
-              {selectedModel && selectedModelProfile ? (
-                <>
-                  {selectedModelProfile.canOutputImage ? (
-                    <div className="workspace-setting-card">
-                      <h4>Images</h4>
-                      <div className="workspace-setting-pill-row">
-                        {responseModeOptions.map((option) => (
-                          <button
-                            className={`workspace-setting-pill ${
-                              responseMode === option.id
-                                ? 'workspace-setting-pill-active'
-                                : ''
-                            }`}
-                            key={option.id}
-                            onClick={() => setResponseMode(option.id)}
-                            type="button"
-                          >
-                            <strong>{option.label}</strong>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
+              <div className="workspace-setting-card">
+                <h4>Response mode</h4>
+                <div className="workspace-setting-pill-row">
+                  {responseModeOptions.map((option) => (
+                    <button
+                      className={`workspace-setting-pill ${
+                        responseMode === option.id ? 'workspace-setting-pill-active' : ''
+                      }`}
+                      disabled={option.id === 'text-image' && !canOutputImage}
+                      key={option.id}
+                      onClick={() => setResponseMode(option.id)}
+                      type="button"
+                    >
+                      <strong>{option.label}</strong>
+                    </button>
+                  ))}
+                </div>
+                {!canOutputImage ? (
+                  <p className="workspace-inline-note">
+                    This model outputs text only.
+                  </p>
+                ) : null}
+              </div>
 
-                  {selectedModelProfile.supportsReasoning ? (
-                    <div className="workspace-setting-card">
-                      <h4>Thinking</h4>
-                      <div className="workspace-setting-pill-row workspace-setting-pill-row-compact">
-                        {reasoningEffortOptions.map((option) => (
-                          <button
-                            className={`workspace-setting-pill ${
-                              reasoningEffort === option.id
-                                ? 'workspace-setting-pill-active'
-                                : ''
-                            }`}
-                            key={option.id}
-                            onClick={() => setReasoningEffort(option.id)}
-                            type="button"
-                          >
-                            <strong>{option.label}</strong>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                </>
-              ) : (
-                <p className="workspace-inline-note">No extra controls.</p>
-              )}
+              <div className="workspace-setting-card">
+                <h4>Thinking</h4>
+                <div className="workspace-setting-pill-row workspace-setting-pill-row-compact">
+                  {reasoningEffortOptions.map((option) => (
+                    <button
+                      className={`workspace-setting-pill ${
+                        reasoningEffort === option.id ? 'workspace-setting-pill-active' : ''
+                      }`}
+                      disabled={!supportsReasoning && option.id !== 'none'}
+                      key={option.id}
+                      onClick={() => setReasoningEffort(option.id)}
+                      type="button"
+                    >
+                      <strong>{option.label}</strong>
+                    </button>
+                  ))}
+                </div>
+                {!supportsReasoning ? (
+                  <p className="workspace-inline-note">
+                    This model does not expose reasoning controls.
+                  </p>
+                ) : null}
+              </div>
             </div>
           </details>
         </div>
@@ -1157,6 +1174,18 @@ function ChatWorkspace({ currentUser: _currentUser }: ChatWorkspaceProps) {
         <div className="workspace-chat-column">
           <div className="workspace-chat-card">
             <div className="workspace-chat-header">
+              <div className="workspace-chat-header-main">
+                <div className="workspace-chat-heading">
+                  <strong>{accountEmail}</strong>
+                  {hasSavedApiKey ? (
+                    <span>API key ready</span>
+                  ) : (
+                    <span className="workspace-api-warning">
+                      Add API key in Settings to start chatting.
+                    </span>
+                  )}
+                </div>
+              </div>
               <div className="workspace-chat-header-actions">
                 <button
                   className="button button-secondary"
@@ -1269,7 +1298,11 @@ function ChatWorkspace({ currentUser: _currentUser }: ChatWorkspaceProps) {
                   className="workspace-textarea"
                   onChange={handleDraftMessageChange}
                   onKeyDown={handleComposerKeyDown}
-                  placeholder="Ask anything"
+                  placeholder={
+                    hasSavedApiKey
+                      ? 'Ask anything'
+                      : 'Add API key in Settings to start chatting'
+                  }
                   ref={composerTextareaRef}
                   rows={1}
                   spellCheck={false}
@@ -1277,7 +1310,11 @@ function ChatWorkspace({ currentUser: _currentUser }: ChatWorkspaceProps) {
                 />
                 <button
                   className="workspace-send-icon"
-                  disabled={isSending || (!draftMessage.trim() && attachments.length === 0)}
+                  disabled={
+                    isSending ||
+                    !hasSavedApiKey ||
+                    (!draftMessage.trim() && attachments.length === 0)
+                  }
                   onClick={() => void handleSendMessage()}
                   type="button"
                   aria-label="Send message"
