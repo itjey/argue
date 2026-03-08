@@ -1,4 +1,4 @@
-import { useState, useRef, type ReactNode } from 'react'
+import { useState, useRef, useEffect, type ReactNode, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Play, X, Loader, RotateCcw } from 'lucide-react'
 
@@ -13,14 +13,6 @@ function registerPanel(closer: () => void) {
 function unregisterPanel(closer: () => void) {
   if (closeActivePanel === closer) closeActivePanel = null
 }
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   Types
-   ═══════════════════════════════════════════════════════════════════════════ */
-type RunResult =
-  | { type: 'html'; content: string }
-  | { type: 'text'; stdout: string; stderr: string; exitCode: number; plots?: string[] }
-  | { type: 'error'; message: string }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Language detection
@@ -52,24 +44,103 @@ export function isRunnable(langId: string): boolean {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Python — Pyodide loaded once in main thread
+   Pyodide Web Worker singleton
    ═══════════════════════════════════════════════════════════════════════════
-   • Runs entirely in the browser via WebAssembly (no server needed)
-   • Auto-installs any imported package (numpy, pandas, matplotlib, scipy…)
-   • input() is patched to use window.prompt() — works for games/interactive code
-   • Matplotlib figures are captured as PNG images
+   A single Worker + SharedArrayBuffer is shared across all CodeBlock instances.
+   The SharedArrayBuffer (4104 bytes) is used to pass user input to the blocking
+   Atomics.wait() call inside the worker.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const SAB_SIZE = 4104 // 4 (status) + 4 (len) + 4096 (data)
+let _worker: Worker | null = null
+let _workerReady = false
+let _workerError: string | null = null
+let _sharedBuf: SharedArrayBuffer | null = null
+let _workerReadyCbs: Array<() => void> = []
+
+// Per-run callbacks registered by the active CodeBlock
+let _onStdout: ((text: string) => void) | null = null
+let _onStderr: ((text: string) => void) | null = null
+let _onDone: ((exitCode: number, plots: string[]) => void) | null = null
+let _onInputReq: ((prompt: string) => void) | null = null
+
+function getOrCreateWorker(): Promise<void> {
+  if (_workerReady) return Promise.resolve()
+  if (_workerError) return Promise.reject(new Error(_workerError))
+
+  return new Promise((resolve, reject) => {
+    if (_workerReady) { resolve(); return }
+    if (_workerError) { reject(new Error(_workerError)); return }
+
+    _workerReadyCbs.push(() => resolve())
+
+    if (_worker) return // already initializing
+
+    if (!crossOriginIsolated) {
+      // SharedArrayBuffer requires COOP/COEP. If not isolated yet (SW not yet
+      // active), fall back to prompt()-based Pyodide on main thread.
+      reject(new Error('__NOT_ISOLATED__'))
+      return
+    }
+
+    _sharedBuf = new SharedArrayBuffer(SAB_SIZE)
+    _worker = new Worker(import.meta.env.BASE_URL + 'py-worker.js')
+
+    _worker.onmessage = (e: MessageEvent) => {
+      const d = e.data
+      switch (d.type) {
+        case 'ready':
+          _workerReady = true
+          _workerReadyCbs.splice(0).forEach(cb => cb())
+          break
+        case 'error':
+          _workerError = d.message
+          _workerReadyCbs.splice(0).forEach(() => {})
+          reject(new Error(d.message))
+          break
+        case 'stdout':
+          _onStdout?.(d.text)
+          break
+        case 'stderr':
+          _onStderr?.(d.text)
+          break
+        case 'input_request':
+          _onInputReq?.(d.prompt)
+          break
+        case 'done':
+          _onDone?.(d.exitCode, d.plots ?? [])
+          break
+      }
+    }
+
+    _worker.postMessage({ type: 'init', buffer: _sharedBuf })
+  })
+}
+
+function sendInputToWorker(value: string) {
+  if (!_sharedBuf) return
+  const encoded = new TextEncoder().encode(value.slice(0, 4096))
+  const lenView = new Int32Array(_sharedBuf, 4, 1)
+  const dataView = new Uint8Array(_sharedBuf, 8, encoded.length)
+  lenView[0] = encoded.length
+  dataView.set(encoded)
+  const statusView = new Int32Array(_sharedBuf, 0, 1)
+  Atomics.store(statusView, 0, 1)
+  Atomics.notify(statusView, 0, 1)
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Fallback: Pyodide on main thread with window.prompt()
+   Used when crossOriginIsolated = false (SW not yet active, or unsupported)
    ═══════════════════════════════════════════════════════════════════════════ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _pyodide: any = null
+let _pyodideMain: any = null
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _pyodideP: Promise<any> | null = null
+let _pyodideMainP: Promise<any> | null = null
 
-async function ensurePyodide() {
-  if (_pyodide) return _pyodide
-  if (_pyodideP) return _pyodideP
-
-  _pyodideP = (async () => {
-    // Load the Pyodide loader script from CDN if not already present
+async function ensurePyodideMain() {
+  if (_pyodideMain) return _pyodideMain
+  if (_pyodideMainP) return _pyodideMainP
+  _pyodideMainP = (async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (!(window as any).loadPyodide) {
       await new Promise<void>((ok, fail) => {
@@ -80,101 +151,34 @@ async function ensurePyodide() {
         document.head.appendChild(s)
       })
     }
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const py = await (window as any).loadPyodide({
-      indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.27.2/full/',
-    })
-
-    // Patch input() → window.prompt() and pre-configure matplotlib
+    const py = await (window as any).loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.27.2/full/' })
     py.runPython(`
 import builtins
 from js import prompt as _js_prompt
-
-def _patched_input(p=''):
-    r = _js_prompt(str(p) if p else 'Enter input:')
-    return '' if r is None else str(r)
-
-builtins.input = _patched_input
-
+builtins.input = lambda p='': (r := _js_prompt(str(p) or 'Input:')) and r or ''
 try:
-    import matplotlib
-    matplotlib.use('Agg')
+    import matplotlib; matplotlib.use('Agg')
 except ImportError:
     pass
 `)
-    _pyodide = py
+    _pyodideMain = py
     return py
   })()
-
-  return _pyodideP
-}
-
-async function executePython(code: string, onStatus: (s: string) => void): Promise<RunResult> {
-  onStatus('loading')
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let py: any
-  try {
-    py = await ensurePyodide()
-  } catch (e: unknown) {
-    return { type: 'error', message: e instanceof Error ? e.message : 'Failed to load Python runtime.' }
-  }
-
-  onStatus('running')
-
-  let stdout = '', stderr = ''
-  py.setStdout({ batched: (s: string) => { stdout += s + '\n' } })
-  py.setStderr({ batched: (s: string) => { stderr += s + '\n' } })
-
-  let exitCode = 0
-  try {
-    await py.loadPackagesFromImports(code)
-    await py.runPythonAsync(code)
-  } catch (e: unknown) {
-    stderr += (e instanceof Error ? e.message : String(e))
-    exitCode = 1
-  }
-
-  // Capture any open matplotlib figures
-  const plots: string[] = []
-  try {
-    const proxy = await py.runPythonAsync(`
-try:
-    import matplotlib.pyplot as _plt
-    import io as _io, base64 as _b64
-    _arg_plots = []
-    for _fn in _plt.get_fignums():
-        _buf = _io.BytesIO()
-        _plt.figure(_fn).savefig(_buf, format='png', bbox_inches='tight', dpi=100)
-        _buf.seek(0)
-        _arg_plots.append(_b64.b64encode(_buf.read()).decode())
-    _plt.close('all')
-    _arg_plots
-except Exception:
-    []
-`)
-    if (proxy?.toJs) {
-      plots.push(...proxy.toJs())
-      proxy.destroy()
-    }
-  } catch { /* matplotlib not imported — fine */ }
-
-  return {
-    type: 'text',
-    stdout: stdout.replace(/\n+$/, ''),
-    stderr: stderr.replace(/\n+$/, ''),
-    exitCode,
-    plots: plots.length ? plots : undefined,
-  }
+  return _pyodideMainP
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   JavaScript — sandboxed iframe with console capture
+   JS sandbox
    ═══════════════════════════════════════════════════════════════════════════ */
 let _jsExecId = 0
+type RunResult =
+  | { type: 'html'; content: string }
+  | { type: 'text'; stdout: string; stderr: string; exitCode: number; plots?: string[] }
+  | { type: 'error'; message: string }
 
 function runJavaScript(code: string): Promise<RunResult> {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const execId = ++_jsExecId
     const src = `<!DOCTYPE html><html><body><script>
 var __L=[],__E=[]
@@ -194,7 +198,7 @@ window.parent.postMessage({__jsId:${execId},l:__L,e:__E,x:__X},'*')
     iframe.style.cssText = 'position:fixed;top:-9999px;opacity:0;width:1px;height:1px;pointer-events:none'
     document.body.appendChild(iframe)
 
-    const tid = setTimeout(() => { cleanup(); resolve({ type: 'text', stdout: '', stderr: 'Timed out after 5 s.', exitCode: 124 }) }, 5000)
+    const tid = setTimeout(() => { cleanup(); resolve({ type: 'text', stdout: '', stderr: 'Timed out (5 s).', exitCode: 124 }) }, 5000)
     const cleanup = () => { clearTimeout(tid); window.removeEventListener('message', handler); if (iframe.parentNode) document.body.removeChild(iframe) }
     const handler = (ev: MessageEvent) => {
       if (ev.data?.__jsId !== execId) return
@@ -207,24 +211,16 @@ window.parent.postMessage({__jsId:${execId},l:__L,e:__E,x:__X},'*')
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Compiled languages — Godbolt Compiler Explorer API
+   Godbolt Compiler Explorer
    ═══════════════════════════════════════════════════════════════════════════ */
-function preprocessForGodbolt(langId: string, code: string): string {
-  // Java: Godbolt feeds source as <source>, so "public class X" fails
-  // because the filename doesn't match. Strip the "public" keyword.
-  if (langId === 'java') {
-    return code.replace(/public\s+class\s+/g, 'class ')
-  }
-  return code
-}
-
 async function runWithGodbolt(langId: string, code: string): Promise<RunResult> {
   const cfg = GODBOLT[langId.toLowerCase()]
-  if (!cfg) {
-    return { type: 'error', message: `No runtime for "${langId}". Supported: Python, C/C++, Go, Rust, Java, Kotlin, Swift, Haskell, Ruby, HTML, JavaScript.` }
-  }
+  if (!cfg) return { type: 'error', message: `No runtime for "${langId}". Supported: Python, C/C++, Go, Rust, Java, Kotlin, Swift, Haskell, Ruby, HTML, JavaScript.` }
 
-  const processedCode = preprocessForGodbolt(langId.toLowerCase(), code)
+  // Godbolt requires the class name to match the filename; strip "public" from Java
+  const processedCode = langId.toLowerCase() === 'java'
+    ? code.replace(/public\s+class\s+/g, 'class ')
+    : code
 
   const res = await fetch(`https://godbolt.org/api/compiler/${cfg.compiler}/compile`, {
     method: 'POST',
@@ -243,11 +239,7 @@ async function runWithGodbolt(langId: string, code: string): Promise<RunResult> 
     }),
   })
 
-  if (!res.ok) {
-    const txt = await res.text().catch(() => '')
-    throw new Error(`Godbolt returned ${res.status}${txt ? ': ' + txt.slice(0, 200) : ''}`)
-  }
-
+  if (!res.ok) throw new Error(`Godbolt returned ${res.status}`)
   const d = await res.json()
   const exec = d.execResult ?? d
   const join = (arr?: Array<{ text: string }>) => (arr ?? []).map(l => l.text).join('\n')
@@ -260,6 +252,14 @@ async function runWithGodbolt(langId: string, code: string): Promise<RunResult> 
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   Terminal line types
+   ═══════════════════════════════════════════════════════════════════════════ */
+type TermLine =
+  | { kind: 'out';   text: string }
+  | { kind: 'err';   text: string }
+  | { kind: 'echo';  text: string }  // echoed user input
+
+/* ═══════════════════════════════════════════════════════════════════════════
    CodeBlock component
    ═══════════════════════════════════════════════════════════════════════════ */
 interface Props { code: string; langId: string; label: string; children: ReactNode }
@@ -267,44 +267,199 @@ interface Props { code: string; langId: string; label: string; children: ReactNo
 export function CodeBlock({ code, langId, label, children }: Props) {
   const [running, setRunning] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
-  const [result, setResult] = useState<RunResult | null>(null)
   const [open, setOpen] = useState(false)
 
+  // Terminal state
+  const [lines, setLines] = useState<TermLine[]>([])
+  const [plots, setPlots] = useState<string[]>([])
+  const [exitCode, setExitCode] = useState<number | null>(null)
+  const [inputPrompt, setInputPrompt] = useState<string | null>(null)
+  const [inputDraft, setInputDraft] = useState('')
+  const [htmlContent, setHtmlContent] = useState<string | null>(null)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  const termBottomRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const closeFnRef = useRef<() => void>(() => setOpen(false))
   closeFnRef.current = () => setOpen(false)
 
+  // Auto-scroll terminal
+  useEffect(() => {
+    termBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [lines, plots, inputPrompt])
+
+  // Focus input when it appears
+  useEffect(() => {
+    if (inputPrompt !== null) inputRef.current?.focus()
+  }, [inputPrompt])
+
   function close() { setOpen(false); unregisterPanel(closeFnRef.current) }
+
+  function appendLine(kind: TermLine['kind'], text: string) {
+    setLines(prev => {
+      // Split by newlines, each becomes its own line entry
+      const chunks = text.split('\n')
+      const newLines: TermLine[] = []
+      for (const chunk of chunks) {
+        if (chunk) newLines.push({ kind, text: chunk })
+      }
+      return [...prev, ...newLines]
+    })
+  }
 
   async function run() {
     registerPanel(closeFnRef.current)
     setOpen(true)
     setRunning(true)
-    setResult(null)
-    setStatusMsg('Running…')
+    setLines([])
+    setPlots([])
+    setExitCode(null)
+    setInputPrompt(null)
+    setInputDraft('')
+    setHtmlContent(null)
+    setErrorMsg(null)
+    setStatusMsg('Starting…')
+
+    const id = langId.toLowerCase()
 
     try {
-      const id = langId.toLowerCase()
-
       if (HTML_LANGS.has(id)) {
-        setResult({ type: 'html', content: code })
+        setHtmlContent(code)
+
       } else if (JS_LANGS.has(id)) {
-        setResult(await runJavaScript(code))
+        const r = await runJavaScript(code)
+        if (r.type === 'text') {
+          if (r.stdout) appendLine('out', r.stdout)
+          if (r.stderr) appendLine('err', r.stderr)
+          setExitCode(r.exitCode)
+        } else if (r.type === 'error') {
+          setErrorMsg(r.message)
+        }
+
       } else if (id === 'python' || id === 'py') {
-        setResult(await executePython(code, (s) => {
-          setStatusMsg(s === 'loading' ? 'Loading Python (first run ~10 s)…' : 'Running…')
-        }))
+        await runPython(code)
+
       } else {
-        setResult(await runWithGodbolt(id, code))
+        setStatusMsg('Compiling…')
+        const r = await runWithGodbolt(id, code)
+        if (r.type === 'text') {
+          if (r.stdout) appendLine('out', r.stdout)
+          if (r.stderr) appendLine('err', r.stderr)
+          setExitCode(r.exitCode)
+        } else if (r.type === 'error') {
+          setErrorMsg(r.message)
+        }
       }
     } catch (err) {
-      setResult({ type: 'error', message: err instanceof Error ? err.message : 'Execution failed.' })
+      setErrorMsg(err instanceof Error ? err.message : 'Execution failed.')
     } finally {
       setRunning(false)
       setStatusMsg('')
+      setInputPrompt(null)
     }
   }
 
+  async function runPython(src: string) {
+    let runId = Date.now()
+
+    try {
+      setStatusMsg('Loading Python…')
+      await getOrCreateWorker()
+      setStatusMsg('')
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : ''
+      if (msg === '__NOT_ISOLATED__') {
+        // Fall back to main-thread Pyodide (no interactive terminal, uses prompt())
+        await runPythonFallback(src)
+        return
+      }
+      throw e
+    }
+
+    // Register per-run callbacks
+    _onStdout = text => appendLine('out', text)
+    _onStderr = text => appendLine('err', text)
+    _onInputReq = prompt => {
+      setInputPrompt(prompt)
+    }
+    _onDone = (ec, p) => {
+      setExitCode(ec)
+      if (p.length) setPlots(prev => [...prev, ...p])
+      _onStdout = null
+      _onStderr = null
+      _onInputReq = null
+      _onDone = null
+    }
+
+    _worker!.postMessage({ type: 'run', id: runId, code: src })
+    // setRunning(false) happens in finally of the parent run() fn, but we need
+    // to wait for 'done' here. We do that by returning a Promise.
+    await new Promise<void>(resolve => {
+      const prev = _onDone
+      _onDone = (ec, p) => {
+        prev?.(ec, p)
+        resolve()
+      }
+    })
+  }
+
+  async function runPythonFallback(src: string) {
+    setStatusMsg('Loading Python (first run ~10 s)…')
+    const py = await ensurePyodideMain()
+    setStatusMsg('Running…')
+
+    let stdout = '', stderr = ''
+    py.setStdout({ batched: (s: string) => { stdout += s + '\n'; appendLine('out', s) } })
+    py.setStderr({ batched: (s: string) => { stderr += s + '\n'; appendLine('err', s) } })
+
+    let exitCode = 0
+    try {
+      await py.loadPackagesFromImports(src)
+      await py.runPythonAsync(src)
+    } catch (e: unknown) {
+      const m = e instanceof Error ? e.message : String(e)
+      appendLine('err', m)
+      exitCode = 1
+    }
+
+    const plots: string[] = []
+    try {
+      const proxy = await py.runPythonAsync(`
+try:
+    import matplotlib.pyplot as _plt, io as _io, base64 as _b64
+    _r = []
+    for _n in _plt.get_fignums():
+        _buf = _io.BytesIO()
+        _plt.figure(_n).savefig(_buf, format='png', bbox_inches='tight', dpi=100)
+        _buf.seek(0)
+        _r.append(_b64.b64encode(_buf.read()).decode())
+    _plt.close('all')
+    _r
+except: []
+`)
+      if (proxy?.toJs) { plots.push(...proxy.toJs()); proxy.destroy() }
+    } catch (_) { /* fine */ }
+
+    setExitCode(exitCode)
+    if (plots.length) setPlots(plots)
+  }
+
+  function submitInput() {
+    const val = inputDraft
+    setInputDraft('')
+    setInputPrompt(null)
+    // Echo the input line into the terminal
+    appendLine('echo', (inputPrompt || '') + val)
+    sendInputToWorker(val)
+  }
+
+  function onInputKey(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') { e.preventDefault(); submitInput() }
+  }
+
   const runnable = isRunnable(langId)
+  const isPython = langId.toLowerCase() === 'python' || langId.toLowerCase() === 'py'
+  const showTerminal = !htmlContent && (lines.length > 0 || plots.length > 0 || running || exitCode !== null || errorMsg !== null)
 
   const panel = open ? createPortal(
     <div className="code-runner-panel">
@@ -321,36 +476,63 @@ export function CodeBlock({ code, langId, label, children }: Props) {
       </div>
 
       <div className="code-runner-body">
-        {running ? (
+        {/* ── HTML preview ── */}
+        {htmlContent && (
+          <iframe
+            className="code-canvas-iframe"
+            sandbox="allow-scripts allow-pointer-lock allow-downloads allow-modals allow-forms"
+            srcDoc={htmlContent}
+            title="Preview"
+          />
+        )}
+
+        {/* ── Terminal ── */}
+        {(showTerminal || (isPython && running)) && (
+          <div className="code-terminal">
+            <div className="code-terminal-output">
+              {lines.map((l, i) => (
+                <div key={i} className={`code-terminal-line code-terminal-${l.kind}`}>{l.text}</div>
+              ))}
+              {plots.map((p, i) => (
+                <img key={i} src={`data:image/png;base64,${p}`} alt="Plot" className="code-canvas-plot" />
+              ))}
+              {errorMsg && <div className="code-terminal-line code-terminal-err">{errorMsg}</div>}
+              {!running && exitCode !== null && exitCode !== 0 && (
+                <div className="code-terminal-exit">Process exited with code {exitCode}</div>
+              )}
+              <div ref={termBottomRef} />
+            </div>
+
+            {/* Input row — shown when Python calls input() */}
+            {running && inputPrompt !== null ? (
+              <div className="code-terminal-input-row">
+                {inputPrompt && <span className="code-terminal-input-prompt">{inputPrompt}</span>}
+                <input
+                  ref={inputRef}
+                  className="code-terminal-input"
+                  value={inputDraft}
+                  onChange={e => setInputDraft(e.target.value)}
+                  onKeyDown={onInputKey}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </div>
+            ) : running ? (
+              <div className="code-terminal-status">
+                <Loader size={11} className="code-run-spinner" />
+                <span>{statusMsg || 'Running…'}</span>
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        {/* ── Initial loading spinner ── */}
+        {running && !showTerminal && !htmlContent && (
           <div className="code-canvas-loading">
             <Loader size={14} className="code-run-spinner" />
             <span>{statusMsg || 'Running…'}</span>
           </div>
-
-        ) : result?.type === 'html' ? (
-          <iframe
-            className="code-canvas-iframe"
-            sandbox="allow-scripts allow-pointer-lock allow-downloads allow-modals allow-forms"
-            srcDoc={result.content}
-            title="Preview"
-          />
-
-        ) : result?.type === 'text' ? (
-          <div className="code-canvas-output">
-            {result.stdout && <pre className="code-canvas-stdout">{result.stdout}</pre>}
-            {result.plots?.map((p, i) => (
-              <img key={i} src={`data:image/png;base64,${p}`} alt="Plot" className="code-canvas-plot" />
-            ))}
-            {result.stderr && <pre className="code-canvas-stderr">{result.stderr}</pre>}
-            {!result.stdout && !result.stderr && !result.plots?.length && (
-              <span className="code-canvas-empty">No output.</span>
-            )}
-            {result.exitCode !== 0 && <div className="code-canvas-exit-code">Exit {result.exitCode}</div>}
-          </div>
-
-        ) : result?.type === 'error' ? (
-          <div className="code-canvas-error">{result.message}</div>
-        ) : null}
+        )}
       </div>
     </div>,
     document.body

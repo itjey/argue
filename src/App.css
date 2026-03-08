@@ -4850,6 +4850,7 @@
   padding-left: 0;
   padding-right: 0;
   max-width: 100%;
+  width: 100%;
   color: rgba(255, 255, 255, 0.88);
 }
 
@@ -5089,62 +5090,84 @@
   margin: 0.5rem 0;
 }
 
-/* ── Interactive input row (shown when Python calls input()) ── */
-.code-runner-input-row {
+/* ── Terminal output panel ── */
+.code-terminal {
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.55rem 0.75rem 0.55rem 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  margin-top: 0.4rem;
-  flex-shrink: 0;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  font-family: 'SF Mono', 'Fira Mono', 'JetBrains Mono', monospace;
+  font-size: 0.82rem;
 }
 
-.code-runner-input-prompt {
-  font-family: 'SF Mono', 'Fira Mono', monospace;
-  font-size: 0.82rem;
-  color: rgba(255, 255, 255, 0.55);
+.code-terminal-output {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.code-terminal-line {
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.6;
+  min-height: 1.3em;
+}
+
+.code-terminal-out  { color: rgba(255, 255, 255, 0.82); }
+.code-terminal-err  { color: rgba(255, 100, 80, 0.9); }
+.code-terminal-echo { color: rgba(255, 255, 255, 0.55); }
+
+.code-terminal-exit {
+  margin-top: 0.5rem;
+  font-size: 0.73rem;
+  color: rgba(255, 100, 80, 0.55);
+}
+
+/* Input row — replaces the cursor line at the bottom when input() is called */
+.code-terminal-input-row {
+  display: flex;
+  align-items: center;
+  padding: 0.45rem 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+  flex-shrink: 0;
+  gap: 0;
+}
+
+.code-terminal-input-prompt {
+  color: rgba(255, 255, 255, 0.75);
   white-space: pre;
   flex-shrink: 0;
+  line-height: 1.6;
 }
 
-.code-runner-input {
+.code-terminal-input {
   flex: 1;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 0.3rem;
-  color: rgba(255, 255, 255, 0.9);
-  font-family: 'SF Mono', 'Fira Mono', monospace;
-  font-size: 0.82rem;
-  padding: 0.3rem 0.5rem;
+  background: transparent;
+  border: none;
   outline: none;
+  color: rgba(255, 255, 255, 0.9);
+  font-family: inherit;
+  font-size: inherit;
+  caret-color: rgba(255, 255, 255, 0.7);
   min-width: 0;
-}
-.code-runner-input:focus {
-  border-color: rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.08);
-}
-.code-runner-input::placeholder {
-  color: rgba(255, 255, 255, 0.2);
+  line-height: 1.6;
 }
 
-.code-runner-input-send {
+/* Running status bar at bottom */
+.code-terminal-status {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 1.6rem;
-  height: 1.6rem;
-  border-radius: 0.3rem;
-  border: none;
-  background: rgba(255, 255, 255, 0.08);
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.5);
-  transition: background 120ms, color 120ms;
+  gap: 0.5rem;
+  padding: 0.45rem 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.28);
+  font-size: 0.78rem;
+  font-family: 'SF Mono', 'Fira Mono', monospace;
   flex-shrink: 0;
-}
-.code-runner-input-send:hover {
-  background: rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.85);
 }
 
 .code-canvas-iframe {
