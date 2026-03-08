@@ -5089,6 +5089,64 @@
   margin: 0.5rem 0;
 }
 
+/* ── Interactive input row (shown when Python calls input()) ── */
+.code-runner-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.75rem 0.55rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 0.4rem;
+  flex-shrink: 0;
+}
+
+.code-runner-input-prompt {
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.55);
+  white-space: pre;
+  flex-shrink: 0;
+}
+
+.code-runner-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.3rem;
+  color: rgba(255, 255, 255, 0.9);
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+  font-size: 0.82rem;
+  padding: 0.3rem 0.5rem;
+  outline: none;
+  min-width: 0;
+}
+.code-runner-input:focus {
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+}
+.code-runner-input::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.code-runner-input-send {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 0.3rem;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.5);
+  transition: background 120ms, color 120ms;
+  flex-shrink: 0;
+}
+.code-runner-input-send:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.85);
+}
+
 .code-canvas-iframe {
   flex: 1;
   width: 100%;
