@@ -90,6 +90,11 @@ const EFFORT_LEVELS: { value: OpenRouterReasoningEffort; label: string; desc: st
   { value: 'minimal', label: 'Minimal', desc: 'Near-instant responses with almost no internal reasoning. Best for trivial tasks and autocomplete-style use.' },
 ]
 
+/** Ensure **Title** section headers in reasoning text appear on their own paragraph. */
+function normalizeReasoningText(text: string): string {
+  return text.replace(/([^\n])(\*\*[A-Z][^*\n]{0,80}\*\*)/g, '$1\n\n$2')
+}
+
 function buildApiMessages(messages: ChatMessage[]): OpenRouterChatMessage[] {
   const history: OpenRouterChatMessage[] = messages
     .filter((m) => !m.streaming && !m.error)
@@ -471,8 +476,10 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                           {expandedThinking.has(msg.id) && (
                             <div className="chat-thinking-content">
                               {msg.reasoning
-                                ? <MarkdownBlock>{msg.reasoning}</MarkdownBlock>
-                                : <span className="chat-thinking-empty">No reasoning trace exposed by this provider.</span>
+                                ? <MarkdownBlock>{normalizeReasoningText(msg.reasoning)}</MarkdownBlock>
+                                : msg.streaming
+                                  ? null
+                                  : <span className="chat-thinking-empty">No reasoning trace for this message.</span>
                               }
                             </div>
                           )}

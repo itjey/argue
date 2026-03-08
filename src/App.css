@@ -4861,6 +4861,13 @@
   font-size: 0.93rem;
   line-height: 1.65;
   color: rgba(255, 255, 255, 0.88);
+  font-family: 'Inter', sans-serif;
+}
+
+/* Softer bold — Inter 500 is clean; Outfit 700 was too heavy */
+.chat-markdown strong {
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .chat-markdown p {
@@ -5095,14 +5102,25 @@
   transform: rotate(180deg);
 }
 
-/* pulsing "Thinking…" text during active reasoning */
+/* pulsing "Thinking…" text — left-to-right shimmer sweep */
 .chat-thinking-pulse {
-  animation: thinking-fade 1.6s ease-in-out infinite;
+  display: inline-block;
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.22) 0%,
+    rgba(255,255,255,0.85) 50%,
+    rgba(255,255,255,0.22) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: thinking-shimmer 2s linear infinite;
 }
 
-@keyframes thinking-fade {
-  0%, 100% { opacity: 0.25; }
-  50% { opacity: 0.75; }
+@keyframes thinking-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -100% 0; }
 }
 
 .chat-thinking-content {
@@ -5114,6 +5132,14 @@
   color: rgba(255, 255, 255, 0.4);
   max-height: 380px;
   overflow-y: auto;
+}
+
+/* Section titles like **Clarifying X** — show as subtle dividers, not heavy bold */
+.chat-thinking-content strong {
+  display: block;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.55);
+  margin-top: 0.7em;
 }
 
 .chat-thinking-empty {
