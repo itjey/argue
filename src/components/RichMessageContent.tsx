@@ -15,6 +15,64 @@ import {
 } from 'lucide-react'
 import type { OpenRouterReasoningDetail } from '../lib/openrouter'
 
+const LANG_LABELS: Record<string, string> = {
+  python: 'Python', py: 'Python',
+  javascript: 'JavaScript', js: 'JavaScript', jsx: 'JSX',
+  typescript: 'TypeScript', ts: 'TypeScript', tsx: 'TSX',
+  cpp: 'C++', 'c++': 'C++', cxx: 'C++', cc: 'C++',
+  c: 'C',
+  csharp: 'C#', cs: 'C#', 'c#': 'C#',
+  java: 'Java',
+  kotlin: 'Kotlin', kt: 'Kotlin',
+  swift: 'Swift',
+  go: 'Go', golang: 'Go',
+  rust: 'Rust', rs: 'Rust',
+  ruby: 'Ruby', rb: 'Ruby',
+  php: 'PHP',
+  scala: 'Scala',
+  haskell: 'Haskell', hs: 'Haskell',
+  elixir: 'Elixir', ex: 'Elixir', exs: 'Elixir',
+  erlang: 'Erlang',
+  clojure: 'Clojure', clj: 'Clojure',
+  ocaml: 'OCaml', ml: 'OCaml',
+  fsharp: 'F#', fs: 'F#',
+  lua: 'Lua',
+  perl: 'Perl', pl: 'Perl',
+  r: 'R',
+  matlab: 'MATLAB',
+  html: 'HTML',
+  css: 'CSS',
+  scss: 'SCSS', sass: 'SCSS',
+  less: 'Less',
+  xml: 'XML',
+  svg: 'SVG',
+  json: 'JSON', jsonc: 'JSON',
+  yaml: 'YAML', yml: 'YAML',
+  toml: 'TOML',
+  markdown: 'Markdown', md: 'Markdown',
+  bash: 'Bash', sh: 'Bash', shell: 'Bash', zsh: 'Bash', fish: 'Bash',
+  powershell: 'PowerShell', ps1: 'PowerShell', pwsh: 'PowerShell',
+  sql: 'SQL', mysql: 'MySQL', postgresql: 'PostgreSQL', psql: 'PostgreSQL', sqlite: 'SQLite',
+  graphql: 'GraphQL', gql: 'GraphQL',
+  vue: 'Vue',
+  svelte: 'Svelte',
+  dockerfile: 'Dockerfile', docker: 'Dockerfile',
+  terraform: 'Terraform', tf: 'Terraform', hcl: 'HCL',
+  nginx: 'Nginx',
+  apache: 'Apache',
+  protobuf: 'Protobuf', proto: 'Protobuf',
+  solidity: 'Solidity', sol: 'Solidity',
+  assembly: 'Assembly', asm: 'Assembly', nasm: 'Assembly',
+  wasm: 'WebAssembly', wat: 'WebAssembly',
+  vb: 'VB.NET', vbnet: 'VB.NET',
+  diff: 'Diff',
+  makefile: 'Makefile', make: 'Makefile',
+  regex: 'Regex',
+  latex: 'LaTeX', tex: 'LaTeX',
+  ini: 'INI', cfg: 'INI', conf: 'Config',
+  env: '.env',
+}
+
 type RichMessageAttachmentKind = 'image' | 'pdf' | 'audio' | 'video' | 'code'
 
 type RichMessageAttachment = {
@@ -126,6 +184,20 @@ function MarkdownBlock({ children }: { children: string }) {
             {linkChildren}
           </a>
         ),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        pre: ({ node, children: preChildren }: any) => {
+          // Extract language id from the code child's AST className
+          const codeNode = node?.children?.[0]
+          const classNames: string[] = (codeNode?.properties?.className as string[]) ?? []
+          const langId = classNames.find((c: string) => c.startsWith('language-'))?.replace('language-', '') ?? ''
+          const label = LANG_LABELS[langId.toLowerCase()] ?? (langId && langId !== 'plaintext' && langId !== 'text' ? langId : '')
+          return (
+            <div className="code-block-wrapper">
+              {label && <span className="code-block-lang">{label}</span>}
+              <pre>{preChildren}</pre>
+            </div>
+          )
+        },
         code: ({ children: codeChildren, className, ...props }) => {
           const isInline = !className
 
