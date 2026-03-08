@@ -176,28 +176,28 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
 
             <div className="model-info-meta">
               {infoModel.context_length && (
-                <div className="model-info-chip">
-                  <span>Context</span>
+                <span className="model-info-stat">
+                  <span className="model-info-stat-label">Context</span>
                   <strong>{infoModel.context_length.toLocaleString()} tokens</strong>
-                </div>
+                </span>
               )}
               {infoModel.architecture?.input_modalities && (
-                <div className="model-info-chip">
-                  <span>Inputs</span>
+                <span className="model-info-stat">
+                  <span className="model-info-stat-label">Inputs</span>
                   <strong>{infoModel.architecture.input_modalities.join(', ')}</strong>
-                </div>
+                </span>
               )}
               {infoModel.pricing?.prompt && (
-                <div className="model-info-chip">
-                  <span>Input price</span>
+                <span className="model-info-stat">
+                  <span className="model-info-stat-label">Input</span>
                   <strong>${(Number(infoModel.pricing.prompt) * 1_000_000).toFixed(2)}/M</strong>
-                </div>
+                </span>
               )}
               {infoModel.pricing?.completion && (
-                <div className="model-info-chip">
-                  <span>Output price</span>
+                <span className="model-info-stat">
+                  <span className="model-info-stat-label">Output</span>
                   <strong>${(Number(infoModel.pricing.completion) * 1_000_000).toFixed(2)}/M</strong>
-                </div>
+                </span>
               )}
             </div>
 

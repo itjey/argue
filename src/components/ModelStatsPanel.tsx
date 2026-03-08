@@ -104,6 +104,7 @@ type StatsChartCardProps = {
   data: OpenRouterSeriesPoint[]
   formatValue: (value: number) => string
   preferredSeries?: string[]
+  seriesLabels?: Record<string, string>
   unitLabel?: string
 }
 
@@ -113,6 +114,7 @@ function StatsChartCard({
   data,
   formatValue,
   preferredSeries,
+  seriesLabels,
   unitLabel,
 }: StatsChartCardProps) {
   const seriesNames = useMemo(
@@ -252,7 +254,7 @@ function StatsChartCard({
                 style={{ backgroundColor: CHART_COLORS[seriesIndex % CHART_COLORS.length] }}
               />
               <div>
-                <strong>{seriesName}</strong>
+                <strong>{seriesLabels?.[seriesName] ?? seriesName}</strong>
                 <small>
                   {typeof latestValue === 'number' ? formatValue(latestValue) : 'n/a'}
                 </small>
@@ -389,6 +391,11 @@ function ModelStatsPanel({
     },
   }))
 
+  // map endpoint UUID → display name for chart legends
+  const endpointLabels = Object.fromEntries(
+    statsEntry.endpointStats.map((ep) => [ep.id, ep.providerDisplayName || ep.providerName])
+  )
+
   const uptimeSummaries = statsEntry.endpointStats
     .map((endpoint) => {
       const points = statsEntry.uptimeRecent[endpoint.id] ?? []
@@ -411,24 +418,28 @@ function ModelStatsPanel({
           formatValue={(value) => `${Math.round(value)} tok/s`}
           title="Performance"
           subtitle="Median throughput"
+          seriesLabels={endpointLabels}
         />
         <StatsChartCard
           data={statsEntry.latencyComparison}
           formatValue={formatMilliseconds}
           title="Performance"
           subtitle="Median time to first token"
+          seriesLabels={endpointLabels}
         />
         <StatsChartCard
           data={statsEntry.latencyE2EComparison}
           formatValue={formatMilliseconds}
           title="Performance"
           subtitle="Median end-to-end latency"
+          seriesLabels={endpointLabels}
         />
         <StatsChartCard
           data={statsEntry.toolCallErrorRate}
           formatValue={formatPercent}
           title="Reliability"
           subtitle="Tool call error rate"
+          seriesLabels={endpointLabels}
         />
       </div>
 
