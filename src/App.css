@@ -151,7 +151,8 @@
   line-height: 1.15;
   animation:
     typing 2.4s steps(6, end) 0.4s forwards,
-    caret 0.9s step-end infinite;
+    caret 0.9s step-end 3,
+    caret-hide 0ms 3.1s forwards;
 }
 
 .nav {
@@ -670,7 +671,8 @@
   color: var(--ink-strong);
   animation:
     typing 2.4s steps(6, end) 0.4s forwards,
-    caret 0.9s step-end infinite;
+    caret 0.9s step-end 3,
+    caret-hide 0ms 3.1s forwards;
 }
 
 .hero-copy h1 {
@@ -3859,6 +3861,12 @@
   }
 }
 
+@keyframes caret-hide {
+  to {
+    border-right-color: transparent;
+  }
+}
+
 @keyframes drift {
   from {
     transform: translate3d(0, 0, 0) scale(1);
@@ -4351,6 +4359,11 @@
 .prompt-pill-btn:hover {
   border-color: rgba(255, 255, 255, 0.22);
   color: rgba(255, 255, 255, 0.75);
+}
+
+.prompt-pill-btn-active {
+  border-color: #ffb366;
+  color: #ffb366;
 }
 
 .prompt-submit {
