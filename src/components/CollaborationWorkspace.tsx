@@ -2,8 +2,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ChangeEvent } from 'react'
 import type { User } from 'firebase/auth'
 import { ArrowUp, Paperclip, Mic, ChevronDown, Search, X, Info, Copy, Pencil, Check, Brain } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import {
   fetchOpenRouterModels,
   createOpenRouterChatCompletionStream,
@@ -11,6 +9,7 @@ import {
   type OpenRouterChatMessage,
 } from '../lib/openrouter'
 import { getModelCapabilityProfile } from '../lib/openrouterCapabilities'
+import { MarkdownBlock } from './RichMessageContent'
 import {
   fetchOpenRouterStatsSnapshot,
   resolveOpenRouterModelStats,
@@ -20,6 +19,16 @@ import {
 import { ModelStatsPanel } from './ModelStatsPanel'
 
 const OPENROUTER_KEY_STORAGE = 'argue-openrouter-api-key'
+
+const SYSTEM_PROMPT = `You are a helpful assistant. Format your responses using Markdown.
+
+Formatting rules:
+- **Math**: Use $...$ for inline math and $$...$$ for display/block equations. Do NOT use \\( \\) or \\[ \\] — use $ and $$ only.
+- **Tables**: Use GFM Markdown tables (pipes | and dashes ---) for any tabular data.
+- **Code**: Use fenced code blocks with a language hint, e.g. \`\`\`python.
+- **Lists**: Use - for bullet lists, 1. for numbered lists.
+- **Bold/italic**: Use **bold** and *italic* for emphasis.
+Keep responses clear and well-structured.`
 
 interface CollaborationWorkspaceProps {
   currentUser: User
@@ -59,7 +68,7 @@ function isMultimodal(model: OpenRouterModel) {
 }
 
 function buildApiMessages(messages: ChatMessage[]): OpenRouterChatMessage[] {
-  return messages
+  const history: OpenRouterChatMessage[] = messages
     .filter((m) => !m.streaming && !m.error)
     .map((m): OpenRouterChatMessage => {
       if (m.role === 'user' && m.attachments && m.attachments.length > 0) {
@@ -74,6 +83,7 @@ function buildApiMessages(messages: ChatMessage[]): OpenRouterChatMessage[] {
       }
       return { role: m.role, content: m.content }
     })
+  return [{ role: 'system', content: SYSTEM_PROMPT }, ...history]
 }
 
 export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
@@ -427,16 +437,12 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                           </button>
                           {expandedThinking.has(msg.id) && msg.reasoning && (
                             <div className="chat-thinking-content">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                {msg.reasoning}
-                              </ReactMarkdown>
+                              <MarkdownBlock>{msg.reasoning}</MarkdownBlock>
                             </div>
                           )}
                         </div>
                       )}
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {msg.content}
-                      </ReactMarkdown>
+                      <MarkdownBlock>{msg.content}</MarkdownBlock>
                       {msg.streaming && msg.content && <span className="chat-typing-dot" />}
                     </div>
                   ) : (

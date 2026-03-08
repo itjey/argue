@@ -348,5 +348,5 @@ function RichMessageContent({
   )
 }
 
-export { RichMessageContent }
+export { RichMessageContent, MarkdownBlock }
 export type { RichMessageAttachment, RichMessageAudio, RichMessageAttachmentKind }
