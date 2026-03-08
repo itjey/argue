@@ -14,6 +14,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import type { OpenRouterReasoningDetail } from '../lib/openrouter'
+import { CodeBlock } from './CodeBlock'
 
 const LANG_LABELS: Record<string, string> = {
   python: 'Python', py: 'Python',
@@ -186,16 +187,17 @@ function MarkdownBlock({ children }: { children: string }) {
         ),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         pre: ({ node, children: preChildren }: any) => {
-          // Extract language id from the code child's AST className
           const codeNode = node?.children?.[0]
           const classNames: string[] = (codeNode?.properties?.className as string[]) ?? []
           const langId = classNames.find((c: string) => c.startsWith('language-'))?.replace('language-', '') ?? ''
           const label = LANG_LABELS[langId.toLowerCase()] ?? (langId && langId !== 'plaintext' && langId !== 'text' ? langId : '')
+          // Raw code text from the AST for execution
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const rawCode: string = (codeNode?.children?.[0] as any)?.value ?? ''
           return (
-            <div className="code-block-wrapper">
-              {label && <span className="code-block-lang">{label}</span>}
-              <pre>{preChildren}</pre>
-            </div>
+            <CodeBlock code={rawCode} langId={langId} label={label}>
+              {preChildren}
+            </CodeBlock>
           )
         },
         code: ({ children: codeChildren, className, ...props }) => {

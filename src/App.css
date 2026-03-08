@@ -4912,6 +4912,7 @@
 }
 
 .chat-markdown pre {
+  /* handled by .code-block-wrapper — this fallback covers unlabeled blocks */
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 0.6rem;
@@ -4920,27 +4921,175 @@
   margin: 0.6em 0;
 }
 
-/* code block wrapper — provides positioning for the language label */
+/* ── Code block with header bar ── */
 .code-block-wrapper {
-  position: relative;
   margin: 0.6em 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.6rem;
+  background: rgba(255, 255, 255, 0.04);
+  overflow: hidden;
 }
 
-.code-block-wrapper pre {
-  margin: 0;
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.3rem 0.65rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+  min-height: 2rem;
 }
 
 .code-block-lang {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.65rem;
   font-size: 0.7rem;
   font-family: 'SF Mono', 'Fira Mono', monospace;
-  color: rgba(255, 255, 255, 0.28);
+  color: rgba(255, 255, 255, 0.38);
   letter-spacing: 0.04em;
-  pointer-events: none;
   user-select: none;
-  z-index: 1;
+}
+
+.code-block-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.code-block-run-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: none;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.45);
+  transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
+  flex-shrink: 0;
+}
+
+.code-block-run-btn:hover:not(:disabled) {
+  color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.code-block-run-btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.code-block-canvas-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.28);
+  transition: color 120ms ease;
+}
+
+.code-block-canvas-close:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Override the generic .chat-markdown pre styles inside wrapper */
+.code-block-wrapper .code-block-pre,
+.code-block-wrapper pre {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0.85rem 1rem;
+  overflow-x: auto;
+}
+
+/* ── Canvas output panel ── */
+.code-block-canvas {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  animation: canvas-reveal 180ms ease;
+}
+
+@keyframes canvas-reveal {
+  from { opacity: 0; transform: translateY(-3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.code-canvas-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
+  color: rgba(255, 255, 255, 0.38);
+  font-size: 0.82rem;
+}
+
+.code-canvas-iframe {
+  width: 100%;
+  min-height: 320px;
+  border: none;
+  display: block;
+  background: #fff;
+}
+
+.code-canvas-output {
+  padding: 0.75rem 1rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.code-canvas-stdout {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.55;
+}
+
+.code-canvas-stderr {
+  margin: 0.3rem 0 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+  font-size: 0.82rem;
+  color: rgba(255, 120, 100, 0.85);
+  line-height: 1.55;
+}
+
+.code-canvas-exit-code {
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  color: rgba(255, 100, 80, 0.65);
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+}
+
+.code-canvas-empty {
+  color: rgba(255, 255, 255, 0.28);
+  font-size: 0.82rem;
+  font-style: italic;
+}
+
+.code-canvas-error {
+  padding: 0.75rem 1rem;
+  color: rgba(255, 120, 100, 0.85);
+  font-size: 0.82rem;
+}
+
+/* Spinner animation for loading state */
+.code-run-spinner {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
 .chat-markdown pre code {
