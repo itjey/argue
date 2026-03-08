@@ -71,11 +71,15 @@ function isMultimodal(model: OpenRouterModel) {
 
 type ReasoningStyle = 'effort' | 'include' | 'none'
 
-/** Determine how this model surfaces reasoning to callers */
+/** Determine how this model surfaces reasoning to callers.
+ *  - 'effort': has the `reasoning` param (object with effort/summary/etc) — all major reasoning models
+ *  - 'include': only has `include_reasoning` toggle, no effort control
+ *  - 'none': no reasoning params at all
+ */
 function getReasoningStyle(model: OpenRouterModel): ReasoningStyle {
   const params = new Set((model.supported_parameters ?? []).map((p) => p.toLowerCase()))
-  if (params.has('reasoning_effort')) return 'effort'    // GPT-5.4, o-series, etc.
-  if (params.has('include_reasoning') || params.has('reasoning')) return 'include'  // DeepSeek, etc.
+  if (params.has('reasoning')) return 'effort'          // GPT-5.4, Claude, Gemini, DeepSeek, etc.
+  if (params.has('include_reasoning')) return 'include' // binary-only toggle
   return 'none'
 }
 
