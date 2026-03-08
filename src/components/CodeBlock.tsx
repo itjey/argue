@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Play, X, Loader, RotateCcw } from 'lucide-react'
 
-// ── Global panel coordination: only one panel open at a time ──────────────
+// ─── Global panel coordination ────────────────────────────────────────────
 let closeActivePanel: (() => void) | null = null
 function registerPanel(closer: () => void) {
   if (closeActivePanel && closeActivePanel !== closer) closeActivePanel()
@@ -12,77 +12,179 @@ function unregisterPanel(closer: () => void) {
   if (closeActivePanel === closer) closeActivePanel = null
 }
 
-// ── Types ─────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────
 type RunResult =
   | { type: 'html'; content: string }
-  | { type: 'text'; stdout: string; stderr: string; exitCode: number }
+  | { type: 'text'; stdout: string; stderr: string; exitCode: number; plots?: string[] }
   | { type: 'error'; message: string }
 
-// ── Language sets ──────────────────────────────────────────────────────────
-const HTML_LANGS  = new Set(['html', 'svg'])
-const JS_LANGS    = new Set(['javascript', 'js', 'jsx'])
-
-// Wandbox compiler map — uses -head for latest, specific version where needed
-const WANDBOX: Record<string, { compiler: string; options?: string; raw?: string }> = {
-  python: { compiler: 'cpython-head' },
-  py:     { compiler: 'cpython-head' },
-  cpp:    { compiler: 'gcc-head', options: 'warning,c++17' },
-  'c++':  { compiler: 'gcc-head', options: 'warning,c++17' },
-  cxx:    { compiler: 'gcc-head', options: 'warning,c++17' },
-  c:      { compiler: 'gcc-head', options: 'warning', raw: '-x c' },
-  ruby:   { compiler: 'ruby-head' },
-  rb:     { compiler: 'ruby-head' },
-  go:     { compiler: 'go-head' },
-  golang: { compiler: 'go-head' },
-  rust:   { compiler: 'rust-head' },
-  rs:     { compiler: 'rust-head' },
-  haskell:{ compiler: 'ghc-head' },
-  hs:     { compiler: 'ghc-head' },
-  php:    { compiler: 'php-head' },
-  perl:   { compiler: 'perl-head' },
-  pl:     { compiler: 'perl-head' },
-  lua:    { compiler: 'lua-head' },
-  elixir: { compiler: 'elixir-head' },
-  ex:     { compiler: 'elixir-head' },
-  erlang: { compiler: 'erlang-head' },
-  bash:   { compiler: 'bash' },
-  sh:     { compiler: 'bash' },
-  shell:  { compiler: 'bash' },
-  zsh:    { compiler: 'bash' },
-  swift:  { compiler: 'swift-head' },
-  ocaml:  { compiler: 'ocaml-head' },
-  ml:     { compiler: 'ocaml-head' },
-  r:      { compiler: 'r-head' },
-  // TypeScript via Wandbox Node.js + ts-node
-  typescript: { compiler: 'typescript-5.2.2' },
-  ts:         { compiler: 'typescript-5.2.2' },
-  tsx:        { compiler: 'typescript-5.2.2' },
-  java:   { compiler: 'openjdk-head' },
-  kotlin: { compiler: 'kotlin-head' },
-  scala:  { compiler: 'scala-head' },
-  nim:    { compiler: 'nim-head' },
-  d:      { compiler: 'dmd-head' },
-  crystal:{ compiler: 'crystal-head' },
+// ─── Godbolt compiler map (verified IDs, latest stable) ──────────────────
+const GODBOLT: Record<string, { compiler: string; lang: string; userArguments?: string }> = {
+  cpp:     { compiler: 'g152',        lang: 'c++' },
+  'c++':   { compiler: 'g152',        lang: 'c++' },
+  cxx:     { compiler: 'g152',        lang: 'c++' },
+  c:       { compiler: 'cg152',       lang: 'c' },
+  go:      { compiler: 'gl1260',      lang: 'go' },
+  golang:  { compiler: 'gl1260',      lang: 'go' },
+  rust:    { compiler: 'r1940',       lang: 'rust' },
+  rs:      { compiler: 'r1940',       lang: 'rust' },
+  java:    { compiler: 'java2501',    lang: 'java' },
+  kotlin:  { compiler: 'kotlinc2220', lang: 'kotlin' },
+  swift:   { compiler: 'swift62',     lang: 'swift' },
+  haskell: { compiler: 'ghc9122',     lang: 'haskell' },
+  hs:      { compiler: 'ghc9122',     lang: 'haskell' },
+  ruby:    { compiler: 'ruby347',     lang: 'ruby' },
+  rb:      { compiler: 'ruby347',     lang: 'ruby' },
 }
+
+const HTML_LANGS = new Set(['html', 'svg', 'xml'])
+const JS_LANGS   = new Set(['javascript', 'js', 'jsx'])
 
 export function isRunnable(langId: string): boolean {
   const id = langId.toLowerCase()
-  return HTML_LANGS.has(id) || JS_LANGS.has(id) || id in WANDBOX
+  return HTML_LANGS.has(id) || JS_LANGS.has(id) || id === 'python' || id === 'py' || id in GODBOLT
 }
 
-// ── JavaScript sandbox ────────────────────────────────────────────────────
+// ─── Persistent Pyodide iframe ────────────────────────────────────────────
+// One hidden iframe lives for the whole page session; Pyodide (~10 MB) loads
+// once and is reused for all subsequent Python runs.
+let _pyIframe: HTMLIFrameElement | null = null
+type PyState = 'idle' | 'loading' | 'ready' | 'error'
+let _pyState: PyState = 'idle'
+type PyPending = { resolve: (r: RunResult) => void; tid: ReturnType<typeof setTimeout> }
+const _pyPending = new Map<number, PyPending>()
+let _pyExecId = 0
+const _pyReadyCallbacks: Array<() => void> = []
+
+const PYODIDE_HTML = `<!DOCTYPE html><html><body><script type="module">
+(async () => {
+  try {
+    const { loadPyodide } = await import('https://cdn.jsdelivr.net/pyodide/v0.27.2/full/pyodide.mjs');
+    const pyodide = await loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.27.2/full/' });
+    // Pre-configure matplotlib Agg backend so imports work seamlessly
+    await pyodide.runPythonAsync(\`
+try:
+  import matplotlib
+  matplotlib.use('Agg')
+except: pass
+\`);
+    window.parent.postMessage({ __py: true, type: 'ready' }, '*');
+    window.addEventListener('message', async (ev) => {
+      if (!ev.data?.__py || ev.data.type !== 'run') return;
+      const { id, code } = ev.data;
+      let stdout = '', stderr = '';
+      pyodide.setStdout({ batched: s => { stdout += s + '\\n' } });
+      pyodide.setStderr({ batched: s => { stderr += s + '\\n' } });
+      let exitCode = 0;
+      try {
+        await pyodide.loadPackagesFromImports(code);
+        const wrapped = code + \`
+# capture any matplotlib figures left open
+try:
+  import matplotlib.pyplot as _plt
+  import io as _io, base64 as _b64
+  for _fn in _plt.get_fignums():
+    _buf = _io.BytesIO()
+    _plt.figure(_fn).savefig(_buf, format='png', bbox_inches='tight', dpi=100)
+    _buf.seek(0)
+    print('__PLOT__' + _b64.b64encode(_buf.read()).decode())
+  _plt.close('all')
+except: pass
+\`;
+        await pyodide.runPythonAsync(wrapped);
+      } catch(e) { stderr += e.message; exitCode = 1; }
+      window.parent.postMessage({ __py: true, type: 'result', id, stdout, stderr, exitCode }, '*');
+    });
+  } catch(e) {
+    window.parent.postMessage({ __py: true, type: 'error', message: 'Failed to load Python runtime: ' + e.message }, '*');
+  }
+})();
+<\/script></body></html>`
+
+function initPyodideIframe() {
+  if (_pyIframe) return
+  _pyIframe = document.createElement('iframe')
+  _pyIframe.setAttribute('sandbox', 'allow-scripts')
+  _pyIframe.style.cssText = 'position:fixed;top:-9999px;opacity:0;width:1px;height:1px;pointer-events:none'
+  document.body.appendChild(_pyIframe)
+  _pyState = 'loading'
+
+  window.addEventListener('message', (ev: MessageEvent) => {
+    if (!ev.data?.__py) return
+    if (ev.data.type === 'ready') {
+      _pyState = 'ready'
+      _pyReadyCallbacks.splice(0).forEach(cb => cb())
+    } else if (ev.data.type === 'error') {
+      _pyState = 'error'
+      _pyPending.forEach(p => {
+        clearTimeout(p.tid)
+        p.resolve({ type: 'error', message: ev.data.message })
+      })
+      _pyPending.clear()
+    } else if (ev.data.type === 'result') {
+      const p = _pyPending.get(ev.data.id)
+      if (!p) return
+      clearTimeout(p.tid)
+      _pyPending.delete(ev.data.id)
+      // extract __PLOT__ lines from stdout
+      const lines = (ev.data.stdout as string).split('\n')
+      const plots: string[] = []
+      const clean: string[] = []
+      for (const l of lines) {
+        if (l.startsWith('__PLOT__')) plots.push(l.slice(8))
+        else clean.push(l)
+      }
+      const stdout = clean.join('\n').replace(/\n+$/, '')
+      p.resolve({ type: 'text', stdout, stderr: (ev.data.stderr as string).replace(/\n+$/, ''), exitCode: ev.data.exitCode, plots: plots.length ? plots : undefined })
+    }
+  })
+
+  _pyIframe.srcdoc = PYODIDE_HTML
+}
+
+function runPython(code: string, onStatus: (s: string) => void): Promise<RunResult> {
+  return new Promise((resolve) => {
+    initPyodideIframe()
+
+    const execId = ++_pyExecId
+    const doRun = () => {
+      onStatus('running')
+      const tid = setTimeout(() => {
+        _pyPending.delete(execId)
+        resolve({ type: 'error', message: 'Execution timed out (60 s). Try a shorter program.' })
+      }, 60000)
+      _pyPending.set(execId, { resolve, tid })
+      _pyIframe!.contentWindow?.postMessage({ __py: true, type: 'run', id: execId, code }, '*')
+    }
+
+    if (_pyState === 'ready') {
+      doRun()
+    } else if (_pyState === 'loading') {
+      onStatus('loading')
+      _pyReadyCallbacks.push(doRun)
+    } else if (_pyState === 'error') {
+      resolve({ type: 'error', message: 'Python runtime failed to load. Reload the page to retry.' })
+    } else {
+      onStatus('loading')
+      _pyReadyCallbacks.push(doRun)
+    }
+  })
+}
+
+// ─── JavaScript sandbox ───────────────────────────────────────────────────
 let _jsId = 0
 function runJavaScript(code: string): Promise<RunResult> {
-  const execId = ++_jsId
   return new Promise((resolve) => {
+    const execId = ++_jsId
     const src = `<!DOCTYPE html><html><body><script>
-const __L=[],__E=[]
-const _l=console.log,_e=console.error,_w=console.warn
-const _fmt=v=>typeof v==='object'?JSON.stringify(v,null,2):String(v)
-console.log=(...a)=>{__L.push(a.map(_fmt).join(' '));_l(...a)}
-console.warn=(...a)=>{__L.push('⚠ '+a.map(_fmt).join(' '));_w(...a)}
-console.error=(...a)=>{__E.push(a.map(_fmt).join(' '));_e(...a)}
-let __X=0
+var __L=[],__E=[]
+var _l=console.log,_e=console.error,_w=console.warn,_i=console.info
+var _f=function(v){return typeof v==='object'?JSON.stringify(v,null,2):String(v)}
+console.log=function(){__L.push([].slice.call(arguments).map(_f).join(' '));_l.apply(console,arguments)}
+console.warn=function(){__L.push('⚠ '+[].slice.call(arguments).map(_f).join(' '));_w.apply(console,arguments)}
+console.error=function(){__E.push([].slice.call(arguments).map(_f).join(' '));_e.apply(console,arguments)}
+console.info=console.log
+var __X=0
 try{${code}}catch(e){__E.push(e.message);__X=1}
 window.parent.postMessage({__jsId:${execId},l:__L,e:__E,x:__X},'*')
 <\/script></body></html>`
@@ -92,93 +194,103 @@ window.parent.postMessage({__jsId:${execId},l:__L,e:__E,x:__X},'*')
     iframe.style.cssText = 'position:fixed;top:-9999px;opacity:0;width:1px;height:1px;pointer-events:none'
     document.body.appendChild(iframe)
 
-    const tid = setTimeout(() => {
-      cleanup()
-      resolve({ type: 'text', stdout: '', stderr: 'Timed out after 5s.', exitCode: 124 })
-    }, 5000)
-
-    function cleanup() {
-      clearTimeout(tid)
-      window.removeEventListener('message', handler)
-      if (iframe.parentNode) document.body.removeChild(iframe)
-    }
+    const tid = setTimeout(() => { cleanup(); resolve({ type: 'text', stdout: '', stderr: 'Timed out after 5 s.', exitCode: 124 }) }, 5000)
+    function cleanup() { clearTimeout(tid); window.removeEventListener('message', handler); if (iframe.parentNode) document.body.removeChild(iframe) }
     function handler(ev: MessageEvent) {
       if (ev.data?.__jsId !== execId) return
       cleanup()
-      resolve({ type: 'text', stdout: ev.data.l.join('\n'), stderr: ev.data.e.join('\n'), exitCode: ev.data.x })
+      resolve({ type: 'text', stdout: (ev.data.l as string[]).join('\n'), stderr: (ev.data.e as string[]).join('\n'), exitCode: ev.data.x })
     }
     window.addEventListener('message', handler)
     iframe.srcdoc = src
   })
 }
 
-// ── Wandbox API ───────────────────────────────────────────────────────────
-async function runWithWandbox(langId: string, code: string): Promise<RunResult> {
-  const cfg = WANDBOX[langId.toLowerCase()]
-  if (!cfg) return { type: 'error', message: `No execution runtime available for "${langId}". Supported: Python, C/C++, Go, Rust, Ruby, Java, TypeScript, Bash, PHP, Haskell, Lua, and more.` }
+// ─── Godbolt execution ────────────────────────────────────────────────────
+async function runWithGodbolt(langId: string, code: string): Promise<RunResult> {
+  const cfg = GODBOLT[langId.toLowerCase()]
+  if (!cfg) return { type: 'error', message: `No execution runtime for "${langId}". Supported: Python, C/C++, Go, Rust, Java, Kotlin, Swift, Haskell, Ruby, HTML, JavaScript.` }
 
-  const body: Record<string, string> = { code, compiler: cfg.compiler }
-  if (cfg.options) body.options = cfg.options
-  if (cfg.raw) body['compiler-option-raw'] = cfg.raw
+  const body = {
+    source: code,
+    options: {
+      userArguments: cfg.userArguments ?? '',
+      executeParameters: { args: [], stdin: '' },
+      compilerOptions: { executorRequest: true },
+      filters: { execute: true },
+      tools: [],
+      libraries: [],
+    },
+    lang: cfg.lang,
+  }
 
-  const res = await fetch('https://wandbox.org/api/compile.json', {
+  const res = await fetch(`https://godbolt.org/api/compiler/${cfg.compiler}/compile`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify(body),
   })
 
   if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`Wandbox API ${res.status}${text ? ': ' + text.slice(0, 300) : ''}`)
+    const txt = await res.text().catch(() => '')
+    throw new Error(`Godbolt ${res.status}${txt ? ': ' + txt.slice(0, 200) : ''}`)
   }
 
   const d = await res.json()
-  const stdout = [d.program_output, d.compiler_output].filter(Boolean).join('')
-  const stderr = [d.program_error, d.compiler_error].filter(Boolean).join('')
-  return { type: 'text', stdout, stderr, exitCode: parseInt(d.status ?? '0', 10) }
+  const exec = d.execResult ?? d
+  const join = (arr: Array<{ text: string }> = []) => arr.map(l => l.text).join('\n')
+  const stdout = join(exec.stdout)
+  const buildErr = join(exec.buildResult?.stderr)
+  const runErr = join(exec.stderr)
+  const stderr = [buildErr, runErr].filter(Boolean).join('\n')
+  return { type: 'text', stdout, stderr, exitCode: exec.code ?? 0 }
 }
 
-// ── Component ─────────────────────────────────────────────────────────────
+// ─── Component ────────────────────────────────────────────────────────────
 interface Props { code: string; langId: string; label: string; children: ReactNode }
 
 export function CodeBlock({ code, langId, label, children }: Props) {
   const [running, setRunning] = useState(false)
+  const [status, setStatus] = useState<'idle' | 'loading' | 'running'>('idle')
   const [result, setResult] = useState<RunResult | null>(null)
   const [open, setOpen] = useState(false)
-  const closeFnRef = useRef<() => void>(() => {})
+  const closeFnRef = useRef<() => void>(() => setOpen(false))
+  useEffect(() => { closeFnRef.current = () => setOpen(false) })
 
-  useEffect(() => {
-    const fn = () => setOpen(false)
-    closeFnRef.current = fn
-  })
-
-  function close() {
-    setOpen(false)
-    unregisterPanel(closeFnRef.current)
-  }
+  function close() { setOpen(false); unregisterPanel(closeFnRef.current) }
 
   async function run() {
     registerPanel(closeFnRef.current)
     setOpen(true)
     setRunning(true)
     setResult(null)
+    setStatus('running')
+
     try {
       const id = langId.toLowerCase()
       if (HTML_LANGS.has(id)) {
         setResult({ type: 'html', content: code })
       } else if (JS_LANGS.has(id)) {
         setResult(await runJavaScript(code))
+      } else if (id === 'python' || id === 'py') {
+        setStatus('loading')
+        setResult(await runPython(code, s => setStatus(s as 'loading' | 'running')))
       } else {
-        setResult(await runWithWandbox(id, code))
+        setResult(await runWithGodbolt(id, code))
       }
     } catch (err) {
       setResult({ type: 'error', message: err instanceof Error ? err.message : 'Execution failed.' })
     } finally {
       setRunning(false)
+      setStatus('idle')
     }
   }
 
   const runnable = isRunnable(langId)
+
+  // Status label shown in the panel while running
+  const statusLabel = status === 'loading' ? 'Loading Python runtime (first run ~10 s)…'
+    : status === 'running' ? 'Running…'
+    : null
 
   const panel = open ? createPortal(
     <div className="code-runner-panel">
@@ -193,22 +305,33 @@ export function CodeBlock({ code, langId, label, children }: Props) {
           </button>
         </div>
       </div>
+
       <div className="code-runner-body">
-        {running ? (
+        {running || !result ? (
           <div className="code-canvas-loading">
             <Loader size={14} className="code-run-spinner" />
-            <span>Running…</span>
+            <span>{statusLabel ?? 'Running…'}</span>
           </div>
-        ) : result?.type === 'html' ? (
-          <iframe className="code-canvas-iframe" sandbox="allow-scripts allow-forms allow-modals" srcDoc={result.content} title="Preview" />
-        ) : result?.type === 'text' ? (
+        ) : result.type === 'html' ? (
+          <iframe
+            className="code-canvas-iframe"
+            sandbox="allow-scripts allow-pointer-lock allow-downloads allow-modals allow-forms"
+            srcDoc={result.content}
+            title="Preview"
+          />
+        ) : result.type === 'text' ? (
           <div className="code-canvas-output">
             {result.stdout && <pre className="code-canvas-stdout">{result.stdout}</pre>}
+            {result.plots?.map((p, i) => (
+              <img key={i} src={`data:image/png;base64,${p}`} alt="Plot" className="code-canvas-plot" />
+            ))}
             {result.stderr && <pre className="code-canvas-stderr">{result.stderr}</pre>}
-            {!result.stdout && !result.stderr && <span className="code-canvas-empty">No output.</span>}
+            {!result.stdout && !result.stderr && !result.plots?.length && (
+              <span className="code-canvas-empty">No output.</span>
+            )}
             {result.exitCode !== 0 && <div className="code-canvas-exit-code">Exit {result.exitCode}</div>}
           </div>
-        ) : result?.type === 'error' ? (
+        ) : result.type === 'error' ? (
           <div className="code-canvas-error">{result.message}</div>
         ) : null}
       </div>
@@ -225,10 +348,14 @@ export function CodeBlock({ code, langId, label, children }: Props) {
             {runnable && (
               <button
                 className={`code-block-run-btn${open ? ' code-block-run-btn-on' : ''}`}
-                type="button" onClick={run} disabled={running}
+                type="button"
+                onClick={run}
+                disabled={running}
                 title={running ? 'Running…' : 'Run'}
               >
-                {running ? <Loader size={11} className="code-run-spinner" /> : <Play size={11} fill="currentColor" />}
+                {running
+                  ? <Loader size={11} className="code-run-spinner" />
+                  : <Play size={11} fill="currentColor" />}
               </button>
             )}
           </div>
