@@ -173,6 +173,7 @@
   border: 0;
   background: transparent;
   font: inherit;
+  font-size: 0.9rem; /* re-apply after font:inherit resets it */
   cursor: pointer;
 }
 
@@ -240,7 +241,7 @@
 .topbar-account-copy strong {
   color: var(--ink-strong);
   font-size: 0.92rem;
-  font-weight: 600;
+  font-weight: 400;
   text-align: right;
 }
 
