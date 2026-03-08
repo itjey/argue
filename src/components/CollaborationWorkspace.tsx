@@ -1,7 +1,7 @@
 // CollaborationWorkspace — redesign in progress
 import { useEffect, useRef, useState, type KeyboardEvent, type ChangeEvent } from 'react'
 import type { User } from 'firebase/auth'
-import { ArrowUp, Paperclip, Mic, ChevronDown, Search, X, Info, Copy, Pencil, Check } from 'lucide-react'
+import { ArrowUp, Paperclip, Mic, ChevronDown, Search, X, Info, Copy, Pencil, Check, Brain } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
@@ -10,6 +10,7 @@ import {
   type OpenRouterModel,
   type OpenRouterChatMessage,
 } from '../lib/openrouter'
+import { getModelCapabilityProfile } from '../lib/openrouterCapabilities'
 import {
   fetchOpenRouterStatsSnapshot,
   resolveOpenRouterModelStats,
@@ -38,6 +39,9 @@ interface ChatMessage {
   attachments?: AttachedFile[]
   streaming?: boolean
   error?: boolean
+  reasoning?: string
+  thinkingStart?: number   // epoch ms when thinking began (for "Thought for Xs")
+  thinkingDuration?: number // ms elapsed while thinking
 }
 
 declare global {
@@ -80,6 +84,7 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
   const [streaming, setStreaming] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set())
 
   // model selector
   const [models, setModels] = useState<OpenRouterModel[]>([])
@@ -196,10 +201,14 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
     const apiKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
     if (!apiKey.trim() || !selectedModel) return
 
+    const profile = getModelCapabilityProfile(selectedModel, null)
+    const includeReasoning = profile.supportsReasoning
+
     const assistantId = crypto.randomUUID()
+    const thinkingStart = Date.now()
     setMessages((prev) => [
       ...prev,
-      { id: assistantId, role: 'assistant', content: '', streaming: true },
+      { id: assistantId, role: 'assistant', content: '', streaming: true, thinkingStart },
     ])
     setStreaming(true)
     abortedRef.current = false
@@ -211,16 +220,29 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
         apiKey,
         model: selectedModel.id,
         messages: apiMessages,
+        includeReasoning,
         onProgress: (reply) => {
           if (abortedRef.current) return
           setMessages((prev) =>
-            prev.map((m) => m.id === assistantId ? { ...m, content: reply.text } : m)
+            prev.map((m) => {
+              if (m.id !== assistantId) return m
+              // record when thinking finished (first text token arrives)
+              const thinkingDuration =
+                reply.text && !m.thinkingDuration
+                  ? Date.now() - (m.thinkingStart ?? thinkingStart)
+                  : m.thinkingDuration
+              return { ...m, content: reply.text, reasoning: reply.reasoning || m.reasoning, thinkingDuration }
+            })
           )
         },
       })
       if (!abortedRef.current) {
         setMessages((prev) =>
-          prev.map((m) => m.id === assistantId ? { ...m, streaming: false } : m)
+          prev.map((m) =>
+            m.id === assistantId
+              ? { ...m, streaming: false, thinkingDuration: m.thinkingDuration ?? (Date.now() - thinkingStart) }
+              : m
+          )
         )
       }
     } catch (err: unknown) {
@@ -275,6 +297,15 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
     navigator.clipboard.writeText(content).then(() => {
       setCopiedId(id)
       setTimeout(() => setCopiedId(null), 1500)
+    })
+  }
+
+  function toggleThinking(id: string) {
+    setExpandedThinking((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
     })
   }
 
@@ -373,10 +404,40 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                   )}
                   {msg.role === 'assistant' ? (
                     <div className="chat-markdown">
+                      {/* thinking / reasoning block */}
+                      {(msg.reasoning || (msg.streaming && !msg.content)) && (
+                        <div className="chat-thinking">
+                          <button
+                            className="chat-thinking-toggle"
+                            type="button"
+                            onClick={() => toggleThinking(msg.id)}
+                          >
+                            <Brain size={13} className="chat-thinking-icon" />
+                            {msg.streaming && !msg.content ? (
+                              <span className="chat-thinking-pulse">Thinking…</span>
+                            ) : msg.thinkingDuration ? (
+                              <span>Thought for {Math.round(msg.thinkingDuration / 1000)}s</span>
+                            ) : (
+                              <span>Thoughts</span>
+                            )}
+                            <ChevronDown
+                              size={12}
+                              className={`chat-thinking-chevron${expandedThinking.has(msg.id) ? ' chat-thinking-chevron-open' : ''}`}
+                            />
+                          </button>
+                          {expandedThinking.has(msg.id) && msg.reasoning && (
+                            <div className="chat-thinking-content">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {msg.reasoning}
+                              </ReactMarkdown>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>
                         {msg.content}
                       </ReactMarkdown>
-                      {msg.streaming && <span className="chat-typing-dot" />}
+                      {msg.streaming && msg.content && <span className="chat-typing-dot" />}
                     </div>
                   ) : (
                     <p className="chat-user-text">{msg.content}</p>

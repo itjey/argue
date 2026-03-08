@@ -5060,3 +5060,77 @@
 .prompt-edit-cancel:hover {
   color: rgba(255, 255, 255, 0.8);
 }
+
+/* ── Thinking / reasoning block ── */
+.chat-thinking {
+  margin-bottom: 0.75rem;
+  border-radius: 0.55rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.chat-thinking-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem 0.75rem;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.78rem;
+  text-align: left;
+  transition: color 120ms ease, background 120ms ease;
+  user-select: none;
+}
+
+.chat-thinking-toggle:hover {
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.chat-thinking-icon {
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.chat-thinking-chevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  transition: transform 200ms ease;
+}
+
+.chat-thinking-chevron-open {
+  transform: rotate(180deg);
+}
+
+/* pulsing "Thinking…" text during active reasoning */
+.chat-thinking-pulse {
+  animation: thinking-fade 1.4s ease-in-out infinite;
+}
+
+@keyframes thinking-fade {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.85; }
+}
+
+.chat-thinking-content {
+  padding: 0.65rem 0.9rem 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.45);
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.chat-thinking-content p { margin: 0 0 0.5em; }
+.chat-thinking-content p:last-child { margin-bottom: 0; }
+.chat-thinking-content code {
+  background: rgba(255,255,255,0.06);
+  border-radius: 0.2rem;
+  padding: 0.1em 0.3em;
+  font-size: 0.85em;
+}
