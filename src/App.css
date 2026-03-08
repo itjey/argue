@@ -4372,6 +4372,64 @@
   color: #ffb366;
 }
 
+.prompt-pill-btn-disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Attachment preview */
+.prompt-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 0.1rem;
+}
+
+.prompt-attachment-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.55rem 0.3rem 0.4rem;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.75);
+  max-width: 180px;
+}
+
+.prompt-attachment-pill span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prompt-attachment-thumb {
+  width: 1.4rem;
+  height: 1.4rem;
+  object-fit: cover;
+  border-radius: 0.25rem;
+  flex-shrink: 0;
+}
+
+.prompt-attachment-pill button {
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 0;
+  margin-left: 0.1rem;
+  flex-shrink: 0;
+}
+
+.prompt-attachment-pill button:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
 /* Bare mic button */
 .prompt-mic {
   display: flex;
