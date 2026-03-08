@@ -5131,48 +5131,9 @@
   font-size: 0.85em;
 }
 
-/* ── Reasoning effort selector (dropdown) ── */
+/* ── Reasoning effort dropdown (reuses .model-selector for trigger) ── */
 .effort-selector {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.effort-selector-trigger {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  background: none;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 0.5rem;
-  cursor: pointer;
-  padding: 0.22rem 0.55rem;
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 0.72rem;
-  transition: color 120ms ease, border-color 120ms ease;
-  white-space: nowrap;
-}
-
-.effort-selector-trigger:hover {
-  color: rgba(255, 255, 255, 0.75);
-  border-color: rgba(255, 255, 255, 0.22);
-}
-
-.effort-selector-label {
-  color: rgba(255, 255, 255, 0.28);
-}
-
-.effort-selector-value {
-  color: rgba(255, 255, 255, 0.7);
-  font-weight: 500;
-}
-
-.effort-chevron {
-  opacity: 0.45;
-  transition: transform 180ms ease;
-}
-
-.effort-chevron-open {
-  transform: rotate(180deg);
+  /* inherits from .model-selector */
 }
 
 .effort-dropdown {
@@ -5184,7 +5145,7 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 0.7rem;
   padding: 0.3rem;
-  min-width: 180px;
+  min-width: 200px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
@@ -5209,7 +5170,7 @@
   border: none;
   cursor: pointer;
   text-align: left;
-  padding: 0.45rem 0.65rem;
+  padding: 0.5rem 0.65rem;
   color: rgba(255, 255, 255, 0.75);
   font-size: 0.82rem;
 }
@@ -5219,15 +5180,22 @@
   font-weight: 500;
 }
 
-.effort-option-desc {
-  padding: 0 0.6rem 0 0.2rem;
-  color: rgba(255, 255, 255, 0.22);
-  font-size: 0.82rem;
-  cursor: default;
-  user-select: none;
+.effort-option-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: help;
+  padding: 0.35rem 0.55rem;
+  color: rgba(255, 255, 255, 0.2);
   transition: color 120ms ease;
 }
 
-.effort-option:hover .effort-option-desc {
-  color: rgba(255, 255, 255, 0.5);
+.effort-option:hover .effort-option-info {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.effort-option-info:hover {
+  color: rgba(255, 255, 255, 0.7) !important;
 }

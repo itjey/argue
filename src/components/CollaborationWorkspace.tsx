@@ -9,8 +9,6 @@ import {
   type OpenRouterChatMessage,
   type OpenRouterReasoningEffort,
 } from '../lib/openrouter'
-import { getModelCapabilityProfile as _unused } from '../lib/openrouterCapabilities'
-void _unused
 import { MarkdownBlock } from './RichMessageContent'
 import {
   fetchOpenRouterStatsSnapshot,
@@ -85,11 +83,11 @@ function getReasoningStyle(model: OpenRouterModel): ReasoningStyle {
 }
 
 const EFFORT_LEVELS: { value: OpenRouterReasoningEffort; label: string; desc: string }[] = [
-  { value: 'xhigh',   label: 'Max',     desc: 'Deepest reasoning, highest cost & latency' },
-  { value: 'high',    label: 'High',    desc: 'Strong reasoning, recommended default' },
-  { value: 'medium',  label: 'Medium',  desc: 'Balanced speed and depth' },
-  { value: 'low',     label: 'Low',     desc: 'Quick, light reasoning' },
-  { value: 'minimal', label: 'Minimal', desc: 'Barely any internal thought' },
+  { value: 'xhigh',   label: 'Max',     desc: 'Best for extremely hard math proofs, novel research questions, and multi-step competitive programming. Highest cost and latency.' },
+  { value: 'high',    label: 'High',    desc: 'Best for complex coding, multi-step reasoning, and detailed analysis. Good balance of depth and speed.' },
+  { value: 'medium',  label: 'Medium',  desc: 'Best for everyday questions, summarization, and moderate reasoning tasks. Faster and cheaper.' },
+  { value: 'low',     label: 'Low',     desc: 'Best for simple Q&A, quick lookups, and straightforward tasks. Fast responses.' },
+  { value: 'minimal', label: 'Minimal', desc: 'Near-instant responses with almost no internal reasoning. Best for trivial tasks and autocomplete-style use.' },
 ]
 
 function buildApiMessages(messages: ChatMessage[]): OpenRouterChatMessage[] {
@@ -243,7 +241,7 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
     if (!apiKey.trim() || !selectedModel) return
 
     const style = getReasoningStyle(selectedModel)
-    const includeReasoning = style === 'include'
+    const includeReasoning = style !== 'none'
     const reasoningConfig = style === 'effort' ? { effort: reasoningEffort } : undefined
 
     const isReasoningModel = style !== 'none'
@@ -631,22 +629,23 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                   )}
                 </div>
 
-                {/* Reasoning effort selector — dropdown, only for models with reasoning param */}
+                {/* Reasoning effort selector — styled like model selector pill */}
                 {(reasoningStyle === 'effort' || reasoningStyle === 'include') && (
-                  <div className="effort-selector" ref={effortDropRef}>
+                  <div className="model-selector effort-selector" ref={effortDropRef}>
                     <button
-                      className="effort-selector-trigger"
+                      className="model-selector-trigger"
                       type="button"
-                      onClick={() => setEffortOpen((o) => !o)}
+                      onClick={() => reasoningStyle === 'effort' && setEffortOpen((o) => !o)}
                       title="Reasoning depth"
                     >
-                      <span className="effort-selector-label">Think:</span>
-                      <span className="effort-selector-value">
+                      <span className="model-selector-name">
                         {reasoningStyle === 'include'
-                          ? 'On'
-                          : (EFFORT_LEVELS.find((e) => e.value === reasoningEffort)?.label ?? 'High')}
+                          ? 'Thinking'
+                          : (EFFORT_LEVELS.find((e) => e.value === reasoningEffort)?.label ?? 'Thinking')}
                       </span>
-                      <ChevronDown size={11} className={`effort-chevron${effortOpen ? ' effort-chevron-open' : ''}`} />
+                      {reasoningStyle === 'effort' && (
+                        <ChevronDown size={13} className={`model-selector-chevron${effortOpen ? ' model-selector-chevron-open' : ''}`} />
+                      )}
                     </button>
 
                     {effortOpen && reasoningStyle === 'effort' && (
@@ -663,7 +662,14 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                             >
                               <span className="effort-option-label">{level.label}</span>
                             </button>
-                            <span className="effort-option-desc" title={level.desc}>ⓘ</span>
+                            <button
+                              type="button"
+                              className="effort-option-info"
+                              onClick={(e) => { e.stopPropagation() }}
+                              title={level.desc}
+                            >
+                              <Info size={13} />
+                            </button>
                           </div>
                         ))}
                       </div>
