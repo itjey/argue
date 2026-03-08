@@ -813,40 +813,7 @@ function App() {
 
       <header className={`topbar${topbarHidden ? ' topbar-hidden' : ''}`}>
         <a className="brand" href="#top" aria-label="Argue home">
-          <span className="brand-mark">
-            <span className="brand-fan" aria-hidden="true">
-              <svg className="brand-blade brand-blade-left" viewBox="0 0 28 14">
-                <path
-                  d="M2 7L25 2V12L2 7Z"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.4"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              <svg className="brand-blade brand-blade-center" viewBox="0 0 28 14">
-                <path
-                  d="M2 7L25 2V12L2 7Z"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.4"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              <svg className="brand-blade brand-blade-right" viewBox="0 0 28 14">
-                <path
-                  d="M2 7L25 2V12L2 7Z"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.4"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </span>
-          </span>
-          <span className="brand-wordmark brand-typewriter" aria-label="argue.">
-            argue.
-          </span>
+          <img src="/favicon.svg" alt="argue" className="brand-favicon-logo" />
         </a>
 
         <nav className="nav" aria-label="Primary navigation">
