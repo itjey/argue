@@ -880,7 +880,7 @@ function App() {
               <strong>{currentUser.email ?? 'Account'}</strong>
               {!hasSavedApiKey ? (
                 <small className="topbar-api-key-warning">
-                  Add API key in Settings to start chatting.
+                  Add API key in Settings
                 </small>
               ) : !isVerified ? (
                 <small className="topbar-account-warning">Unverified account</small>

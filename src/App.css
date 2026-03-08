@@ -240,6 +240,7 @@
   color: var(--ink-strong);
   font-size: 0.92rem;
   font-weight: 600;
+  text-align: right;
 }
 
 .topbar-account-copy small {
@@ -247,6 +248,7 @@
   font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  text-align: right;
 }
 
 .topbar-account-warning {
@@ -254,7 +256,7 @@
 }
 
 .topbar-api-key-warning {
-  color: #ff6e6e;
+  color: #ffb366;
   font-size: 0.68rem;
   letter-spacing: 0.02em;
   text-transform: none;
