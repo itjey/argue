@@ -1,7 +1,7 @@
 // CollaborationWorkspace — redesign in progress
 import { useEffect, useRef, useState, type KeyboardEvent, type ChangeEvent } from 'react'
 import type { User } from 'firebase/auth'
-import { ArrowUp, Paperclip, Mic, ChevronDown, Search, X, Info, Copy, Pencil, Check } from 'lucide-react'
+import { ArrowUp, Square, Paperclip, Mic, ChevronDown, Search, X, Info, Copy, Pencil, Check } from 'lucide-react'
 import {
   fetchOpenRouterModels,
   createOpenRouterChatCompletionStream,
@@ -49,9 +49,10 @@ interface ChatMessage {
   streaming?: boolean
   error?: boolean
   reasoning?: string
-  isReasoningModel?: boolean   // true when sent to a model with reasoning param
+  isReasoningModel?: boolean
   thinkingStart?: number
   thinkingDuration?: number
+  stoppedThinking?: boolean   // true if user stopped during thinking phase
 }
 
 declare global {
@@ -355,6 +356,27 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
     }, 0)
   }
 
+  function stopStream() {
+    abortedRef.current = true
+    setStreaming(false)
+    // Finalize the assistant message and find the last user message in one pass
+    let lastUserMsg: ChatMessage | undefined
+    setMessages((prev) => {
+      lastUserMsg = [...prev].reverse().find((m) => m.role === 'user')
+      return prev.map((m) => {
+        if (m.role !== 'assistant' || !m.streaming) return m
+        return {
+          ...m,
+          streaming: false,
+          stoppedThinking: !m.content && m.isReasoningModel,
+          thinkingDuration: m.thinkingDuration ?? (m.thinkingStart ? Date.now() - m.thinkingStart : undefined),
+        }
+      })
+    })
+    // Auto-open the last user message for editing
+    if (lastUserMsg) setTimeout(() => startEdit(lastUserMsg!), 0)
+  }
+
   function copyMessage(id: string, content: string) {
     navigator.clipboard.writeText(content).then(() => {
       setCopiedId(id)
@@ -477,6 +499,8 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                           >
                             {msg.streaming && !msg.content && !msg.reasoning ? (
                               <span className="chat-thinking-pulse">Thinking…</span>
+                            ) : msg.stoppedThinking ? (
+                              <span className="chat-thinking-stopped">Stopped thinking</span>
                             ) : msg.thinkingDuration != null ? (
                               <span>Thought for {Math.round(msg.thinkingDuration / 1000)}s</span>
                             ) : msg.streaming ? (
@@ -706,13 +730,13 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                   <Mic size={18} />
                 </button>
                 <button
-                  className={`prompt-submit${(prompt.trim() || attachments.length > 0) ? ' prompt-submit-active' : ''}`}
+                  className={`prompt-submit${streaming ? ' prompt-submit-active' : (prompt.trim() || attachments.length > 0) ? ' prompt-submit-active' : ''}`}
                   type="button"
-                  disabled={(!prompt.trim() && attachments.length === 0) || streaming}
-                  onClick={handleSubmit}
-                  aria-label="Submit"
+                  disabled={!streaming && !prompt.trim() && attachments.length === 0}
+                  onClick={streaming ? stopStream : handleSubmit}
+                  aria-label={streaming ? 'Stop' : 'Submit'}
                 >
-                  <ArrowUp size={18} />
+                  {streaming ? <Square size={14} fill="currentColor" /> : <ArrowUp size={18} />}
                 </button>
               </div>
             </div>

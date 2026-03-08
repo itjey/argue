@@ -5098,6 +5098,10 @@
   color: rgba(255, 255, 255, 0.65);
 }
 
+.chat-thinking-stopped {
+  color: rgba(255, 255, 255, 0.35);
+}
+
 /* pulsing "Thinking…" text — left-to-right shimmer sweep */
 .chat-thinking-pulse {
   display: inline-block;
