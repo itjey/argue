@@ -4341,6 +4341,12 @@
   gap: 0.5rem;
 }
 
+.prompt-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
 .prompt-pill-btn {
   display: inline-flex;
   align-items: center;
@@ -4364,6 +4370,157 @@
 .prompt-pill-btn-active {
   border-color: #ffb366;
   color: #ffb366;
+}
+
+/* Bare mic button */
+.prompt-mic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  transition: color 160ms ease;
+  flex-shrink: 0;
+}
+
+.prompt-mic:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.prompt-mic-active {
+  color: #fff;
+}
+
+/* Model selector */
+.model-selector {
+  position: relative;
+}
+
+.model-selector-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.38rem 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font-family: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  max-width: 160px;
+  transition: border-color 160ms ease, color 160ms ease;
+}
+
+.model-selector-trigger:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.model-selector-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-selector-chevron {
+  flex-shrink: 0;
+  transition: transform 160ms ease;
+}
+
+.model-selector-chevron-open {
+  transform: rotate(180deg);
+}
+
+.model-dropdown {
+  position: absolute;
+  bottom: calc(100% + 0.5rem);
+  left: 0;
+  z-index: 50;
+  width: 300px;
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.85rem;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.model-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.model-search-icon {
+  color: rgba(255, 255, 255, 0.3);
+  flex-shrink: 0;
+}
+
+.model-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--ink-strong);
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+
+.model-search-input::placeholder {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.model-list {
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 0.35rem 0;
+}
+
+.model-list-empty {
+  padding: 0.75rem 1rem;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 0.82rem;
+  margin: 0;
+}
+
+.model-list-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  width: 100%;
+  padding: 0.5rem 0.85rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.model-list-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.model-list-item-active {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.model-list-name {
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.84rem;
+  font-weight: 500;
+}
+
+.model-list-id {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 0.72rem;
+  font-family: var(--font-mono, monospace);
 }
 
 .prompt-submit {
