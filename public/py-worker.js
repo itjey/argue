@@ -19,9 +19,10 @@ async function initPyodide(buffer) {
     indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.27.2/full/',
   });
 
-  // Expose a JS function callable from Python that blocks until the main
-  // thread writes a value to the SharedArrayBuffer.
-  pyodide.globals.set('__worker_input', prompt => {
+  // Expose a JS function callable from Python via `from js import __worker_input`.
+  // It must be on globalThis (= self in a worker), NOT pyodide.globals — that's
+  // Python's namespace. Pyodide's `js` module reflects JavaScript's globalThis.
+  self.__worker_input = prompt => {
     // Signal the main thread that we need input, passing the prompt text
     self.postMessage({ type: 'input_request', prompt: String(prompt || '') });
 
@@ -34,7 +35,7 @@ async function initPyodide(buffer) {
     const lenView = new Int32Array(stdinBuf, 4, 1);
     const byteView = new Uint8Array(stdinBuf, 8, lenView[0]);
     return new TextDecoder().decode(byteView);
-  });
+  };
 
   await pyodide.runPythonAsync(`
 import builtins
