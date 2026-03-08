@@ -214,8 +214,8 @@
 
 .topbar-account-button-minimal:hover,
 .topbar-account-button-minimal:focus-visible {
-  border-color: transparent;
-  background: transparent;
+  border-color: transparent !important;
+  background: transparent !important;
 }
 
 .topbar-account-button svg {
