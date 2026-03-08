@@ -1,8 +1,15 @@
 // CollaborationWorkspace — redesign in progress
 import { useEffect, useRef, useState, type KeyboardEvent, type ChangeEvent } from 'react'
 import type { User } from 'firebase/auth'
-import { ArrowUp, Paperclip, Mic, ChevronDown, Search, X, Info } from 'lucide-react'
-import { fetchOpenRouterModels, type OpenRouterModel } from '../lib/openrouter'
+import { ArrowUp, Paperclip, Mic, ChevronDown, Search, X, Info, Copy, Pencil, Check } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import {
+  fetchOpenRouterModels,
+  createOpenRouterChatCompletionStream,
+  type OpenRouterModel,
+  type OpenRouterChatMessage,
+} from '../lib/openrouter'
 import {
   fetchOpenRouterStatsSnapshot,
   resolveOpenRouterModelStats,
@@ -10,6 +17,8 @@ import {
   type OpenRouterModelStatsEntry,
 } from '../lib/openrouterStats'
 import { ModelStatsPanel } from './ModelStatsPanel'
+
+const OPENROUTER_KEY_STORAGE = 'argue-openrouter-api-key'
 
 interface CollaborationWorkspaceProps {
   currentUser: User
@@ -20,6 +29,15 @@ interface AttachedFile {
   name: string
   dataUrl: string
   mimeType: string
+}
+
+interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  attachments?: AttachedFile[]
+  streaming?: boolean
+  error?: boolean
 }
 
 declare global {
@@ -36,10 +54,32 @@ function isMultimodal(model: OpenRouterModel) {
   return inputs.some((m) => m === 'image' || m === 'file')
 }
 
+function buildApiMessages(messages: ChatMessage[]): OpenRouterChatMessage[] {
+  return messages
+    .filter((m) => !m.streaming && !m.error)
+    .map((m): OpenRouterChatMessage => {
+      if (m.role === 'user' && m.attachments && m.attachments.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const parts: any[] = [{ type: 'text', text: m.content }]
+        for (const att of m.attachments) {
+          if (att.mimeType.startsWith('image/')) {
+            parts.push({ type: 'image_url', image_url: { url: att.dataUrl } })
+          }
+        }
+        return { role: 'user', content: parts }
+      }
+      return { role: m.role, content: m.content }
+    })
+}
+
 export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [prompt, setPrompt] = useState('')
   const [listening, setListening] = useState(false)
   const [attachments, setAttachments] = useState<AttachedFile[]>([])
+  const [streaming, setStreaming] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
   // model selector
   const [models, setModels] = useState<OpenRouterModel[]>([])
@@ -57,8 +97,10 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const chatEndRef = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null)
+  const abortedRef = useRef(false)
 
   useEffect(() => {
     fetchOpenRouterModels().then((list) => setModels(list)).catch(() => {})
@@ -97,6 +139,11 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
     recognitionRef.current = rec
   }, [])
 
+  // scroll to bottom on new messages
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
   function autoResize() {
     const el = textareaRef.current
     if (!el) return
@@ -112,7 +159,10 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Enter' && !e.shiftKey) e.preventDefault()
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSubmit()
+    }
   }
 
   function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
@@ -142,7 +192,94 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
     }
   }
 
+  async function runStream(historyBefore: ChatMessage[], userMsg: ChatMessage) {
+    const apiKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
+    if (!apiKey.trim() || !selectedModel) return
+
+    const assistantId = crypto.randomUUID()
+    setMessages((prev) => [
+      ...prev,
+      { id: assistantId, role: 'assistant', content: '', streaming: true },
+    ])
+    setStreaming(true)
+    abortedRef.current = false
+
+    const apiMessages = buildApiMessages([...historyBefore, userMsg])
+
+    try {
+      await createOpenRouterChatCompletionStream({
+        apiKey,
+        model: selectedModel.id,
+        messages: apiMessages,
+        onProgress: (reply) => {
+          if (abortedRef.current) return
+          setMessages((prev) =>
+            prev.map((m) => m.id === assistantId ? { ...m, content: reply.text } : m)
+          )
+        },
+      })
+      if (!abortedRef.current) {
+        setMessages((prev) =>
+          prev.map((m) => m.id === assistantId ? { ...m, streaming: false } : m)
+        )
+      }
+    } catch (err: unknown) {
+      if (!abortedRef.current) {
+        const msg = err instanceof Error ? err.message : 'An error occurred.'
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, content: msg, streaming: false, error: true } : m
+          )
+        )
+      }
+    } finally {
+      setStreaming(false)
+    }
+  }
+
+  async function handleSubmit() {
+    const text = prompt.trim()
+    if (!text && attachments.length === 0) return
+    if (streaming) return
+
+    const userMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: text,
+      attachments: attachments.length > 0 ? [...attachments] : undefined,
+    }
+
+    const historyBefore = editingId
+      ? messages.slice(0, messages.findIndex((m) => m.id === editingId))
+      : messages
+
+    setMessages([...historyBefore, userMsg])
+    setPrompt('')
+    setAttachments([])
+    setEditingId(null)
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
+
+    await runStream(historyBefore, userMsg)
+  }
+
+  function startEdit(msg: ChatMessage) {
+    setEditingId(msg.id)
+    setPrompt(msg.content)
+    setTimeout(() => {
+      textareaRef.current?.focus()
+      autoResize()
+    }, 0)
+  }
+
+  function copyMessage(id: string, content: string) {
+    navigator.clipboard.writeText(content).then(() => {
+      setCopiedId(id)
+      setTimeout(() => setCopiedId(null), 1500)
+    })
+  }
+
   const supportsFiles = selectedModel ? isMultimodal(selectedModel) : false
+  const hasMessages = messages.length > 0
 
   const filteredModels = modelSearch.trim()
     ? models.filter((m) =>
@@ -213,8 +350,69 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
         </div>
       )}
 
-      <div className="prompt-page">
-        <div className="prompt-center">
+      <div className={`prompt-page${hasMessages ? ' prompt-page-chat' : ''}`}>
+        {/* Chat history */}
+        {hasMessages && (
+          <div className="chat-container">
+            {messages.map((msg) => (
+              <div key={msg.id} className={`chat-row chat-row-${msg.role}`}>
+                <div className={`chat-bubble chat-bubble-${msg.role}${msg.error ? ' chat-bubble-error' : ''}`}>
+                  {msg.role === 'user' && msg.attachments && msg.attachments.length > 0 && (
+                    <div className="chat-attachments">
+                      {msg.attachments.map((a) => (
+                        <div key={a.id} className="chat-attachment-pill">
+                          {a.mimeType.startsWith('image/') ? (
+                            <img src={a.dataUrl} alt={a.name} className="chat-attachment-thumb" />
+                          ) : (
+                            <Paperclip size={11} />
+                          )}
+                          <span>{a.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {msg.role === 'assistant' ? (
+                    <div className="chat-markdown">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {msg.content}
+                      </ReactMarkdown>
+                      {msg.streaming && <span className="chat-typing-dot" />}
+                    </div>
+                  ) : (
+                    <p className="chat-user-text">{msg.content}</p>
+                  )}
+                </div>
+
+                <div className={`chat-actions chat-actions-${msg.role}`}>
+                  <button
+                    className={`chat-action-btn${copiedId === msg.id ? ' chat-action-btn-done' : ''}`}
+                    type="button"
+                    onClick={() => copyMessage(msg.id, msg.content)}
+                    aria-label="Copy"
+                    title="Copy"
+                  >
+                    {copiedId === msg.id ? <Check size={13} /> : <Copy size={13} />}
+                  </button>
+                  {msg.role === 'user' && !streaming && (
+                    <button
+                      className="chat-action-btn"
+                      type="button"
+                      onClick={() => startEdit(msg)}
+                      aria-label="Edit"
+                      title="Edit & resend"
+                    >
+                      <Pencil size={13} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+            <div ref={chatEndRef} />
+          </div>
+        )}
+
+        {/* Input area */}
+        <div className={`prompt-center${hasMessages ? ' prompt-center-sticky' : ''}`}>
           <div className="prompt-box">
             {attachments.length > 0 && (
               <div className="prompt-attachments">
@@ -237,7 +435,7 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
             <textarea
               ref={textareaRef}
               className="prompt-textarea"
-              placeholder="Ask anything…"
+              placeholder={editingId ? 'Edit your message…' : 'Ask anything…'}
               value={prompt}
               rows={1}
               onChange={(e) => { setPrompt(e.target.value); autoResize() }}
@@ -341,7 +539,8 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                 <button
                   className={`prompt-submit${(prompt.trim() || attachments.length > 0) ? ' prompt-submit-active' : ''}`}
                   type="button"
-                  disabled={!prompt.trim() && attachments.length === 0}
+                  disabled={(!prompt.trim() && attachments.length === 0) || streaming}
+                  onClick={handleSubmit}
                   aria-label="Submit"
                 >
                   <ArrowUp size={18} />
@@ -349,6 +548,19 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
               </div>
             </div>
           </div>
+
+          {editingId && (
+            <p className="prompt-edit-notice">
+              Editing — submit to replace &amp; resend
+              <button
+                type="button"
+                className="prompt-edit-cancel"
+                onClick={() => { setEditingId(null); setPrompt('') }}
+              >
+                Cancel
+              </button>
+            </p>
+          )}
         </div>
       </div>
     </>
