@@ -4803,7 +4803,6 @@
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  scroll-behavior: smooth;
 }
 
 .chat-row {
@@ -5090,16 +5089,6 @@
 
 .chat-thinking-toggle:hover {
   color: rgba(255, 255, 255, 0.65);
-}
-
-.chat-thinking-chevron {
-  flex-shrink: 0;
-  transition: transform 200ms ease;
-  opacity: 0.5;
-}
-
-.chat-thinking-chevron-open {
-  transform: rotate(180deg);
 }
 
 /* pulsing "Thinking…" text — left-to-right shimmer sweep */

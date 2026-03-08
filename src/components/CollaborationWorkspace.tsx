@@ -143,7 +143,8 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const chatEndRef = useRef<HTMLDivElement>(null)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
+  const userScrolledRef = useRef(false)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null)
   const abortedRef = useRef(false)
@@ -188,9 +189,24 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
     recognitionRef.current = rec
   }, [])
 
-  // scroll to bottom on new messages
+  // Track whether user has scrolled away from the bottom
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const el = chatContainerRef.current
+    if (!el) return
+    const onScroll = () => {
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+      userScrolledRef.current = !atBottom
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [])
+
+  // Smart auto-scroll: only follow the bottom if the user hasn't scrolled up
+  useEffect(() => {
+    if (!userScrolledRef.current) {
+      const el = chatContainerRef.current
+      if (el) el.scrollTop = el.scrollHeight
+    }
   }, [messages])
 
   function autoResize() {
@@ -431,7 +447,7 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
       <div className={`prompt-page${hasMessages ? ' prompt-page-chat' : ''}`}>
         {/* Chat history */}
         {hasMessages && (
-          <div className="chat-container">
+          <div className="chat-container" ref={chatContainerRef}>
             {messages.map((msg) => (
               <div key={msg.id} className={`chat-row chat-row-${msg.role}`}>
                 <div className={`chat-bubble chat-bubble-${msg.role}${msg.error ? ' chat-bubble-error' : ''}`}>
@@ -468,10 +484,6 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                             ) : (
                               <span>Thoughts</span>
                             )}
-                            <ChevronDown
-                              size={12}
-                              className={`chat-thinking-chevron${expandedThinking.has(msg.id) ? ' chat-thinking-chevron-open' : ''}`}
-                            />
                           </button>
                           {expandedThinking.has(msg.id) && (
                             <div className="chat-thinking-content">
@@ -517,7 +529,6 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                 </div>
               </div>
             ))}
-            <div ref={chatEndRef} />
           </div>
         )}
 
