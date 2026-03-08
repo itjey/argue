@@ -5,7 +5,6 @@ import {
   Gauge,
   Medal,
   Rocket,
-  Sparkles,
 } from 'lucide-react'
 import { formatOpenRouterPrice } from '../lib/openrouter'
 import type {
@@ -33,26 +32,6 @@ function formatCompactNumber(value?: number) {
     notation: 'compact',
     maximumFractionDigits: 1,
   }).format(value)
-}
-
-function formatSnapshotDate(value: string | null) {
-  if (!value) {
-    return 'Unknown'
-  }
-
-  const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return 'Unknown'
-  }
-
-  return date.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
 }
 
 function formatShortDate(value: string) {
@@ -367,11 +346,10 @@ function BenchmarkSection({ benchmarks }: { benchmarks: OpenRouterBenchmarkSnaps
 
 function ModelStatsPanel({
   modelName,
-  snapshotRefreshedAt,
   statsEntry,
   statsError,
   statsLoading,
-}: ModelStatsPanelProps) {
+}: Omit<ModelStatsPanelProps, 'snapshotRefreshedAt'>) {
   if (statsLoading) {
     return (
       <article className="control-card model-stats-card model-stats-empty">
@@ -427,23 +405,6 @@ function ModelStatsPanel({
 
   return (
     <section className="model-stats-panel">
-      <div className="control-card model-stats-card">
-        <div className="model-stats-card-header">
-          <div>
-            <p className="model-stats-eyebrow">OpenRouter stats</p>
-            <h4>Performance, pricing, apps, activity, and uptime for {modelName}</h4>
-          </div>
-          <Sparkles size={18} />
-        </div>
-        <p className="model-stats-copy">
-          Bundled from OpenRouter&apos;s current stats endpoints at deploy time so the
-          GitHub Pages app can show the same model context without sending users away.
-        </p>
-        <p className="model-stats-note">
-          Snapshot refreshed {formatSnapshotDate(snapshotRefreshedAt)}.
-        </p>
-      </div>
-
       <div className="model-stats-grid">
         <StatsChartCard
           data={statsEntry.throughputComparison}

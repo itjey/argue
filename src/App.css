@@ -3497,6 +3497,7 @@
   border: 1px solid var(--workspace-border-soft);
   border-radius: 0.24rem;
   background: var(--workspace-surface-soft);
+  filter: invert(1) hue-rotate(180deg);
 }
 
 .ambient {
@@ -4550,23 +4551,16 @@
 
 .model-list-item {
   display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
+  align-items: stretch;
   width: 100%;
-  padding: 0.5rem 0.85rem;
-  border: none;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-  transition: background 120ms ease;
 }
 
 .model-list-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .model-list-item-active {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .model-list-name {

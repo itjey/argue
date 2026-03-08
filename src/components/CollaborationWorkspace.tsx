@@ -204,7 +204,6 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
             <div className="model-info-stats">
               <ModelStatsPanel
                 modelName={infoModel.name}
-                snapshotRefreshedAt={statsSnapshot?.refreshedAt ?? null}
                 statsEntry={statsEntry}
                 statsError={statsError}
                 statsLoading={statsLoading}
