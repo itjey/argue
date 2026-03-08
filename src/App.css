@@ -9,7 +9,7 @@
 .page,
 .topbar {
   position: relative;
-  width: min(1180px, calc(100% - 2rem));
+  width: min(1600px, calc(100% - 2rem));
   margin: 0 auto;
 }
 
@@ -60,8 +60,8 @@
 }
 
 .brand-mark {
-  width: 2rem;
-  height: 1.35rem;
+  width: clamp(2rem, 3vw, 2.8rem);
+  height: clamp(1.35rem, 2vw, 1.9rem);
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
@@ -69,8 +69,8 @@
 
 .brand-fan {
   position: relative;
-  width: 1.86rem;
-  height: 1.12rem;
+  width: clamp(1.86rem, 2.8vw, 2.6rem);
+  height: clamp(1.12rem, 1.7vw, 1.57rem);
   transition: transform 240ms ease;
 }
 
@@ -78,8 +78,8 @@
   position: absolute;
   left: 0;
   top: 50%;
-  width: 1.62rem;
-  height: 0.82rem;
+  width: clamp(1.62rem, 2.4vw, 2.3rem);
+  height: clamp(0.82rem, 1.2vw, 1.15rem);
   transform-origin: 0% 50%;
   transition:
     transform 240ms ease,
@@ -138,7 +138,7 @@
 }
 
 .brand-wordmark {
-  font-size: 0.84rem;
+  font-size: clamp(0.9rem, 1.4vw, 1.15rem);
 }
 
 .brand-typewriter {
@@ -164,7 +164,7 @@
 .nav-link-button,
 .topbar-cta {
   color: var(--ink-muted);
-  font-size: 0.9rem;
+  font-size: clamp(0.9rem, 1.3vw, 1.05rem);
 }
 
 .nav-link-button {
@@ -208,6 +208,8 @@
 .topbar-account-button-minimal {
   min-width: 0;
   padding-inline: 1rem;
+  border-color: transparent;
+  background: transparent;
 }
 
 .topbar-account-button svg {
