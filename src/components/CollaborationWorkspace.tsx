@@ -7,8 +7,10 @@ import {
   createOpenRouterChatCompletionStream,
   type OpenRouterModel,
   type OpenRouterChatMessage,
+  type OpenRouterReasoningEffort,
 } from '../lib/openrouter'
-import { getModelCapabilityProfile } from '../lib/openrouterCapabilities'
+import { getModelCapabilityProfile as _unused } from '../lib/openrouterCapabilities'
+void _unused
 import { MarkdownBlock } from './RichMessageContent'
 import {
   fetchOpenRouterStatsSnapshot,
@@ -67,6 +69,24 @@ function isMultimodal(model: OpenRouterModel) {
   return inputs.some((m) => m === 'image' || m === 'file')
 }
 
+type ReasoningStyle = 'effort' | 'include' | 'none'
+
+/** Determine how this model surfaces reasoning to callers */
+function getReasoningStyle(model: OpenRouterModel): ReasoningStyle {
+  const params = new Set((model.supported_parameters ?? []).map((p) => p.toLowerCase()))
+  if (params.has('reasoning_effort')) return 'effort'    // GPT-5.4, o-series, etc.
+  if (params.has('include_reasoning') || params.has('reasoning')) return 'include'  // DeepSeek, etc.
+  return 'none'
+}
+
+const EFFORT_LEVELS: { value: OpenRouterReasoningEffort; label: string; desc: string }[] = [
+  { value: 'xhigh',   label: 'Max',     desc: 'Deepest reasoning, highest cost & latency' },
+  { value: 'high',    label: 'High',    desc: 'Strong reasoning, recommended default' },
+  { value: 'medium',  label: 'Medium',  desc: 'Balanced speed and depth' },
+  { value: 'low',     label: 'Low',     desc: 'Quick, light reasoning' },
+  { value: 'minimal', label: 'Minimal', desc: 'Barely any internal thought' },
+]
+
 function buildApiMessages(messages: ChatMessage[]): OpenRouterChatMessage[] {
   const history: OpenRouterChatMessage[] = messages
     .filter((m) => !m.streaming && !m.error)
@@ -95,6 +115,7 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set())
+  const [reasoningEffort, setReasoningEffort] = useState<OpenRouterReasoningEffort>('high')
 
   // model selector
   const [models, setModels] = useState<OpenRouterModel[]>([])
@@ -211,8 +232,9 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
     const apiKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
     if (!apiKey.trim() || !selectedModel) return
 
-    const profile = getModelCapabilityProfile(selectedModel, null)
-    const includeReasoning = profile.supportsReasoning
+    const style = getReasoningStyle(selectedModel)
+    const includeReasoning = style === 'include'
+    const reasoningConfig = style === 'effort' ? { effort: reasoningEffort } : undefined
 
     const assistantId = crypto.randomUUID()
     const thinkingStart = Date.now()
@@ -231,12 +253,12 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
         model: selectedModel.id,
         messages: apiMessages,
         includeReasoning,
+        reasoning: reasoningConfig,
         onProgress: (reply) => {
           if (abortedRef.current) return
           setMessages((prev) =>
             prev.map((m) => {
               if (m.id !== assistantId) return m
-              // record when thinking finished (first text token arrives)
               const thinkingDuration =
                 reply.text && !m.thinkingDuration
                   ? Date.now() - (m.thinkingStart ?? thinkingStart)
@@ -321,6 +343,7 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
 
   const supportsFiles = selectedModel ? isMultimodal(selectedModel) : false
   const hasMessages = messages.length > 0
+  const reasoningStyle = selectedModel ? getReasoningStyle(selectedModel) : 'none'
 
   const filteredModels = modelSearch.trim()
     ? models.filter((m) =>
@@ -592,6 +615,33 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                     </div>
                   )}
                 </div>
+
+                {/* Reasoning effort selector — only for models that support effort levels */}
+                {reasoningStyle === 'effort' && (
+                  <div className="effort-selector">
+                    <Brain size={12} className="effort-selector-icon" />
+                    <span className="effort-selector-label">Think:</span>
+                    {EFFORT_LEVELS.map((level) => (
+                      <button
+                        key={level.value}
+                        type="button"
+                        className={`effort-btn${reasoningEffort === level.value ? ' effort-btn-active' : ''}`}
+                        onClick={() => setReasoningEffort(level.value)}
+                        title={level.desc}
+                      >
+                        {level.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* For include_reasoning models: subtle badge */}
+                {reasoningStyle === 'include' && (
+                  <span className="effort-include-badge" title="This model exposes its chain-of-thought">
+                    <Brain size={12} />
+                    Thinking on
+                  </span>
+                )}
               </div>
 
               <div className="prompt-actions-right">
