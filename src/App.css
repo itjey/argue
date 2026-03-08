@@ -5061,45 +5061,34 @@
   color: rgba(255, 255, 255, 0.8);
 }
 
-/* ── Thinking / reasoning block ── */
-.chat-thinking {
-  margin-bottom: 0.75rem;
-  border-radius: 0.55rem;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
+/* ── Thinking / reasoning block (flat, no box) ── */
+.chat-thinking-row {
+  margin-bottom: 0.6rem;
 }
 
 .chat-thinking-toggle {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  width: 100%;
+  gap: 0.35rem;
   background: none;
   border: none;
   cursor: pointer;
-  padding: 0.5rem 0.75rem;
-  color: rgba(255, 255, 255, 0.45);
+  padding: 0.15rem 0;
+  color: rgba(255, 255, 255, 0.38);
   font-size: 0.78rem;
   text-align: left;
-  transition: color 120ms ease, background 120ms ease;
+  transition: color 140ms ease;
   user-select: none;
 }
 
 .chat-thinking-toggle:hover {
-  color: rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.chat-thinking-icon {
-  flex-shrink: 0;
-  opacity: 0.6;
+  color: rgba(255, 255, 255, 0.65);
 }
 
 .chat-thinking-chevron {
-  margin-left: auto;
   flex-shrink: 0;
   transition: transform 200ms ease;
+  opacity: 0.5;
 }
 
 .chat-thinking-chevron-open {
@@ -5108,22 +5097,29 @@
 
 /* pulsing "Thinking…" text during active reasoning */
 .chat-thinking-pulse {
-  animation: thinking-fade 1.4s ease-in-out infinite;
+  animation: thinking-fade 1.6s ease-in-out infinite;
 }
 
 @keyframes thinking-fade {
-  0%, 100% { opacity: 0.35; }
-  50% { opacity: 0.85; }
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.75; }
 }
 
 .chat-thinking-content {
-  padding: 0.65rem 0.9rem 0.75rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 0.4rem;
+  padding: 0.6rem 0.85rem;
+  border-left: 2px solid rgba(255, 255, 255, 0.08);
   font-size: 0.82rem;
   line-height: 1.6;
-  color: rgba(255, 255, 255, 0.45);
-  max-height: 360px;
+  color: rgba(255, 255, 255, 0.4);
+  max-height: 380px;
   overflow-y: auto;
+}
+
+.chat-thinking-empty {
+  color: rgba(255, 255, 255, 0.28);
+  font-style: italic;
+  font-size: 0.8rem;
 }
 
 .chat-thinking-content p { margin: 0 0 0.5em; }
@@ -5135,57 +5131,103 @@
   font-size: 0.85em;
 }
 
-/* ── Reasoning effort selector ── */
+/* ── Reasoning effort selector (dropdown) ── */
 .effort-selector {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.effort-selector-trigger {
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  padding: 0 0.25rem;
-  flex-shrink: 0;
-}
-
-.effort-selector-icon {
-  color: rgba(255, 255, 255, 0.3);
-  flex-shrink: 0;
-}
-
-.effort-selector-label {
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.3);
-  letter-spacing: 0.04em;
-  margin-right: 0.15rem;
-  white-space: nowrap;
-}
-
-.effort-btn {
   background: none;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 0.35rem;
-  color: rgba(255, 255, 255, 0.4);
+  border-radius: 0.5rem;
   cursor: pointer;
-  font-size: 0.71rem;
-  padding: 0.18rem 0.5rem;
-  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+  padding: 0.22rem 0.55rem;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.72rem;
+  transition: color 120ms ease, border-color 120ms ease;
   white-space: nowrap;
 }
 
-.effort-btn:hover {
+.effort-selector-trigger:hover {
   color: rgba(255, 255, 255, 0.75);
   border-color: rgba(255, 255, 255, 0.22);
 }
 
-.effort-btn-active {
-  color: rgba(255, 255, 255, 0.9) !important;
-  border-color: rgba(255, 255, 255, 0.35) !important;
+.effort-selector-label {
+  color: rgba(255, 255, 255, 0.28);
+}
+
+.effort-selector-value {
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+}
+
+.effort-chevron {
+  opacity: 0.45;
+  transition: transform 180ms ease;
+}
+
+.effort-chevron-open {
+  transform: rotate(180deg);
+}
+
+.effort-dropdown {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 120;
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.7rem;
+  padding: 0.3rem;
+  min-width: 180px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.effort-option {
+  display: flex;
+  align-items: center;
+  border-radius: 0.45rem;
+  transition: background 100ms ease;
+}
+
+.effort-option:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.effort-option-active {
   background: rgba(255, 255, 255, 0.07);
 }
 
-.effort-include-badge {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.71rem;
-  color: rgba(255, 255, 255, 0.3);
-  padding: 0 0.25rem;
-  white-space: nowrap;
+.effort-option-select {
+  flex: 1;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  padding: 0.45rem 0.65rem;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.82rem;
+}
+
+.effort-option-active .effort-option-select {
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 500;
+}
+
+.effort-option-desc {
+  padding: 0 0.6rem 0 0.2rem;
+  color: rgba(255, 255, 255, 0.22);
+  font-size: 0.82rem;
+  cursor: default;
+  user-select: none;
+  transition: color 120ms ease;
+}
+
+.effort-option:hover .effort-option-desc {
+  color: rgba(255, 255, 255, 0.5);
 }

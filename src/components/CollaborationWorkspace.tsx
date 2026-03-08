@@ -1,7 +1,7 @@
 // CollaborationWorkspace — redesign in progress
 import { useEffect, useRef, useState, type KeyboardEvent, type ChangeEvent } from 'react'
 import type { User } from 'firebase/auth'
-import { ArrowUp, Paperclip, Mic, ChevronDown, Search, X, Info, Copy, Pencil, Check, Brain } from 'lucide-react'
+import { ArrowUp, Paperclip, Mic, ChevronDown, Search, X, Info, Copy, Pencil, Check } from 'lucide-react'
 import {
   fetchOpenRouterModels,
   createOpenRouterChatCompletionStream,
@@ -51,8 +51,9 @@ interface ChatMessage {
   streaming?: boolean
   error?: boolean
   reasoning?: string
-  thinkingStart?: number   // epoch ms when thinking began (for "Thought for Xs")
-  thinkingDuration?: number // ms elapsed while thinking
+  isReasoningModel?: boolean   // true when sent to a model with reasoning param
+  thinkingStart?: number
+  thinkingDuration?: number
 }
 
 declare global {
@@ -120,6 +121,8 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set())
   const [reasoningEffort, setReasoningEffort] = useState<OpenRouterReasoningEffort>('high')
+  const [effortOpen, setEffortOpen] = useState(false)
+  const effortDropRef = useRef<HTMLDivElement>(null)
 
   // model selector
   const [models, setModels] = useState<OpenRouterModel[]>([])
@@ -151,6 +154,9 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
       if (modelDropRef.current && !modelDropRef.current.contains(e.target as Node)) {
         setModelOpen(false)
         setModelSearch('')
+      }
+      if (effortDropRef.current && !effortDropRef.current.contains(e.target as Node)) {
+        setEffortOpen(false)
       }
     }
     document.addEventListener('pointerdown', onPointerDown)
@@ -240,11 +246,12 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
     const includeReasoning = style === 'include'
     const reasoningConfig = style === 'effort' ? { effort: reasoningEffort } : undefined
 
+    const isReasoningModel = style !== 'none'
     const assistantId = crypto.randomUUID()
     const thinkingStart = Date.now()
     setMessages((prev) => [
       ...prev,
-      { id: assistantId, role: 'assistant', content: '', streaming: true, thinkingStart },
+      { id: assistantId, role: 'assistant', content: '', streaming: true, thinkingStart, isReasoningModel },
     ])
     setStreaming(true)
     abortedRef.current = false
@@ -441,19 +448,20 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                   )}
                   {msg.role === 'assistant' ? (
                     <div className="chat-markdown">
-                      {/* thinking / reasoning block */}
-                      {(msg.reasoning || (msg.streaming && !msg.content)) && (
-                        <div className="chat-thinking">
+                      {/* thinking / reasoning block — shown for reasoning models only */}
+                      {msg.isReasoningModel && (
+                        <div className="chat-thinking-row">
                           <button
                             className="chat-thinking-toggle"
                             type="button"
                             onClick={() => toggleThinking(msg.id)}
                           >
-                            <Brain size={13} className="chat-thinking-icon" />
-                            {msg.streaming && !msg.content ? (
+                            {msg.streaming && !msg.content && !msg.reasoning ? (
                               <span className="chat-thinking-pulse">Thinking…</span>
-                            ) : msg.thinkingDuration ? (
+                            ) : msg.thinkingDuration != null ? (
                               <span>Thought for {Math.round(msg.thinkingDuration / 1000)}s</span>
+                            ) : msg.streaming ? (
+                              <span className="chat-thinking-pulse">Thinking…</span>
                             ) : (
                               <span>Thoughts</span>
                             )}
@@ -462,9 +470,12 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                               className={`chat-thinking-chevron${expandedThinking.has(msg.id) ? ' chat-thinking-chevron-open' : ''}`}
                             />
                           </button>
-                          {expandedThinking.has(msg.id) && msg.reasoning && (
+                          {expandedThinking.has(msg.id) && (
                             <div className="chat-thinking-content">
-                              <MarkdownBlock>{msg.reasoning}</MarkdownBlock>
+                              {msg.reasoning
+                                ? <MarkdownBlock>{msg.reasoning}</MarkdownBlock>
+                                : <span className="chat-thinking-empty">No reasoning trace exposed by this provider.</span>
+                              }
                             </div>
                           )}
                         </div>
@@ -620,31 +631,44 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                   )}
                 </div>
 
-                {/* Reasoning effort selector — only for models that support effort levels */}
-                {reasoningStyle === 'effort' && (
-                  <div className="effort-selector">
-                    <Brain size={12} className="effort-selector-icon" />
-                    <span className="effort-selector-label">Think:</span>
-                    {EFFORT_LEVELS.map((level) => (
-                      <button
-                        key={level.value}
-                        type="button"
-                        className={`effort-btn${reasoningEffort === level.value ? ' effort-btn-active' : ''}`}
-                        onClick={() => setReasoningEffort(level.value)}
-                        title={level.desc}
-                      >
-                        {level.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                {/* Reasoning effort selector — dropdown, only for models with reasoning param */}
+                {(reasoningStyle === 'effort' || reasoningStyle === 'include') && (
+                  <div className="effort-selector" ref={effortDropRef}>
+                    <button
+                      className="effort-selector-trigger"
+                      type="button"
+                      onClick={() => setEffortOpen((o) => !o)}
+                      title="Reasoning depth"
+                    >
+                      <span className="effort-selector-label">Think:</span>
+                      <span className="effort-selector-value">
+                        {reasoningStyle === 'include'
+                          ? 'On'
+                          : (EFFORT_LEVELS.find((e) => e.value === reasoningEffort)?.label ?? 'High')}
+                      </span>
+                      <ChevronDown size={11} className={`effort-chevron${effortOpen ? ' effort-chevron-open' : ''}`} />
+                    </button>
 
-                {/* For include_reasoning models: subtle badge */}
-                {reasoningStyle === 'include' && (
-                  <span className="effort-include-badge" title="This model exposes its chain-of-thought">
-                    <Brain size={12} />
-                    Thinking on
-                  </span>
+                    {effortOpen && reasoningStyle === 'effort' && (
+                      <div className="effort-dropdown">
+                        {EFFORT_LEVELS.map((level) => (
+                          <div
+                            key={level.value}
+                            className={`effort-option${reasoningEffort === level.value ? ' effort-option-active' : ''}`}
+                          >
+                            <button
+                              type="button"
+                              className="effort-option-select"
+                              onClick={() => { setReasoningEffort(level.value); setEffortOpen(false) }}
+                            >
+                              <span className="effort-option-label">{level.label}</span>
+                            </button>
+                            <span className="effort-option-desc" title={level.desc}>ⓘ</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
