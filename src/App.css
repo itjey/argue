@@ -4255,3 +4255,125 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Prompt page ─────────────────────────────── */
+
+.prompt-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 56px);
+  padding: 2rem 1rem;
+}
+
+.prompt-center {
+  width: 100%;
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+}
+
+.prompt-heading {
+  color: var(--ink-strong);
+  font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-align: center;
+  margin: 0;
+}
+
+.prompt-box {
+  width: 100%;
+  background: #111;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1.25rem;
+  padding: 1rem 1rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.prompt-box:focus-within {
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.04);
+}
+
+.prompt-textarea {
+  width: 100%;
+  min-height: 32px;
+  max-height: 320px;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  color: var(--ink-strong);
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1.65;
+  padding: 0;
+  overflow-y: auto;
+}
+
+.prompt-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.prompt-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.prompt-actions-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.prompt-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.38rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.45);
+  font-family: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease;
+}
+
+.prompt-pill-btn:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.prompt-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.35);
+  cursor: not-allowed;
+  transition: background 160ms ease, color 160ms ease;
+  flex-shrink: 0;
+}
+
+.prompt-submit-active {
+  background: #fff;
+  color: #000;
+  cursor: pointer;
+}
+
+.prompt-submit-active:hover {
+  background: rgba(255, 255, 255, 0.88);
+}
