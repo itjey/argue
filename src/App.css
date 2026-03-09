@@ -5127,27 +5127,28 @@
 /* Input row — always visible at the bottom of terminal during execution */
 .code-terminal-input-row {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   padding: 0.45rem 1rem;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(255, 255, 255, 0.02);
   flex-shrink: 0;
   gap: 0;
+  font-family: 'SF Mono', 'Fira Mono', 'JetBrains Mono', monospace;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  flex-wrap: nowrap;
 }
 
 .code-terminal-input-caret {
   color: rgba(80, 255, 120, 0.7);
-  font-size: 0.82rem;
   margin-right: 0.4rem;
   flex-shrink: 0;
-  font-family: 'SF Mono', 'Fira Mono', monospace;
 }
 
 .code-terminal-input-prompt {
   color: rgba(255, 255, 255, 0.75);
   white-space: pre;
   flex-shrink: 0;
-  line-height: 1.6;
 }
 
 .code-terminal-input {
@@ -5158,9 +5159,12 @@
   color: rgba(255, 255, 255, 0.9);
   font-family: inherit;
   font-size: inherit;
+  line-height: inherit;
   caret-color: rgba(255, 255, 255, 0.7);
   min-width: 0;
-  line-height: 1.6;
+  padding: 0;
+  margin: 0;
+  height: auto;
 }
 
 /* Running status bar at bottom */
