@@ -288,10 +288,10 @@ export function CodeBlock({ code, langId, label, children }: Props) {
     termBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [lines, plots, inputPrompt])
 
-  // Focus input when it appears
+  // Focus input when it appears or when panel opens
   useEffect(() => {
-    if (inputPrompt !== null) inputRef.current?.focus()
-  }, [inputPrompt])
+    if (inputPrompt !== null || (running && open)) inputRef.current?.focus()
+  }, [inputPrompt, running, open])
 
   function close() { setOpen(false); unregisterPanel(closeFnRef.current) }
 
@@ -480,14 +480,14 @@ except: []
         {htmlContent && (
           <iframe
             className="code-canvas-iframe"
-            sandbox="allow-scripts allow-pointer-lock allow-downloads allow-modals allow-forms"
+            sandbox="allow-scripts allow-pointer-lock allow-downloads allow-modals allow-forms allow-same-origin"
             srcDoc={htmlContent}
             title="Preview"
           />
         )}
 
         {/* ── Terminal ── */}
-        {(showTerminal || (isPython && running)) && (
+        {(showTerminal || (isPython && running) || !htmlContent) && (
           <div className="code-terminal">
             <div className="code-terminal-output">
               {lines.map((l, i) => (
@@ -500,12 +500,16 @@ except: []
               {!running && exitCode !== null && exitCode !== 0 && (
                 <div className="code-terminal-exit">Process exited with code {exitCode}</div>
               )}
+              {!running && exitCode !== null && exitCode === 0 && (
+                <div className="code-terminal-exit" style={{ color: 'rgba(80, 255, 120, 0.45)' }}>Process exited with code 0</div>
+              )}
               <div ref={termBottomRef} />
             </div>
 
-            {/* Input row — shown when Python calls input() */}
-            {running && inputPrompt !== null ? (
+            {/* Always-visible terminal input during execution */}
+            {running ? (
               <div className="code-terminal-input-row">
+                <span className="code-terminal-input-caret">{'>'}</span>
                 {inputPrompt && <span className="code-terminal-input-prompt">{inputPrompt}</span>}
                 <input
                   ref={inputRef}
@@ -515,12 +519,9 @@ except: []
                   onKeyDown={onInputKey}
                   autoComplete="off"
                   spellCheck={false}
+                  placeholder={inputPrompt !== null ? '' : 'Waiting for program...'}
+                  disabled={inputPrompt === null}
                 />
-              </div>
-            ) : running ? (
-              <div className="code-terminal-status">
-                <Loader size={11} className="code-run-spinner" />
-                <span>{statusMsg || 'Running…'}</span>
               </div>
             ) : null}
           </div>

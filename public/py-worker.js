@@ -31,10 +31,13 @@ async function initPyodide(buffer) {
     Atomics.store(statusView, 0, 0);
     Atomics.wait(statusView, 0, 0); // blocks until status becomes non-zero
 
-    // Read the user's value back out of the buffer
+    // Read the user's value back out of the buffer.
+    // Copy into a plain ArrayBuffer — TextDecoder rejects SharedArrayBuffer views.
     const lenView = new Int32Array(stdinBuf, 4, 1);
-    const byteView = new Uint8Array(stdinBuf, 8, lenView[0]);
-    return new TextDecoder().decode(byteView);
+    const len = lenView[0];
+    const copy = new Uint8Array(len);
+    copy.set(new Uint8Array(stdinBuf, 8, len));
+    return new TextDecoder().decode(copy);
   };
 
   await pyodide.runPythonAsync(`
