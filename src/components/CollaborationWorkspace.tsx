@@ -708,9 +708,9 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                               type="button"
                               className="effort-option-info"
                               onClick={(e) => { e.stopPropagation() }}
-                              title={level.desc}
                             >
                               <Info size={13} />
+                              <span className="effort-tooltip">{level.desc}</span>
                             </button>
                           </div>
                         ))}
