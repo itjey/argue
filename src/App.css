@@ -5006,7 +5006,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  height: 50vh;
+  /* height set via inline style */
   background: #0e0e0e;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
   display: flex;
@@ -5019,6 +5019,57 @@
 @keyframes panel-slide-up {
   from { transform: translateY(100%); }
   to   { transform: translateY(0); }
+}
+
+/* Drag handle at top of panel for resizing */
+.code-runner-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 8px;
+  cursor: row-resize;
+  flex-shrink: 0;
+  background: transparent;
+  transition: background 120ms ease;
+}
+.code-runner-drag-handle:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.code-runner-drag-bar {
+  width: 36px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.15);
+  transition: background 120ms ease;
+}
+.code-runner-drag-handle:hover .code-runner-drag-bar {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Minimized tab in bottom-left to restore terminal */
+.code-runner-minimized-tab {
+  position: fixed;
+  bottom: 0;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  color: rgba(255, 255, 255, 0.55);
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+  font-size: 0.72rem;
+  cursor: pointer;
+  z-index: 499;
+  transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+.code-runner-minimized-tab:hover {
+  color: rgba(255, 255, 255, 0.85);
+  background: #222;
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .code-runner-header {

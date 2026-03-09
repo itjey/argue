@@ -1,17 +1,67 @@
-import { useState, useRef, useEffect, type ReactNode, type KeyboardEvent } from 'react'
+import { useState, useRef, useEffect, useCallback, type ReactNode, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { Play, X, Loader, RotateCcw } from 'lucide-react'
+import { Play, X, Loader, RotateCcw, Terminal } from 'lucide-react'
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Panel coordination — only one output panel open at a time
    ═══════════════════════════════════════════════════════════════════════════ */
 let closeActivePanel: (() => void) | null = null
-function registerPanel(closer: () => void) {
+let reopenActivePanel: (() => void) | null = null
+let hasMinimizedPanel = false
+let minimizedListeners: Array<(v: boolean) => void> = []
+
+function notifyMinimized(v: boolean) {
+  hasMinimizedPanel = v
+  minimizedListeners.forEach(fn => fn(v))
+}
+
+function registerPanel(closer: () => void, reopener: () => void) {
   if (closeActivePanel && closeActivePanel !== closer) closeActivePanel()
   closeActivePanel = closer
+  reopenActivePanel = reopener
+  notifyMinimized(false)
 }
-function unregisterPanel(closer: () => void) {
-  if (closeActivePanel === closer) closeActivePanel = null
+function minimizePanel() {
+  notifyMinimized(true)
+}
+function tryReopen() {
+  if (reopenActivePanel) {
+    reopenActivePanel()
+    notifyMinimized(false)
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Minimized tab — rendered once via a dedicated component
+   ═══════════════════════════════════════════════════════════════════════════ */
+function MinimizedTab() {
+  const [visible, setVisible] = useState(hasMinimizedPanel)
+  useEffect(() => {
+    minimizedListeners.push(setVisible)
+    return () => { minimizedListeners = minimizedListeners.filter(fn => fn !== setVisible) }
+  }, [])
+  if (!visible) return null
+  return createPortal(
+    <button className="code-runner-minimized-tab" type="button" onClick={tryReopen} title="Restore terminal">
+      <Terminal size={13} />
+      <span>Terminal</span>
+    </button>,
+    document.body
+  )
+}
+
+// Mount the minimized tab once
+let _minimizedMounted = false
+function ensureMinimizedTab() {
+  if (_minimizedMounted) return
+  _minimizedMounted = true
+  const el = document.createElement('div')
+  el.id = 'minimized-tab-root'
+  document.body.appendChild(el)
+  // Use React 19 createRoot
+  import('react-dom/client').then(({ createRoot }) => {
+    createRoot(el).render(<MinimizedTab />)
+  })
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -278,10 +328,26 @@ export function CodeBlock({ code, langId, label, children }: Props) {
   const [htmlContent, setHtmlContent] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
+  // Resizable panel height (in vh)
+  const [panelHeight, setPanelHeight] = useState(50)
+  const draggingRef = useRef(false)
+
   const termBottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  const closeFnRef = useRef<() => void>(() => setOpen(false))
-  closeFnRef.current = () => setOpen(false)
+
+  // Mount minimized tab singleton on first render
+  useEffect(() => { ensureMinimizedTab() }, [])
+
+  const reopenFn = useCallback(() => setOpen(true), [])
+  const closeFnRef = useRef<() => void>(() => {})
+  closeFnRef.current = () => {
+    setOpen(false)
+    // Stop running code when closing
+    setRunning(false)
+    setInputPrompt(null)
+    _onStdout = null; _onStderr = null; _onInputReq = null; _onDone = null
+    minimizePanel()
+  }
 
   // Auto-scroll terminal
   useEffect(() => {
@@ -293,7 +359,33 @@ export function CodeBlock({ code, langId, label, children }: Props) {
     if (inputPrompt !== null || (running && open)) inputRef.current?.focus()
   }, [inputPrompt, running, open])
 
-  function close() { setOpen(false); unregisterPanel(closeFnRef.current) }
+  function close() { closeFnRef.current() }
+
+  // Drag-to-resize handler
+  function onDragStart(e: ReactMouseEvent) {
+    e.preventDefault()
+    draggingRef.current = true
+    const startY = e.clientY
+    const startH = panelHeight
+
+    const onMove = (ev: globalThis.MouseEvent) => {
+      if (!draggingRef.current) return
+      const deltaVh = ((startY - ev.clientY) / window.innerHeight) * 100
+      const newH = Math.max(15, Math.min(85, startH + deltaVh))
+      setPanelHeight(newH)
+    }
+    const onUp = () => {
+      draggingRef.current = false
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    document.body.style.cursor = 'row-resize'
+    document.body.style.userSelect = 'none'
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
 
   function appendLine(kind: TermLine['kind'], text: string) {
     setLines(prev => {
@@ -308,7 +400,7 @@ export function CodeBlock({ code, langId, label, children }: Props) {
   }
 
   async function run() {
-    registerPanel(closeFnRef.current)
+    registerPanel(closeFnRef.current, reopenFn)
     setOpen(true)
     setRunning(true)
     setLines([])
@@ -462,7 +554,11 @@ except: []
   const showTerminal = !htmlContent && (lines.length > 0 || plots.length > 0 || running || exitCode !== null || errorMsg !== null)
 
   const panel = open ? createPortal(
-    <div className="code-runner-panel">
+    <div className="code-runner-panel" style={{ height: `${panelHeight}vh` }}>
+      {/* Drag handle for resizing */}
+      <div className="code-runner-drag-handle" onMouseDown={onDragStart}>
+        <div className="code-runner-drag-bar" />
+      </div>
       <div className="code-runner-header">
         <span className="code-runner-title">{label || 'Output'}</span>
         <div className="code-runner-header-actions">
