@@ -8,6 +8,7 @@ import {
   type OpenRouterModel,
   type OpenRouterChatMessage,
   type OpenRouterReasoningEffort,
+  type OpenRouterUrlCitation,
 } from '../lib/openrouter'
 import { MarkdownBlock } from './RichMessageContent'
 import {
@@ -19,6 +20,7 @@ import {
 import { ModelStatsPanel } from './ModelStatsPanel'
 
 const OPENROUTER_KEY_STORAGE = 'argue-openrouter-api-key'
+const WEB_SEARCH_PREFERENCES_STORAGE = 'argue-web-search-preferences'
 
 const SYSTEM_PROMPT = `You are a helpful assistant. Format your responses using Markdown.
 
@@ -53,6 +55,12 @@ interface ChatMessage {
   thinkingStart?: number
   thinkingDuration?: number
   stoppedThinking?: boolean   // true if user stopped during thinking phase
+  webSearch?: {
+    enabled: boolean
+    approximateQuery: string
+    citations: OpenRouterUrlCitation[]
+    searching: boolean
+  }
 }
 
 declare global {
@@ -115,6 +123,101 @@ function buildApiMessages(messages: ChatMessage[]): OpenRouterChatMessage[] {
   return [{ role: 'system', content: SYSTEM_PROMPT }, ...history]
 }
 
+type WebSearchModelCategory = 'free' | 'metered' | 'unsupported'
+
+function formatWebSearchPrice(value: number | null) {
+  if (value == null || !Number.isFinite(value)) {
+    return 'Web search'
+  }
+
+  if (value === 0) {
+    return 'Free web search'
+  }
+
+  return `$${value.toFixed(value >= 0.1 ? 2 : 3).replace(/0+$/, '').replace(/\.$/, '')}/search`
+}
+
+function getWebSearchModelProfile(model: OpenRouterModel | null) {
+  if (!model) {
+    return {
+      supported: false,
+      category: 'unsupported' as WebSearchModelCategory,
+      price: null,
+      priceLabel: 'Web search unavailable',
+      providerLabel: 'Standard',
+    }
+  }
+
+  const rawPrice = model.pricing?.web_search
+
+  if (rawPrice == null) {
+    return {
+      supported: false,
+      category: 'unsupported' as WebSearchModelCategory,
+      price: null,
+      priceLabel: 'Web search unavailable',
+      providerLabel: model.id.split('/')[0],
+    }
+  }
+
+  const numericPrice = Number(rawPrice)
+  const category: WebSearchModelCategory = numericPrice === 0 ? 'free' : 'metered'
+
+  return {
+    supported: true,
+    category,
+    price: Number.isFinite(numericPrice) ? numericPrice : null,
+    priceLabel: formatWebSearchPrice(Number.isFinite(numericPrice) ? numericPrice : null),
+    providerLabel: model.id.split('/')[0],
+  }
+}
+
+function getCitationHost(url: string) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return url
+  }
+}
+
+function readWebSearchPreferences() {
+  if (typeof window === 'undefined') {
+    return {} as Record<string, boolean>
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(WEB_SEARCH_PREFERENCES_STORAGE)
+
+    if (!rawValue) {
+      return {} as Record<string, boolean>
+    }
+
+    const parsed = JSON.parse(rawValue) as Record<string, unknown>
+
+    return Object.fromEntries(
+      Object.entries(parsed).filter((entry): entry is [string, boolean] => typeof entry[1] === 'boolean'),
+    )
+  } catch {
+    return {} as Record<string, boolean>
+  }
+}
+
+function writeWebSearchPreference(modelId: string, enabled: boolean) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  const nextPreferences = {
+    ...readWebSearchPreferences(),
+    [modelId]: enabled,
+  }
+
+  window.localStorage.setItem(
+    WEB_SEARCH_PREFERENCES_STORAGE,
+    JSON.stringify(nextPreferences),
+  )
+}
+
 export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [prompt, setPrompt] = useState('')
@@ -125,6 +228,7 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set())
   const [reasoningEffort, setReasoningEffort] = useState<OpenRouterReasoningEffort>('high')
+  const [webSearchEnabled, setWebSearchEnabled] = useState(true)
   const [effortOpen, setEffortOpen] = useState(false)
   const effortDropRef = useRef<HTMLDivElement>(null)
 
@@ -172,6 +276,28 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
   useEffect(() => {
     if (modelOpen) setTimeout(() => modelSearchRef.current?.focus(), 40)
   }, [modelOpen])
+
+  useEffect(() => {
+    const profile = getWebSearchModelProfile(selectedModel)
+
+    if (!selectedModel || !profile.supported) {
+      setWebSearchEnabled(false)
+      return
+    }
+
+    const savedPreferences = readWebSearchPreferences()
+    setWebSearchEnabled(savedPreferences[selectedModel.id] ?? true)
+  }, [selectedModel])
+
+  useEffect(() => {
+    const profile = getWebSearchModelProfile(selectedModel)
+
+    if (!selectedModel || !profile.supported) {
+      return
+    }
+
+    writeWebSearchPreference(selectedModel.id, webSearchEnabled)
+  }, [selectedModel, webSearchEnabled])
 
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -279,11 +405,29 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
     const reasoningConfig = style === 'effort' ? { effort: reasoningEffort } : undefined
 
     const isReasoningModel = style !== 'none'
+    const selectedWebSearchProfile = getWebSearchModelProfile(selectedModel)
+    const webSearchRequested = selectedWebSearchProfile.supported && webSearchEnabled
+    const approximateSearchQuery = userMsg.content.trim() || 'Attached content'
     const assistantId = crypto.randomUUID()
     const thinkingStart = Date.now()
     setMessages((prev) => [
       ...prev,
-      { id: assistantId, role: 'assistant', content: '', streaming: true, thinkingStart, isReasoningModel },
+      {
+        id: assistantId,
+        role: 'assistant',
+        content: '',
+        streaming: true,
+        thinkingStart,
+        isReasoningModel,
+        webSearch: webSearchRequested
+          ? {
+              enabled: true,
+              approximateQuery: approximateSearchQuery,
+              citations: [],
+              searching: true,
+            }
+          : undefined,
+      },
     ])
     setStreaming(true)
     abortedRef.current = false
@@ -291,12 +435,16 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
     const apiMessages = buildApiMessages([...historyBefore, userMsg])
 
     try {
-      await createOpenRouterChatCompletionStream({
+      const finalReply = await createOpenRouterChatCompletionStream({
         apiKey,
         model: selectedModel.id,
         messages: apiMessages,
         includeReasoning,
         reasoning: reasoningConfig,
+        plugins: webSearchRequested ? [{ id: 'web' }] : undefined,
+        webSearchOptions: webSearchRequested
+          ? { search_context_size: 'high' }
+          : undefined,
         onProgress: (reply) => {
           if (abortedRef.current) return
           setMessages((prev) =>
@@ -306,7 +454,22 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                 reply.text && !m.thinkingDuration
                   ? Date.now() - (m.thinkingStart ?? thinkingStart)
                   : m.thinkingDuration
-              return { ...m, content: reply.text, reasoning: reply.reasoning || m.reasoning, thinkingDuration }
+              return {
+                ...m,
+                content: reply.text,
+                reasoning: reply.reasoning || m.reasoning,
+                thinkingDuration,
+                webSearch: m.webSearch
+                  ? {
+                      ...m.webSearch,
+                      citations:
+                        reply.citations.length > 0
+                          ? reply.citations
+                          : m.webSearch.citations,
+                      searching: !reply.text && reply.citations.length === 0,
+                    }
+                  : undefined,
+              }
             })
           )
         },
@@ -315,7 +478,23 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId
-              ? { ...m, streaming: false, thinkingDuration: m.thinkingDuration ?? (Date.now() - thinkingStart) }
+              ? {
+                  ...m,
+                  content: finalReply.text,
+                  reasoning: finalReply.reasoning || m.reasoning,
+                  streaming: false,
+                  thinkingDuration: m.thinkingDuration ?? (Date.now() - thinkingStart),
+                  webSearch: m.webSearch
+                    ? {
+                        ...m.webSearch,
+                        citations:
+                          finalReply.citations.length > 0
+                            ? finalReply.citations
+                            : m.webSearch.citations,
+                        searching: false,
+                      }
+                    : undefined,
+                }
               : m
           )
         )
@@ -325,7 +504,15 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
         const msg = err instanceof Error ? err.message : 'An error occurred.'
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === assistantId ? { ...m, content: msg, streaming: false, error: true } : m
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: msg,
+                  streaming: false,
+                  error: true,
+                  webSearch: m.webSearch ? { ...m.webSearch, searching: false } : undefined,
+                }
+              : m
           )
         )
       }
@@ -384,6 +571,7 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
           streaming: false,
           stoppedThinking: !m.content && m.isReasoningModel,
           thinkingDuration: m.thinkingDuration ?? (m.thinkingStart ? Date.now() - m.thinkingStart : undefined),
+          webSearch: m.webSearch ? { ...m.webSearch, searching: false } : undefined,
         }
       })
     })
@@ -410,12 +598,38 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
   const supportsFiles = selectedModel ? isMultimodal(selectedModel) : false
   const hasMessages = messages.length > 0
   const reasoningStyle = selectedModel ? getReasoningStyle(selectedModel) : 'none'
+  const selectedWebSearchProfile = getWebSearchModelProfile(selectedModel)
+  const supportsWebSearch = selectedWebSearchProfile.supported
 
   const filteredModels = modelSearch.trim()
     ? models.filter((m) =>
         m.name.toLowerCase().includes(modelSearch.toLowerCase()) ||
         m.id.toLowerCase().includes(modelSearch.toLowerCase()))
     : models
+
+  const groupedModels = [
+    {
+      key: 'free',
+      label: 'Web search included',
+      models: filteredModels.filter(
+        (model) => getWebSearchModelProfile(model).category === 'free',
+      ),
+    },
+    {
+      key: 'metered',
+      label: 'Web search available',
+      models: filteredModels.filter(
+        (model) => getWebSearchModelProfile(model).category === 'metered',
+      ),
+    },
+    {
+      key: 'unsupported',
+      label: 'No OpenRouter web search',
+      models: filteredModels.filter(
+        (model) => getWebSearchModelProfile(model).category === 'unsupported',
+      ),
+    },
+  ].filter((group) => group.models.length > 0)
 
   let statsEntry: OpenRouterModelStatsEntry | null = null
   if (statsSnapshot && infoModel) statsEntry = resolveOpenRouterModelStats(statsSnapshot, infoModel)
@@ -532,6 +746,38 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                           {isThinkingExpanded && (
                             <div className="chat-thinking-content">
                               <MarkdownBlock>{normalizeReasoningText(msg.reasoning ?? '')}</MarkdownBlock>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {msg.webSearch?.enabled && (
+                        <div className="chat-web-search-panel">
+                          <div className="chat-web-search-header">
+                            <span className="chat-web-search-badge">Web search</span>
+                            <span className="chat-web-search-state">
+                              {msg.webSearch.searching
+                                ? 'Searching OpenRouter web sources'
+                                : msg.webSearch.citations.length > 0
+                                  ? `${msg.webSearch.citations.length} sources used`
+                                  : 'Search enabled'}
+                            </span>
+                          </div>
+                          <p className="chat-web-search-query">{msg.webSearch.approximateQuery}</p>
+                          {msg.webSearch.citations.length > 0 && (
+                            <div className="chat-web-search-results">
+                              {msg.webSearch.citations.slice(0, 6).map((citation) => (
+                                <a
+                                  key={`${citation.url}-${citation.start_index ?? 'na'}`}
+                                  className="chat-web-result"
+                                  href={citation.url}
+                                  rel="noreferrer"
+                                  target="_blank"
+                                >
+                                  <strong>{citation.title || getCitationHost(citation.url)}</strong>
+                                  <span>{citation.content?.trim() || 'Open source'}</span>
+                                  <small>{getCitationHost(citation.url)}</small>
+                                </a>
+                              ))}
                             </div>
                           )}
                         </div>
@@ -653,32 +899,51 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                         {filteredModels.length === 0 && (
                           <p className="model-list-empty">No models found</p>
                         )}
-                        {filteredModels.map((m) => (
-                          <div
-                            key={m.id}
-                            className={`model-list-item${selectedModel?.id === m.id ? ' model-list-item-active' : ''}`}
-                          >
-                            <button
-                              className="model-list-select"
-                              type="button"
-                              onClick={() => {
-                                setSelectedModel(m)
-                                setModelOpen(false)
-                                setModelSearch('')
-                                if (!isMultimodal(m)) setAttachments([])
-                              }}
-                            >
-                              <span className="model-list-name">{m.name}</span>
-                              <span className="model-list-id">{m.id}</span>
-                            </button>
-                            <button
-                              className="model-list-info-btn"
-                              type="button"
-                              onClick={(e) => openInfoPanel(e, m)}
-                              aria-label={`Info for ${m.name}`}
-                            >
-                              <Info size={13} />
-                            </button>
+                        {groupedModels.map((group) => (
+                          <div key={group.key} className="model-list-group">
+                            <p className="model-list-group-label">{group.label}</p>
+                            {group.models.map((m) => {
+                              const webSearchProfile = getWebSearchModelProfile(m)
+
+                              return (
+                                <div
+                                  key={m.id}
+                                  className={`model-list-item${selectedModel?.id === m.id ? ' model-list-item-active' : ''}`}
+                                >
+                                  <button
+                                    className="model-list-select"
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedModel(m)
+                                      setModelOpen(false)
+                                      setModelSearch('')
+                                      if (!isMultimodal(m)) setAttachments([])
+                                    }}
+                                  >
+                                    <span className="model-list-name">{m.name}</span>
+                                    <span className="model-list-id">{m.id}</span>
+                                    <div className="model-list-badges">
+                                      {webSearchProfile.supported && (
+                                        <span className={`model-list-badge${webSearchProfile.category === 'free' ? ' model-list-badge-free' : ' model-list-badge-metered'}`}>
+                                          {webSearchProfile.priceLabel}
+                                        </span>
+                                      )}
+                                      <span className="model-list-badge model-list-badge-provider">
+                                        {webSearchProfile.providerLabel}
+                                      </span>
+                                    </div>
+                                  </button>
+                                  <button
+                                    className="model-list-info-btn"
+                                    type="button"
+                                    onClick={(e) => openInfoPanel(e, m)}
+                                    aria-label={`Info for ${m.name}`}
+                                  >
+                                    <Info size={13} />
+                                  </button>
+                                </div>
+                              )
+                            })}
                           </div>
                         ))}
                       </div>
@@ -732,6 +997,18 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                       </div>
                     )}
                   </div>
+                )}
+
+                {supportsWebSearch && (
+                  <button
+                    className={`prompt-pill-btn${webSearchEnabled ? ' prompt-pill-btn-active' : ''}`}
+                    type="button"
+                    onClick={() => setWebSearchEnabled((value) => !value)}
+                    title={selectedWebSearchProfile.priceLabel}
+                  >
+                    <Search size={15} />
+                    <span>{webSearchEnabled ? 'Web on' : 'Web off'}</span>
+                  </button>
                 )}
               </div>
 

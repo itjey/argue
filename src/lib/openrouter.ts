@@ -76,12 +76,34 @@ type OpenRouterVideoContentPart = {
   }
 }
 
+type OpenRouterUrlCitation = {
+  url: string
+  title?: string
+  content?: string
+  start_index?: number
+  end_index?: number
+}
+
+type OpenRouterCitationContentPart = {
+  type: 'citation'
+  url_citation: OpenRouterUrlCitation
+}
+
 type OpenRouterChatContentPart =
   | OpenRouterTextContentPart
   | OpenRouterImageContentPart
   | OpenRouterFileContentPart
   | OpenRouterAudioContentPart
   | OpenRouterVideoContentPart
+  | OpenRouterCitationContentPart
+
+type OpenRouterPlugin = {
+  id: string
+}
+
+type OpenRouterWebSearchOptions = {
+  search_context_size?: 'low' | 'medium' | 'high'
+}
 
 type OpenRouterReasoningDetail =
   | {
@@ -194,6 +216,7 @@ type OpenRouterChatResponse = {
 type OpenRouterAssistantReply = {
   text: string
   contentParts: OpenRouterChatContentPart[]
+  citations: OpenRouterUrlCitation[]
   images: string[]
   audio: OpenRouterAssistantAudio | null
   reasoning: string
@@ -212,6 +235,8 @@ type CreateOpenRouterChatCompletionOptions = {
   modalities?: OpenRouterOutputModality[]
   reasoning?: OpenRouterReasoningConfig
   imageConfig?: Record<string, number | string | Array<unknown>>
+  plugins?: OpenRouterPlugin[]
+  webSearchOptions?: OpenRouterWebSearchOptions
 }
 
 type CreateOpenRouterChatCompletionStreamOptions =
@@ -281,6 +306,21 @@ function extractContentParts(
   return []
 }
 
+function extractCitations(
+  content: string | OpenRouterChatContentPart[] | null | undefined,
+) {
+  if (!Array.isArray(content)) {
+    return []
+  }
+
+  return content
+    .filter(
+      (part): part is OpenRouterCitationContentPart => part.type === 'citation',
+    )
+    .map((part) => part.url_citation)
+    .filter((citation) => Boolean(citation?.url))
+}
+
 function extractAssistantReply(response: OpenRouterChatResponse) {
   const message = response.choices?.[0]?.message
 
@@ -290,6 +330,7 @@ function extractAssistantReply(response: OpenRouterChatResponse) {
 
   const contentParts = extractContentParts(message.content)
   const text = extractChatText(message.content)
+  const citations = extractCitations(message.content)
   const images = (message.images ?? [])
     .map((entry) => entry.image_url?.url?.trim() ?? '')
     .filter(Boolean)
@@ -312,6 +353,7 @@ function extractAssistantReply(response: OpenRouterChatResponse) {
   return {
     text,
     contentParts,
+    citations,
     images,
     audio: message.audio ?? null,
     reasoning,
@@ -320,6 +362,36 @@ function extractAssistantReply(response: OpenRouterChatResponse) {
     phase: message.phase ?? null,
     usage: response.usage ?? null,
   } satisfies OpenRouterAssistantReply
+}
+
+function getCitationKey(citation: OpenRouterUrlCitation) {
+  return [
+    citation.url,
+    citation.title ?? '',
+    citation.start_index ?? '',
+    citation.end_index ?? '',
+  ].join('::')
+}
+
+function appendUniqueCitations(
+  currentCitations: OpenRouterUrlCitation[],
+  nextCitations: OpenRouterUrlCitation[],
+) {
+  const seenValues = new Set(currentCitations.map(getCitationKey))
+  const mergedValues = [...currentCitations]
+
+  for (const citation of nextCitations) {
+    const key = getCitationKey(citation)
+
+    if (!citation.url || seenValues.has(key)) {
+      continue
+    }
+
+    seenValues.add(key)
+    mergedValues.push(citation)
+  }
+
+  return mergedValues
 }
 
 function appendUniqueStrings(currentValues: string[], nextValues: string[]) {
@@ -443,6 +515,7 @@ function createEmptyAssistantReply(): OpenRouterAssistantReply {
   return {
     text: '',
     contentParts: [],
+    citations: [],
     images: [],
     audio: null,
     reasoning: '',
@@ -484,6 +557,10 @@ function applyStreamDelta(
           },
         ]
       : [],
+    citations: appendUniqueCitations(
+      currentReply.citations,
+      extractCitations(delta.content),
+    ),
     images: appendUniqueStrings(
       currentReply.images,
       (delta.images ?? [])
@@ -545,6 +622,8 @@ async function createOpenRouterChatCompletion({
   modalities,
   reasoning,
   imageConfig,
+  plugins,
+  webSearchOptions,
 }: CreateOpenRouterChatCompletionOptions) {
   const response = await fetch(OPENROUTER_CHAT_URL, {
     method: 'POST',
@@ -557,6 +636,8 @@ async function createOpenRouterChatCompletion({
       modalities,
       reasoning,
       image_config: imageConfig,
+      plugins,
+      web_search_options: webSearchOptions,
     }),
   })
 
@@ -581,6 +662,8 @@ async function createOpenRouterChatCompletionStream({
   onProgress,
   reasoning,
   imageConfig,
+  plugins,
+  webSearchOptions,
 }: CreateOpenRouterChatCompletionStreamOptions) {
   const response = await fetch(OPENROUTER_CHAT_URL, {
     method: 'POST',
@@ -594,6 +677,8 @@ async function createOpenRouterChatCompletionStream({
       modalities,
       reasoning,
       image_config: imageConfig,
+      plugins,
+      web_search_options: webSearchOptions,
     }),
   })
 
@@ -751,9 +836,12 @@ export type {
   OpenRouterInputModality,
   OpenRouterModel,
   OpenRouterOutputModality,
+  OpenRouterPlugin,
   OpenRouterReasoningDetail,
   OpenRouterReasoningEffort,
   OpenRouterReasoningConfig,
   OpenRouterTokenDetails,
+  OpenRouterUrlCitation,
   OpenRouterUsage,
+  OpenRouterWebSearchOptions,
 }
