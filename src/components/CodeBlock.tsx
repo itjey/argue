@@ -354,10 +354,14 @@ export function CodeBlock({ code, langId, label, children }: Props) {
     termBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [lines, plots, inputPrompt])
 
-  // Focus input when it appears or when panel opens
+  // Keep interactive input focused while waiting for stdin.
   useEffect(() => {
-    if (inputPrompt !== null || (running && open)) inputRef.current?.focus()
-  }, [inputPrompt, running, open])
+    if (open && inputPrompt !== null) inputRef.current?.focus()
+  }, [open, inputPrompt])
+
+  function focusLiveInput() {
+    if (inputPrompt !== null) inputRef.current?.focus()
+  }
 
   function close() { closeFnRef.current() }
 
@@ -585,7 +589,7 @@ except: []
         {/* ── Terminal ── */}
         {(showTerminal || (isPython && running) || !htmlContent) && (
           <div className="code-terminal">
-            <div className="code-terminal-output">
+            <div className="code-terminal-output" onMouseDown={focusLiveInput}>
               {lines.map((l, i) => (
                 <div key={i} className={`code-terminal-line code-terminal-${l.kind}`}>{l.text}</div>
               ))}
@@ -599,27 +603,23 @@ except: []
               {!running && exitCode !== null && exitCode === 0 && (
                 <div className="code-terminal-exit" style={{ color: 'rgba(80, 255, 120, 0.45)' }}>Process exited with code 0</div>
               )}
+              {inputPrompt !== null ? (
+                <label className="code-terminal-line code-terminal-live-input">
+                  {inputPrompt ? <span className="code-terminal-input-prompt">{inputPrompt}</span> : null}
+                  <input
+                    ref={inputRef}
+                    className="code-terminal-input code-terminal-input-inline"
+                    value={inputDraft}
+                    onChange={e => setInputDraft(e.target.value)}
+                    onKeyDown={onInputKey}
+                    autoComplete="off"
+                    spellCheck={false}
+                    aria-label={inputPrompt || 'Terminal input'}
+                  />
+                </label>
+              ) : null}
               <div ref={termBottomRef} />
             </div>
-
-            {/* Always-visible terminal input during execution */}
-            {running ? (
-              <div className="code-terminal-input-row">
-                <span className="code-terminal-input-caret">{'>'}</span>
-                {inputPrompt && <span className="code-terminal-input-prompt">{inputPrompt}</span>}
-                <input
-                  ref={inputRef}
-                  className="code-terminal-input"
-                  value={inputDraft}
-                  onChange={e => setInputDraft(e.target.value)}
-                  onKeyDown={onInputKey}
-                  autoComplete="off"
-                  spellCheck={false}
-                  placeholder={inputPrompt !== null ? '' : 'Waiting for program...'}
-                  disabled={inputPrompt === null}
-                />
-              </div>
-            ) : null}
           </div>
         )}
 

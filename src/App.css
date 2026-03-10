@@ -5164,6 +5164,13 @@
   min-height: 1.3em;
 }
 
+.code-terminal-live-input {
+  display: flex;
+  align-items: baseline;
+  cursor: text;
+  white-space: normal;
+}
+
 .code-terminal-out  { color: rgba(255, 255, 255, 0.82); }
 .code-terminal-err  { color: rgba(255, 100, 80, 0.9); }
 .code-terminal-echo { color: rgba(255, 255, 255, 0.55); }
@@ -5174,29 +5181,7 @@
   color: rgba(255, 100, 80, 0.55);
 }
 
-/* Input row — always visible at the bottom of terminal during execution */
-.code-terminal-input-row {
-  display: flex;
-  align-items: baseline;
-  padding: 0.45rem 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.02);
-  flex-shrink: 0;
-  gap: 0;
-  font-family: 'SF Mono', 'Fira Mono', 'JetBrains Mono', monospace;
-  font-size: 0.82rem;
-  line-height: 1.6;
-  flex-wrap: nowrap;
-  min-height: calc(1.3em + 0.9rem);
-}
-
-.code-terminal-input-caret {
-  color: rgba(80, 255, 120, 0.7);
-  margin-right: 0.4rem;
-  flex-shrink: 0;
-  line-height: inherit;
-}
-
+/* Inline prompt + input rendered inside the terminal stream */
 .code-terminal-input-prompt {
   color: rgba(255, 255, 255, 0.75);
   white-space: pre;
@@ -5220,6 +5205,10 @@
   min-height: 1.3em;
   height: auto;
   align-self: baseline;
+}
+
+.code-terminal-input-inline {
+  flex: 1 1 8ch;
 }
 
 /* Running status bar at bottom */
