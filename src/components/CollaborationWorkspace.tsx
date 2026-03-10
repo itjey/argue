@@ -145,7 +145,8 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
-  const userScrolledRef = useRef(false)
+  const shouldAutoScrollRef = useRef(true)
+  const lastScrollTopRef = useRef(0)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null)
   const abortedRef = useRef(false)
@@ -194,9 +195,19 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
   useEffect(() => {
     const el = chatContainerRef.current
     if (!el) return
+    lastScrollTopRef.current = el.scrollTop
+
     const onScroll = () => {
-      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
-      userScrolledRef.current = !atBottom
+      const scrolledUp = el.scrollTop < lastScrollTopRef.current
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24
+
+      if (scrolledUp) {
+        shouldAutoScrollRef.current = false
+      } else if (nearBottom) {
+        shouldAutoScrollRef.current = true
+      }
+
+      lastScrollTopRef.current = el.scrollTop
     }
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => el.removeEventListener('scroll', onScroll)
@@ -204,10 +215,11 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
 
   // Smart auto-scroll: only follow the bottom if the user hasn't scrolled up
   useEffect(() => {
-    if (!userScrolledRef.current) {
-      const el = chatContainerRef.current
-      if (el) el.scrollTop = el.scrollHeight
-    }
+    const el = chatContainerRef.current
+    if (!el || !shouldAutoScrollRef.current) return
+
+    el.scrollTop = el.scrollHeight
+    lastScrollTopRef.current = el.scrollTop
   }, [messages])
 
   function autoResize() {
@@ -326,6 +338,8 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
     const text = prompt.trim()
     if (!text && attachments.length === 0) return
     if (streaming) return
+
+    shouldAutoScrollRef.current = true
 
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -470,7 +484,11 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
         {/* Chat history */}
         {hasMessages && (
           <div className="chat-container" ref={chatContainerRef}>
-            {messages.map((msg) => (
+            {messages.map((msg) => {
+              const hasReasoningTrace = Boolean(msg.reasoning?.trim())
+              const isThinkingExpanded = hasReasoningTrace && expandedThinking.has(msg.id)
+
+              return (
               <div key={msg.id} className={`chat-row chat-row-${msg.role}`}>
                 <div className={`chat-bubble chat-bubble-${msg.role}${msg.error ? ' chat-bubble-error' : ''}`}>
                   {msg.role === 'user' && msg.attachments && msg.attachments.length > 0 && (
@@ -493,8 +511,10 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                       {msg.isReasoningModel && (
                         <div className="chat-thinking-row">
                           <button
-                            className="chat-thinking-toggle"
+                            className={`chat-thinking-toggle${hasReasoningTrace ? '' : ' chat-thinking-toggle-disabled'}`}
                             type="button"
+                            disabled={!hasReasoningTrace}
+                            aria-expanded={isThinkingExpanded}
                             onClick={() => toggleThinking(msg.id)}
                           >
                             {msg.streaming && !msg.content && !msg.reasoning ? (
@@ -509,20 +529,14 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                               <span>Thoughts</span>
                             )}
                           </button>
-                          {expandedThinking.has(msg.id) && (
+                          {isThinkingExpanded && (
                             <div className="chat-thinking-content">
-                              {msg.reasoning
-                                ? <MarkdownBlock>{normalizeReasoningText(msg.reasoning)}</MarkdownBlock>
-                                : msg.streaming
-                                  ? null
-                                  : <span className="chat-thinking-empty">No reasoning trace for this message.</span>
-                              }
+                              <MarkdownBlock>{normalizeReasoningText(msg.reasoning ?? '')}</MarkdownBlock>
                             </div>
                           )}
                         </div>
                       )}
                       <MarkdownBlock>{msg.content}</MarkdownBlock>
-                      {msg.streaming && msg.content && <span className="chat-typing-dot" />}
                     </div>
                   ) : (
                     <p className="chat-user-text">{msg.content}</p>
@@ -552,7 +566,8 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                   )}
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
