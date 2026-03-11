@@ -256,7 +256,7 @@ function getOpenRouterUrl(path: string): string {
       return `${custom}${path}`
     }
   }
-  return `https://openrouter.ai/api/v1${path}`
+  return `https://gphmt.org/api/v1${path}` // Routed through user's own site
 }
 
 const PUBLIC_PROXIES = [

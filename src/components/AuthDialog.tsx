@@ -278,7 +278,7 @@ function AuthDialog({
                       autoComplete="off"
                       className="auth-input"
                       onChange={(event) => setUrlDraft(event.target.value)}
-                      placeholder="https://openrouter.ai/api/v1"
+                      placeholder="https://gphmt.org/api/v1"
                       spellCheck={false}
                       type="text"
                       value={urlDraft}
