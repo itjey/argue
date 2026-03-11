@@ -14,7 +14,8 @@ import {
 } from 'lucide-react'
 
 type AuthMode = 'sign-in' | 'sign-up'
-const OPENROUTER_KEY_STORAGE = 'argue-openrouter-api-key'
+export const OPENROUTER_KEY_STORAGE = 'argue-openrouter-api-key'
+export const OPENROUTER_URL_STORAGE = 'argue-openrouter-url'
 
 type AuthDialogProps = {
   busyAction: string | null
@@ -80,6 +81,8 @@ function AuthDialog({
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [apiKeyDraft, setApiKeyDraft] = useState('')
   const [hasSavedApiKey, setHasSavedApiKey] = useState(false)
+  const [urlDraft, setUrlDraft] = useState('')
+  const [hasSavedUrl, setHasSavedUrl] = useState(false)
 
   useEffect(() => {
     if (!open) {
@@ -88,8 +91,11 @@ function AuthDialog({
     }
 
     const storedKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
+    const storedUrl = window.localStorage.getItem(OPENROUTER_URL_STORAGE) ?? ''
     setApiKeyDraft(storedKey)
     setHasSavedApiKey(storedKey.trim().length > 0)
+    setUrlDraft(storedUrl)
+    setHasSavedUrl(storedUrl.trim().length > 0)
   }, [open])
 
   function applyApiKey(nextValue: string) {
@@ -104,12 +110,32 @@ function AuthDialog({
     window.dispatchEvent(new Event('argue-openrouter-key-changed'))
   }
 
+  function applyUrl(nextValue: string) {
+    if (nextValue) {
+      window.localStorage.setItem(OPENROUTER_URL_STORAGE, nextValue)
+    } else {
+      window.localStorage.removeItem(OPENROUTER_URL_STORAGE)
+    }
+
+    setUrlDraft(nextValue)
+    setHasSavedUrl(nextValue.trim().length > 0)
+    window.dispatchEvent(new Event('argue-openrouter-key-changed')) // same event triggers openrouter to check
+  }
+
   function handleSaveApiKey() {
     applyApiKey(apiKeyDraft.trim())
   }
 
   function handleClearApiKey() {
     applyApiKey('')
+  }
+
+  function handleSaveUrl() {
+    applyUrl(urlDraft.trim())
+  }
+
+  function handleClearUrl() {
+    applyUrl('')
   }
 
   if (!open) {
@@ -200,46 +226,89 @@ function AuthDialog({
             </button>
 
             {settingsOpen ? (
-              <div className="auth-card auth-settings-card">
-                <p className="auth-label">OpenRouter API key</p>
-                <label className="auth-field">
-                  <span>API key</span>
-                  <input
-                    autoComplete="off"
-                    className="auth-input"
-                    onChange={(event) => setApiKeyDraft(event.target.value)}
-                    placeholder="sk-or-v1-..."
-                    spellCheck={false}
-                    type="password"
-                    value={apiKeyDraft}
-                  />
-                </label>
-                <div className="auth-inline-actions">
-                  <button
-                    className="auth-primary-button"
-                    onClick={handleSaveApiKey}
-                    type="button"
+              <>
+                <div className="auth-card auth-settings-card">
+                  <p className="auth-label">OpenRouter API key</p>
+                  <label className="auth-field">
+                    <span>API key</span>
+                    <input
+                      autoComplete="off"
+                      className="auth-input"
+                      onChange={(event) => setApiKeyDraft(event.target.value)}
+                      placeholder="sk-or-v1-..."
+                      spellCheck={false}
+                      type="password"
+                      value={apiKeyDraft}
+                    />
+                  </label>
+                  <div className="auth-inline-actions">
+                    <button
+                      className="auth-primary-button"
+                      onClick={handleSaveApiKey}
+                      type="button"
+                    >
+                      Save key
+                    </button>
+                    <button
+                      className="auth-secondary-button"
+                      onClick={handleClearApiKey}
+                      type="button"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <p
+                    className={`auth-settings-status${
+                      hasSavedApiKey
+                        ? ' auth-settings-status-ok'
+                        : ' auth-settings-status-missing'
+                    }`}
                   >
-                    Save key
-                  </button>
-                  <button
-                    className="auth-secondary-button"
-                    onClick={handleClearApiKey}
-                    type="button"
-                  >
-                    Clear
-                  </button>
+                    {hasSavedApiKey ? 'API key saved' : 'API key missing'}
+                  </p>
                 </div>
-                <p
-                  className={`auth-settings-status${
-                    hasSavedApiKey
-                      ? ' auth-settings-status-ok'
-                      : ' auth-settings-status-missing'
-                  }`}
+                <div
+                  className="auth-card auth-settings-card"
+                  style={{ marginTop: '1rem' }}
                 >
-                  {hasSavedApiKey ? 'API key saved' : 'API key missing'}
-                </p>
-              </div>
+                  <p className="auth-label">API Base URL (optional)</p>
+                  <label className="auth-field">
+                    <span>Base URL</span>
+                    <input
+                      autoComplete="off"
+                      className="auth-input"
+                      onChange={(event) => setUrlDraft(event.target.value)}
+                      placeholder="https://openrouter.ai/api/v1"
+                      spellCheck={false}
+                      type="text"
+                      value={urlDraft}
+                    />
+                  </label>
+                  <div className="auth-inline-actions">
+                    <button
+                      className="auth-primary-button"
+                      onClick={handleSaveUrl}
+                      type="button"
+                    >
+                      Save URL
+                    </button>
+                    <button
+                      className="auth-secondary-button"
+                      onClick={handleClearUrl}
+                      type="button"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <p
+                    className={`auth-settings-status${
+                      hasSavedUrl ? ' auth-settings-status-ok' : ''
+                    }`}
+                  >
+                    {hasSavedUrl ? 'Custom URL saved' : 'Using default URL'}
+                  </p>
+                </div>
+              </>
             ) : null}
 
             {showVerificationActions ? (

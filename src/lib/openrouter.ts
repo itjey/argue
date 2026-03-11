@@ -244,9 +244,60 @@ type CreateOpenRouterChatCompletionStreamOptions =
     onProgress?: (reply: OpenRouterAssistantReply) => void
   }
 
-const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models'
-const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions'
 const APP_TITLE = 'Argue'
+
+export const OPENROUTER_URL_STORAGE = 'argue-openrouter-url'
+
+function getOpenRouterUrl(path: string): string {
+  if (typeof window !== 'undefined') {
+    let custom = window.localStorage.getItem(OPENROUTER_URL_STORAGE)
+    if (custom && custom.trim().length > 0) {
+      custom = custom.trim().replace(/\/+$/, '')
+      return `${custom}${path}`
+    }
+  }
+  return `https://openrouter.ai/api/v1${path}`
+}
+
+const PUBLIC_PROXIES = [
+  '', // Direct
+  'https://corsproxy.io/?' // Proxy fallback
+]
+
+async function fetchOpenRouter(path: string, options: RequestInit): Promise<Response> {
+  const custom = typeof window !== 'undefined' ? window.localStorage.getItem(OPENROUTER_URL_STORAGE) : null
+  
+  if (custom && custom.trim().length > 0) {
+    return fetch(getOpenRouterUrl(path), options)
+  }
+
+  let lastError: unknown
+  let lastResponse: Response | null = null
+
+  // Fallback through known methods if no custom URL is provided
+  for (const proxy of PUBLIC_PROXIES) {
+    try {
+      const url = proxy ? `${proxy}${getOpenRouterUrl(path)}` : getOpenRouterUrl(path)
+      const response = await fetch(url, options)
+      lastResponse = response
+
+      // Sometimes school proxies return 200 with an HTML block page
+      const contentType = response.headers.get('content-type') || ''
+      if (response.ok && contentType.includes('text/html')) {
+        throw new Error('Received HTML instead of API response (Firewall/Proxy block)')
+      }
+
+      // If it actually hit OpenRouter (or we get a typical API error like 400), return it
+      return response
+    } catch (error) {
+      lastError = error
+      console.warn(`[OpenRouter] Failed to fetch via proxy: ${proxy || 'direct'}`, error)
+    }
+  }
+
+  if (lastResponse) return lastResponse
+  throw lastError || new Error('Failed to fetch from OpenRouter')
+}
 
 function getAppOrigin() {
   if (typeof window === 'undefined') {
@@ -593,7 +644,7 @@ function extractSsePayload(rawEvent: string) {
 }
 
 async function fetchOpenRouterModels() {
-  const response = await fetch(OPENROUTER_MODELS_URL, {
+  const response = await fetchOpenRouter('/models', {
     headers: requestHeaders(),
   })
 
@@ -625,7 +676,7 @@ async function createOpenRouterChatCompletion({
   plugins,
   webSearchOptions,
 }: CreateOpenRouterChatCompletionOptions) {
-  const response = await fetch(OPENROUTER_CHAT_URL, {
+  const response = await fetchOpenRouter('/chat/completions', {
     method: 'POST',
     headers: requestHeaders(apiKey),
     body: JSON.stringify({
@@ -665,7 +716,7 @@ async function createOpenRouterChatCompletionStream({
   plugins,
   webSearchOptions,
 }: CreateOpenRouterChatCompletionStreamOptions) {
-  const response = await fetch(OPENROUTER_CHAT_URL, {
+  const response = await fetchOpenRouter('/chat/completions', {
     method: 'POST',
     headers: requestHeaders(apiKey),
     body: JSON.stringify({
