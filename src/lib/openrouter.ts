@@ -321,6 +321,22 @@ function requestHeaders(apiKey?: string) {
   return headers
 }
 
+function normalizeOpenRouterModel(model: OpenRouterModel): OpenRouterModel {
+  return {
+    ...model,
+    name: model.name?.trim() || model.id,
+    description: model.description?.trim() || 'No description available yet.',
+  }
+}
+
+async function getBundledOpenRouterModels() {
+  const { BUNDLED_OPENROUTER_MODELS } = await import('./openrouterCatalog')
+
+  return BUNDLED_OPENROUTER_MODELS.map((model) =>
+    normalizeOpenRouterModel(model as OpenRouterModel),
+  ).sort((left, right) => left.name.localeCompare(right.name))
+}
+
 function extractChatText(
   content: string | OpenRouterChatContentPart[] | null | undefined,
 ) {
@@ -644,24 +660,28 @@ function extractSsePayload(rawEvent: string) {
 }
 
 async function fetchOpenRouterModels() {
-  const response = await fetchOpenRouter('/models', {
-    headers: requestHeaders(),
-  })
+  try {
+    const response = await fetchOpenRouter('/models', {
+      headers: requestHeaders(),
+    })
 
-  if (!response.ok) {
-    throw new Error('OpenRouter model catalog could not be loaded right now.')
+    if (!response.ok) {
+      throw new Error('OpenRouter model catalog could not be loaded right now.')
+    }
+
+    const payload = (await response.json()) as OpenRouterModelsResponse
+    const models = (payload.data ?? [])
+      .filter((model): model is OpenRouterModel => Boolean(model?.id))
+      .map((model) => normalizeOpenRouterModel(model))
+
+    if (models.length > 0) {
+      return models.sort((left, right) => left.name.localeCompare(right.name))
+    }
+  } catch (error) {
+    console.warn('[OpenRouter] Falling back to bundled model catalog.', error)
   }
 
-  const payload = (await response.json()) as OpenRouterModelsResponse
-  const models = (payload.data ?? [])
-    .filter((model): model is OpenRouterModel => Boolean(model?.id))
-    .map((model) => ({
-      ...model,
-      name: model.name?.trim() || model.id,
-      description: model.description?.trim() || 'No description available yet.',
-    }))
-
-  return models.sort((left, right) => left.name.localeCompare(right.name))
+  return getBundledOpenRouterModels()
 }
 
 async function createOpenRouterChatCompletion({
