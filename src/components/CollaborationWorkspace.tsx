@@ -77,6 +77,40 @@ function isMultimodal(model: OpenRouterModel) {
   return inputs.some((m) => m === 'image' || m === 'file')
 }
 
+function buildFallbackModelsFromStats(snapshot: OpenRouterStatsSnapshot) {
+  return snapshot.models
+    .map((entry) => {
+      const primaryEndpoint = entry.endpointStats[0]
+      const nameParts = primaryEndpoint?.name?.split(' | ')
+
+      return {
+        id: entry.id,
+        canonical_slug: entry.canonicalSlug,
+        name: nameParts?.[1]?.trim() || entry.canonicalSlug || entry.id,
+        description:
+          primaryEndpoint?.providerDisplayName
+            ? `Bundled snapshot fallback via ${primaryEndpoint.providerDisplayName}`
+            : 'Bundled snapshot fallback',
+        context_length: primaryEndpoint?.contextLength ?? undefined,
+        pricing: primaryEndpoint
+          ? {
+              prompt: String(primaryEndpoint.pricing.prompt),
+              completion: String(primaryEndpoint.pricing.completion),
+            }
+          : undefined,
+        top_provider: primaryEndpoint
+          ? {
+              context_length: primaryEndpoint.contextLength ?? undefined,
+              max_completion_tokens:
+                primaryEndpoint.maxCompletionTokens ?? undefined,
+              is_moderated: primaryEndpoint.moderationRequired,
+            }
+          : undefined,
+      } satisfies OpenRouterModel
+    })
+    .sort((left, right) => left.name.localeCompare(right.name))
+}
+
 type ReasoningStyle = 'effort' | 'include' | 'none'
 
 /** Determine how this model surfaces reasoning to callers.
@@ -248,7 +282,31 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
   const abortedRef = useRef(false)
 
   useEffect(() => {
-    fetchOpenRouterModels().then((list) => setModels(list)).catch(() => {})
+    let cancelled = false
+
+    fetchOpenRouterModels()
+      .then((list) => {
+        if (!cancelled) {
+          setModels(list)
+        }
+      })
+      .catch(async () => {
+        try {
+          const snapshot = await fetchOpenRouterStatsSnapshot()
+
+          if (!cancelled) {
+            setModels(buildFallbackModelsFromStats(snapshot))
+          }
+        } catch {
+          if (!cancelled) {
+            setModels([])
+          }
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
