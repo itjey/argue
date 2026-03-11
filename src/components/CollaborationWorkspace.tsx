@@ -111,6 +111,57 @@ function buildFallbackModelsFromStats(snapshot: OpenRouterStatsSnapshot) {
     .sort((left, right) => left.name.localeCompare(right.name))
 }
 
+const EMERGENCY_FALLBACK_MODELS: OpenRouterModel[] = [
+  {
+    id: 'openai/gpt-4o-mini',
+    canonical_slug: 'openai/gpt-4o-mini',
+    name: 'GPT-4o Mini',
+    description: 'Built-in fallback model list.',
+  },
+  {
+    id: 'openai/gpt-4.1-mini',
+    canonical_slug: 'openai/gpt-4.1-mini',
+    name: 'GPT-4.1 Mini',
+    description: 'Built-in fallback model list.',
+  },
+  {
+    id: 'anthropic/claude-3.7-sonnet',
+    canonical_slug: 'anthropic/claude-3.7-sonnet',
+    name: 'Claude 3.7 Sonnet',
+    description: 'Built-in fallback model list.',
+  },
+  {
+    id: 'google/gemini-2.0-flash-001',
+    canonical_slug: 'google/gemini-2.0-flash-001',
+    name: 'Gemini 2.0 Flash',
+    description: 'Built-in fallback model list.',
+  },
+  {
+    id: 'meta-llama/llama-3.3-70b-instruct',
+    canonical_slug: 'meta-llama/llama-3.3-70b-instruct',
+    name: 'Llama 3.3 70B Instruct',
+    description: 'Built-in fallback model list.',
+  },
+  {
+    id: 'deepseek/deepseek-chat-v3-0324',
+    canonical_slug: 'deepseek/deepseek-chat-v3-0324',
+    name: 'DeepSeek Chat V3 0324',
+    description: 'Built-in fallback model list.',
+  },
+  {
+    id: 'qwen/qwen-2.5-72b-instruct',
+    canonical_slug: 'qwen/qwen-2.5-72b-instruct',
+    name: 'Qwen 2.5 72B Instruct',
+    description: 'Built-in fallback model list.',
+  },
+  {
+    id: 'mistralai/mistral-small-3.1-24b-instruct',
+    canonical_slug: 'mistralai/mistral-small-3.1-24b-instruct',
+    name: 'Mistral Small 3.1 24B Instruct',
+    description: 'Built-in fallback model list.',
+  },
+]
+
 type ReasoningStyle = 'effort' | 'include' | 'none'
 
 /** Determine how this model surfaces reasoning to callers.
@@ -299,7 +350,7 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
           }
         } catch {
           if (!cancelled) {
-            setModels([])
+            setModels(EMERGENCY_FALLBACK_MODELS)
           }
         }
       })
@@ -308,6 +359,12 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    if (!selectedModel && models.length > 0) {
+      setSelectedModel(models[0])
+    }
+  }, [models, selectedModel])
 
   useEffect(() => {
     function onPointerDown(e: PointerEvent) {
