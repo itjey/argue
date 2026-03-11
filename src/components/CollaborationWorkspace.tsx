@@ -10,6 +10,11 @@ import {
   type OpenRouterReasoningEffort,
   type OpenRouterUrlCitation,
 } from '../lib/openrouter'
+import {
+  GPHMT_GATEWAY_PASSWORD_STORAGE,
+  GPHMT_GATEWAY_USER_STORAGE,
+  OPENROUTER_KEY_STORAGE,
+} from '../lib/openrouterStorage'
 import { MarkdownBlock } from './RichMessageContent'
 import {
   fetchOpenRouterStatsSnapshot,
@@ -19,7 +24,6 @@ import {
 } from '../lib/openrouterStats'
 import { ModelStatsPanel } from './ModelStatsPanel'
 
-const OPENROUTER_KEY_STORAGE = 'argue-openrouter-api-key'
 const WEB_SEARCH_PREFERENCES_STORAGE = 'argue-web-search-preferences'
 
 const SYSTEM_PROMPT = `You are a helpful assistant. Format your responses using Markdown.
@@ -402,7 +406,13 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
 
   async function runStream(historyBefore: ChatMessage[], userMsg: ChatMessage) {
     const apiKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
-    if (!apiKey.trim() || !selectedModel) return
+    const gatewayUser = window.localStorage.getItem(GPHMT_GATEWAY_USER_STORAGE) ?? ''
+    const gatewayPassword =
+      window.localStorage.getItem(GPHMT_GATEWAY_PASSWORD_STORAGE) ?? ''
+
+    if ((!apiKey.trim() && (!gatewayUser.trim() || !gatewayPassword.trim())) || !selectedModel) {
+      return
+    }
 
     const style = getReasoningStyle(selectedModel)
     const includeReasoning = style !== 'none'

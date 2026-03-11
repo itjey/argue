@@ -51,6 +51,11 @@ import {
   hasPasswordProvider,
   syncUserProfile,
 } from './lib/firebase'
+import {
+  GPHMT_GATEWAY_PASSWORD_STORAGE,
+  GPHMT_GATEWAY_USER_STORAGE,
+  OPENROUTER_KEY_STORAGE,
+} from './lib/openrouterStorage'
 import './App.css'
 
 type FeatureCard = {
@@ -90,8 +95,6 @@ type PendingGoogleLink = {
   credential: OAuthCredential
   email: string
 }
-
-const OPENROUTER_KEY_STORAGE = 'argue-openrouter-api-key'
 
 function buildVerificationUrl() {
   return `${window.location.origin}${import.meta.env.BASE_URL}`
@@ -371,7 +374,14 @@ function App() {
   useEffect(() => {
     const syncSavedApiKey = () => {
       const storedKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
-      setHasSavedApiKey(storedKey.trim().length > 0)
+      const storedGatewayUser =
+        window.localStorage.getItem(GPHMT_GATEWAY_USER_STORAGE) ?? ''
+      const storedGatewayPassword =
+        window.localStorage.getItem(GPHMT_GATEWAY_PASSWORD_STORAGE) ?? ''
+      setHasSavedApiKey(
+        storedKey.trim().length > 0 ||
+          (storedGatewayUser.trim().length > 0 && storedGatewayPassword.trim().length > 0),
+      )
     }
 
     const handleVisibilityChange = () => {
@@ -853,7 +863,7 @@ function App() {
               <strong>{currentUser.email ?? 'Account'}</strong>
               {!hasSavedApiKey ? (
                 <small className="topbar-api-key-warning">
-                  Add API key in Settings
+                  Add API key or gateway in Settings
                 </small>
               ) : !isVerified ? (
                 <small className="topbar-account-warning">Unverified account</small>
