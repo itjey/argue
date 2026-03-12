@@ -5420,13 +5420,54 @@
   left: clamp(1rem, 8vw, 7rem);
   display: flex;
   flex-direction: column;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 1rem;
-  background: #0e0e0e;
-  box-shadow: -12px 0 44px rgba(0, 0, 0, 0.4);
+  background: #030303;
+  box-shadow:
+    -18px 0 52px rgba(0, 0, 0, 0.62),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02);
   overflow: hidden;
   z-index: 500;
   animation: panel-slide-left 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.latex-workspace-restore-tab {
+  position: fixed;
+  top: 50%;
+  right: 0.75rem;
+  z-index: 505;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 11rem;
+  padding: 0.95rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.9rem;
+  background: rgba(3, 3, 3, 0.96);
+  box-shadow: -10px 0 28px rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.74);
+  cursor: pointer;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: translateY(-50%);
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    transform 120ms ease;
+}
+
+.latex-workspace-restore-tab:hover {
+  background: rgba(8, 8, 8, 0.98);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.94);
+  transform: translateY(-50%) translateX(-2px);
+}
+
+.latex-workspace-restore-tab:focus-visible {
+  outline: 2px solid rgba(96, 165, 250, 0.38);
+  outline-offset: 2px;
 }
 
 .latex-workspace-header {
@@ -5435,8 +5476,8 @@
   justify-content: space-between;
   gap: 1rem;
   padding: 0.75rem 0.85rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.015);
 }
 
 .latex-workspace-heading {
@@ -5452,13 +5493,13 @@
   font-size: 0.72rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.38);
+  color: rgba(255, 255, 255, 0.34);
   font-family: 'SF Mono', 'Fira Mono', monospace;
 }
 
 .latex-workspace-title {
   font-size: 0.92rem;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .latex-workspace-actions {
@@ -5478,9 +5519,9 @@
   min-height: 2rem;
   padding: 0.45rem 0.8rem;
   border-radius: 0.55rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.8);
   font-size: 0.78rem;
   text-decoration: none;
   cursor: pointer;
@@ -5489,8 +5530,8 @@
 
 .latex-workspace-btn:hover,
 .latex-workspace-toggle:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.16);
   color: rgba(255, 255, 255, 0.95);
 }
 
@@ -5501,14 +5542,14 @@
 }
 
 .latex-workspace-btn-primary {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(96, 165, 250, 0.12);
+  border-color: rgba(96, 165, 250, 0.22);
   color: rgba(255, 255, 255, 0.96);
 }
 
 .latex-workspace-toggle-on {
-  background: rgba(96, 165, 250, 0.16);
-  border-color: rgba(96, 165, 250, 0.28);
+  background: rgba(96, 165, 250, 0.14);
+  border-color: rgba(96, 165, 250, 0.24);
   color: rgba(219, 234, 254, 0.95);
 }
 
@@ -5519,7 +5560,7 @@
   gap: 0.75rem;
   padding: 0.55rem 0.85rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.015);
+  background: rgba(255, 255, 255, 0.01);
   color: rgba(255, 255, 255, 0.52);
   font-size: 0.79rem;
 }
@@ -5533,7 +5574,7 @@
   display: flex;
   flex: 1;
   min-height: 0;
-  background: linear-gradient(180deg, #121316 0%, #0a0b0d 100%);
+  background: linear-gradient(180deg, #080808 0%, #020202 100%);
 }
 
 .latex-workspace-pane {
@@ -5555,7 +5596,7 @@
 .latex-workspace-log-header {
   padding: 0.55rem 0.75rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.015);
 }
 
 .latex-workspace-editor {
@@ -5565,7 +5606,7 @@
   border: none;
   outline: none;
   resize: none;
-  background: #0b0d12;
+  background: #040404;
   color: rgba(255, 255, 255, 0.9);
   padding: 1rem;
   font-family: 'SF Mono', 'Fira Mono', 'JetBrains Mono', monospace;
@@ -5579,7 +5620,7 @@
   min-height: 9.5rem;
   max-height: 34%;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: #090a0d;
+  background: #020202;
 }
 
 .latex-workspace-log pre {
@@ -5601,19 +5642,19 @@
   align-items: center;
   justify-content: center;
   cursor: col-resize;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.015), rgba(255, 255, 255, 0.04));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.01), rgba(255, 255, 255, 0.025));
 }
 
 .latex-workspace-splitter-handle {
   width: 4px;
   height: 58px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.14);
   transition: background 120ms ease;
 }
 
 .latex-workspace-splitter:hover .latex-workspace-splitter-handle {
-  background: rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.26);
 }
 
 .latex-workspace-preview-shell {
@@ -5623,7 +5664,7 @@
   min-height: 0;
   gap: 0.75rem;
   padding: 1rem;
-  background: linear-gradient(180deg, #1a1b20 0%, #0f1014 100%);
+  background: linear-gradient(180deg, #090909 0%, #040404 100%);
 }
 
 .latex-workspace-banner {
@@ -5631,8 +5672,8 @@
   gap: 0.4rem;
   padding: 0.75rem 0.85rem;
   border-radius: 0.8rem;
-  border: 1px solid rgba(255, 110, 90, 0.22);
-  background: rgba(127, 29, 29, 0.16);
+  border: 1px solid rgba(255, 110, 90, 0.18);
+  background: rgba(76, 12, 12, 0.42);
   color: rgba(255, 228, 221, 0.92);
 }
 
@@ -5652,10 +5693,10 @@
   width: 100%;
   border: none;
   border-radius: 0.9rem;
-  background: #edf0f5;
+  background: #141414;
   box-shadow:
-    inset 0 0 0 1px rgba(15, 23, 42, 0.08),
-    0 20px 40px rgba(0, 0, 0, 0.28);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 20px 40px rgba(0, 0, 0, 0.3);
 }
 
 .latex-workspace-placeholder {
@@ -5667,9 +5708,9 @@
   gap: 0.6rem;
   padding: 1.2rem;
   border-radius: 0.9rem;
-  border: 1px dashed rgba(255, 255, 255, 0.14);
+  border: 1px dashed rgba(255, 255, 255, 0.12);
   color: rgba(255, 255, 255, 0.46);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.02);
   text-align: center;
 }
 
@@ -5679,6 +5720,11 @@
     right: 0.75rem;
     bottom: 0.75rem;
     left: 0.75rem;
+  }
+
+  .latex-workspace-restore-tab {
+    right: 0.5rem;
+    min-height: 9.5rem;
   }
 }
 

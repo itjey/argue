@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, type ReactNode, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { Play, X, Loader, RotateCcw, Terminal } from 'lucide-react'
+import { ChevronLeft, Play, X, Loader, RotateCcw, Terminal } from 'lucide-react'
 import { LatexWorkspacePanel } from './LatexWorkspacePanel'
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -323,6 +323,7 @@ export function CodeBlock({ code, langId, label, children }: Props) {
   const [running, setRunning] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
   const [open, setOpen] = useState(false)
+  const [latexMinimized, setLatexMinimized] = useState(false)
 
   // Terminal state
   const [lines, setLines] = useState<TermLine[]>([])
@@ -339,19 +340,28 @@ export function CodeBlock({ code, langId, label, children }: Props) {
 
   const termBottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const normalizedLangId = langId.toLowerCase()
+  const isPython = normalizedLangId === 'python' || normalizedLangId === 'py'
+  const isLatex = LATEX_LANGS.has(normalizedLangId)
 
   // Mount minimized tab singleton on first render
   useEffect(() => { ensureMinimizedTab() }, [])
 
-  const reopenFn = useCallback(() => setOpen(true), [])
+  const reopenFn = useCallback(() => {
+    setLatexMinimized(false)
+    setOpen(true)
+  }, [])
   const closeFnRef = useRef<() => void>(() => {})
   closeFnRef.current = () => {
     setOpen(false)
+    setLatexMinimized(false)
     // Stop running code when closing
     setRunning(false)
     setInputPrompt(null)
     _onStdout = null; _onStderr = null; _onInputReq = null; _onDone = null
-    minimizePanel()
+    if (!isLatex) {
+      minimizePanel()
+    }
   }
 
   // Auto-scroll terminal
@@ -410,6 +420,7 @@ export function CodeBlock({ code, langId, label, children }: Props) {
 
   async function run() {
     registerPanel(closeFnRef.current, reopenFn)
+    setLatexMinimized(false)
     setOpen(true)
 
     const id = langId.toLowerCase()
@@ -563,21 +574,48 @@ except: []
   }
 
   const runnable = isRunnable(langId)
-  const normalizedLangId = langId.toLowerCase()
-  const isPython = normalizedLangId === 'python' || normalizedLangId === 'py'
-  const isLatex = LATEX_LANGS.has(normalizedLangId)
   const showTerminal =
     !preview &&
     (lines.length > 0 || plots.length > 0 || running || exitCode !== null || errorMsg !== null)
   const panelTitle = label || 'Output'
 
+  function hideLatexWorkspace() {
+    setOpen(false)
+    setLatexMinimized(true)
+  }
+
+  function restoreLatexWorkspace() {
+    registerPanel(closeFnRef.current, reopenFn)
+    setLatexMinimized(false)
+    setOpen(true)
+  }
+
   const panel = isLatex ? (
-    <LatexWorkspacePanel
-      initialSource={code}
-      label={label}
-      onClose={close}
-      open={open}
-    />
+    <>
+      {open || latexMinimized ? (
+        <LatexWorkspacePanel
+          hidden={latexMinimized}
+          initialSource={code}
+          label={label}
+          onHide={hideLatexWorkspace}
+          open={open || latexMinimized}
+        />
+      ) : null}
+      {latexMinimized
+        ? createPortal(
+            <button
+              className="latex-workspace-restore-tab"
+              type="button"
+              onClick={restoreLatexWorkspace}
+              title="Restore LaTeX workspace"
+            >
+              <ChevronLeft size={14} />
+              <span>{label || 'LaTeX'}</span>
+            </button>,
+            document.body,
+          )
+        : null}
+    </>
   ) : open ? createPortal(
     <div
       className="code-runner-panel"

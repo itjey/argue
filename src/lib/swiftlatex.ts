@@ -1,32 +1,13 @@
-const SWIFTLATEX_WORKER_SOURCE_URL = 'https://www.swiftlatex.com/swiftlatexxetex.js'
-const SWIFTLATEX_WASM_URL = 'https://www.swiftlatex.com/swiftlatexxetex.wasm'
-const SWIFTLATEX_TEXLIVE_ENDPOINT = 'https://texlive2.swiftlatex.com/'
-const SWIFTLATEX_WORKER_PATCH_TOKEN = 'var Module={};'
-const SWIFTLATEX_MAIN_FILE = 'main.tex'
-
-type SwiftLatexWorkerCommand = 'writefile' | 'mkdir'
-
-type SwiftLatexWorkerInitMessage = {
-  result: string
-}
-
-type SwiftLatexWorkerAckMessage = {
-  cmd: SwiftLatexWorkerCommand
-  result: 'ok' | 'failed'
-}
-
-type SwiftLatexWorkerCompileMessage = {
-  cmd: 'compile'
-  log: string
-  pdf?: ArrayBuffer
-  result: 'ok' | 'failed'
-  status: number
-}
-
-type SwiftLatexWorkerMessage =
-  | SwiftLatexWorkerInitMessage
-  | SwiftLatexWorkerAckMessage
-  | SwiftLatexWorkerCompileMessage
+const BUSYTEX_BASE_PATH = `${import.meta.env.BASE_URL}core/busytex`
+const BUSYTEX_PRELOAD_PACKAGE_FILES = [
+  'texlive-basic.js',
+  'texlive-latex-base_texlive-latex-recommended_texlive-science_texlive-fonts-recommended.js',
+  'texlive-latex-extra.js',
+] as const
+const BUSYTEX_AVAILABLE_PACKAGE_URLS = BUSYTEX_PRELOAD_PACKAGE_FILES.map(
+  (fileName) => `${BUSYTEX_BASE_PATH}/${fileName}`,
+)
+const BUSYTEX_MAIN_FILE = 'main.tex'
 
 type LatexCompileResult = {
   log: string
@@ -34,72 +15,91 @@ type LatexCompileResult = {
   status: number
 }
 
+type BusyTexInitMessage = {
+  initialized: unknown
+}
+
+type BusyTexPrintMessage = {
+  print: string
+}
+
+type BusyTexExceptionMessage = {
+  exception: string
+}
+
+type BusyTexCompileLogEntry = {
+  aux: string
+  cmd: string
+  exit_code: number
+  log: string
+  missfontlog: string
+  stderr: string
+  stdout: string
+  texmflog: string
+}
+
+type BusyTexCompileMessage = {
+  exit_code: number
+  log: string
+  logs: BusyTexCompileLogEntry[]
+  pdf?: Uint8Array
+  synctex?: Uint8Array
+}
+
+type BusyTexWorkerMessage =
+  | BusyTexInitMessage
+  | BusyTexPrintMessage
+  | BusyTexExceptionMessage
+  | BusyTexCompileMessage
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-function isWorkerAckMessage(
-  value: unknown,
-  command: SwiftLatexWorkerCommand,
-): value is SwiftLatexWorkerAckMessage {
-  return (
-    isRecord(value) &&
-    value.cmd === command &&
-    (value.result === 'ok' || value.result === 'failed')
-  )
+function isBusyTexInitMessage(value: unknown): value is BusyTexInitMessage {
+  return isRecord(value) && 'initialized' in value
 }
 
-function isWorkerCompileMessage(value: unknown): value is SwiftLatexWorkerCompileMessage {
+function isBusyTexPrintMessage(value: unknown): value is BusyTexPrintMessage {
+  return isRecord(value) && typeof value.print === 'string'
+}
+
+function isBusyTexExceptionMessage(value: unknown): value is BusyTexExceptionMessage {
+  return isRecord(value) && typeof value.exception === 'string'
+}
+
+function isBusyTexCompileMessage(value: unknown): value is BusyTexCompileMessage {
   return (
     isRecord(value) &&
-    value.cmd === 'compile' &&
+    typeof value.exit_code === 'number' &&
     typeof value.log === 'string' &&
-    typeof value.status === 'number' &&
-    (value.result === 'ok' || value.result === 'failed')
+    Array.isArray(value.logs)
   )
 }
 
-function patchWorkerScript(workerSource: string) {
-  if (!workerSource.includes(SWIFTLATEX_WORKER_PATCH_TOKEN)) {
-    throw new Error('SwiftLaTeX worker format changed unexpectedly.')
-  }
-
-  const modulePatch = `var Module={locateFile:function(path){return path.endsWith(".wasm")?${JSON.stringify(SWIFTLATEX_WASM_URL)}:path;}};`
-
-  return workerSource.replace(SWIFTLATEX_WORKER_PATCH_TOKEN, modulePatch)
+function toPdfBuffer(data: Uint8Array) {
+  const copy = new Uint8Array(data.byteLength)
+  copy.set(data)
+  return copy.buffer
 }
 
-let swiftLatexWorkerBlobUrlPromise: Promise<string> | null = null
+function buildCompileLog(message: BusyTexCompileMessage, prints: string[]) {
+  const sections = [
+    ...prints,
+    message.log,
+    ...message.logs.flatMap((entry) =>
+      [entry.stdout, entry.stderr, entry.log, entry.texmflog, entry.aux, entry.missfontlog]
+        .map((section) => section.trim())
+        .filter(Boolean),
+    ),
+  ]
 
-async function getSwiftLatexWorkerBlobUrl() {
-  if (!swiftLatexWorkerBlobUrlPromise) {
-    swiftLatexWorkerBlobUrlPromise = (async () => {
-      const response = await fetch(SWIFTLATEX_WORKER_SOURCE_URL)
+  const log = sections.join('\n\n').trim()
 
-      if (!response.ok) {
-        throw new Error(`Failed to download LaTeX engine (${response.status}).`)
-      }
-
-      const workerSource = await response.text()
-      const patchedWorkerSource = patchWorkerScript(workerSource)
-
-      return URL.createObjectURL(
-        new Blob([patchedWorkerSource], { type: 'application/javascript' }),
-      )
-    })().catch((error) => {
-      swiftLatexWorkerBlobUrlPromise = null
-      throw error
-    })
-  }
-
-  return swiftLatexWorkerBlobUrlPromise
+  return log || `Compilation finished with exit code ${message.exit_code}.`
 }
 
-function isInitMessage(value: unknown): value is SwiftLatexWorkerInitMessage {
-  return isRecord(value) && typeof value.result === 'string' && !('cmd' in value)
-}
-
-class SwiftLatexEngine {
+class BusyTexEngine {
   private compileQueue: Promise<unknown> = Promise.resolve()
   private readyWorkerPromise: Promise<Worker> | null = null
   private worker: Worker | null = null
@@ -111,10 +111,7 @@ class SwiftLatexEngine {
 
     if (!this.readyWorkerPromise) {
       this.readyWorkerPromise = this.createWorker().catch((error) => {
-        if (this.worker) {
-          this.worker.terminate()
-        }
-
+        this.worker?.terminate()
         this.worker = null
         this.readyWorkerPromise = null
         throw error
@@ -125,27 +122,31 @@ class SwiftLatexEngine {
   }
 
   private async createWorker() {
-    const workerBlobUrl = await getSwiftLatexWorkerBlobUrl()
-    const worker = new Worker(workerBlobUrl)
+    const worker = new Worker(`${BUSYTEX_BASE_PATH}/busytex_worker.js`)
 
     await new Promise<void>((resolve, reject) => {
-      const handleMessage = (event: MessageEvent<SwiftLatexWorkerMessage>) => {
-        if (!isInitMessage(event.data)) {
+      const handleMessage = (event: MessageEvent<BusyTexWorkerMessage>) => {
+        if (isBusyTexPrintMessage(event.data)) {
+          return
+        }
+
+        if (isBusyTexExceptionMessage(event.data)) {
+          cleanup()
+          reject(new Error(event.data.exception))
+          return
+        }
+
+        if (!isBusyTexInitMessage(event.data)) {
           return
         }
 
         cleanup()
-
-        if (event.data.result === 'ok') {
-          resolve()
-        } else {
-          reject(new Error('Failed to initialize the XeTeX engine.'))
-        }
+        resolve()
       }
 
-      const handleError = () => {
+      const handleError = (event: ErrorEvent) => {
         cleanup()
-        reject(new Error('Failed to initialize the XeTeX engine.'))
+        reject(new Error(event.message || 'Failed to initialize BusyTeX.'))
       }
 
       const cleanup = () => {
@@ -155,93 +156,72 @@ class SwiftLatexEngine {
 
       worker.addEventListener('message', handleMessage)
       worker.addEventListener('error', handleError)
+      worker.postMessage({
+        busytex_js: `${BUSYTEX_BASE_PATH}/busytex.js`,
+        busytex_wasm: `${BUSYTEX_BASE_PATH}/busytex.wasm`,
+        data_packages_js: BUSYTEX_AVAILABLE_PACKAGE_URLS,
+        preload: true,
+        preload_data_packages_js: BUSYTEX_AVAILABLE_PACKAGE_URLS,
+        texmf_local: [],
+      })
     })
 
-    worker.postMessage({ cmd: 'settexliveurl', url: SWIFTLATEX_TEXLIVE_ENDPOINT })
     this.worker = worker
 
     return worker
   }
 
-  private async sendCommandForAck(
-    worker: Worker,
-    command: { cmd: SwiftLatexWorkerCommand; url: string; src?: string | Uint8Array },
-  ) {
-    return new Promise<void>((resolve, reject) => {
-      const handleMessage = (event: MessageEvent<SwiftLatexWorkerMessage>) => {
-        if (!isWorkerAckMessage(event.data, command.cmd)) {
-          return
-        }
-
-        cleanup()
-
-        if (event.data.result === 'ok') {
-          resolve()
-        } else {
-          reject(new Error(`LaTeX engine failed while handling ${command.cmd}.`))
-        }
-      }
-
-      const handleError = () => {
-        cleanup()
-        reject(new Error(`LaTeX engine failed while handling ${command.cmd}.`))
-      }
-
-      const cleanup = () => {
-        worker.removeEventListener('message', handleMessage)
-        worker.removeEventListener('error', handleError)
-      }
-
-      worker.addEventListener('message', handleMessage)
-      worker.addEventListener('error', handleError)
-      worker.postMessage(command)
-    })
-  }
-
-  private async sendCompileCommand(worker: Worker) {
-    return new Promise<LatexCompileResult>((resolve, reject) => {
-      const handleMessage = (event: MessageEvent<SwiftLatexWorkerMessage>) => {
-        if (!isWorkerCompileMessage(event.data)) {
-          return
-        }
-
-        cleanup()
-
-        resolve({
-          log: event.data.log,
-          pdf: event.data.result === 'ok' && event.data.pdf ? event.data.pdf : null,
-          status: event.data.status,
-        })
-      }
-
-      const handleError = () => {
-        cleanup()
-        reject(new Error('The XeTeX worker crashed during compilation.'))
-      }
-
-      const cleanup = () => {
-        worker.removeEventListener('message', handleMessage)
-        worker.removeEventListener('error', handleError)
-      }
-
-      worker.addEventListener('message', handleMessage)
-      worker.addEventListener('error', handleError)
-      worker.postMessage({ cmd: 'compilelatex' })
-    })
-  }
-
   private async compileInternal(source: string) {
     const worker = await this.getWorker()
 
-    worker.postMessage({ cmd: 'flushcache' })
-    await this.sendCommandForAck(worker, {
-      cmd: 'writefile',
-      src: source,
-      url: SWIFTLATEX_MAIN_FILE,
-    })
-    worker.postMessage({ cmd: 'setmainfile', url: SWIFTLATEX_MAIN_FILE })
+    return new Promise<LatexCompileResult>((resolve, reject) => {
+      const prints: string[] = []
 
-    return this.sendCompileCommand(worker)
+      const handleMessage = (event: MessageEvent<BusyTexWorkerMessage>) => {
+        if (isBusyTexPrintMessage(event.data)) {
+          prints.push(event.data.print)
+          return
+        }
+
+        if (isBusyTexExceptionMessage(event.data)) {
+          cleanup()
+          reject(new Error(event.data.exception))
+          return
+        }
+
+        if (!isBusyTexCompileMessage(event.data)) {
+          return
+        }
+
+        cleanup()
+        resolve({
+          log: buildCompileLog(event.data, prints),
+          pdf: event.data.pdf ? toPdfBuffer(event.data.pdf) : null,
+          status: event.data.exit_code,
+        })
+      }
+
+      const handleError = (event: ErrorEvent) => {
+        cleanup()
+        reject(new Error(event.message || 'BusyTeX crashed during compilation.'))
+      }
+
+      const cleanup = () => {
+        worker.removeEventListener('message', handleMessage)
+        worker.removeEventListener('error', handleError)
+      }
+
+      worker.addEventListener('message', handleMessage)
+      worker.addEventListener('error', handleError)
+      worker.postMessage({
+        bibtex: false,
+        data_packages_js: BUSYTEX_AVAILABLE_PACKAGE_URLS,
+        driver: 'xetex_bibtex8_dvipdfmx',
+        files: [{ contents: source, path: BUSYTEX_MAIN_FILE }],
+        main_tex_path: BUSYTEX_MAIN_FILE,
+        verbose: 'info',
+      })
+    })
   }
 
   async compile(source: string) {
@@ -259,7 +239,7 @@ class SwiftLatexEngine {
   }
 }
 
-const swiftLatexEngine = new SwiftLatexEngine()
+const latexEngine = new BusyTexEngine()
 
 const PREAMBLE_COMMAND_PATTERN =
   /^\s*\\(usepackage|title|author|date|newcommand|renewcommand|providecommand|setlength|geometry|hypersetup|definecolor|newtheorem|lstset|DeclareMathOperator|graphicspath|bibliographystyle|usetikzlibrary|tikzset|setmainfont|setsansfont|setmonofont|setmathfont|defaultfontfeatures|input|includeonly|makeindex|makeglossaries|linespread|bibliography)\b/
@@ -311,7 +291,7 @@ function normalizeLatexDocument(source: string) {
 }
 
 async function compileLatexToPdf(source: string) {
-  return swiftLatexEngine.compile(normalizeLatexDocument(source))
+  return latexEngine.compile(normalizeLatexDocument(source))
 }
 
 export { compileLatexToPdf, normalizeLatexDocument }

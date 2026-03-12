@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { Download, Loader, RotateCcw, X } from 'lucide-react'
+import { ChevronRight, Download, Loader, RotateCcw } from 'lucide-react'
 import { compileLatexToPdf } from '../lib/swiftlatex'
 
 type LatexWorkspacePanelProps = {
+  hidden?: boolean
   initialSource: string
   label: string
-  onClose: () => void
+  onHide: () => void
   open: boolean
 }
 
@@ -44,9 +45,18 @@ function extractLatexError(log: string, status: number) {
   return `Compilation failed with status ${status}.`
 }
 
-function getStatusText(compiling: boolean, compileError: string | null, pdfUrl: string | null) {
+function getStatusText(
+  compiling: boolean,
+  compileError: string | null,
+  pdfUrl: string | null,
+  hidden: boolean,
+) {
+  if (hidden) {
+    return 'Workspace hidden. Restore it from the right edge.'
+  }
+
   if (compiling) {
-    return 'Compiling with XeTeX and fetching packages on demand…'
+    return 'Compiling in the browser and fetching packages on demand…'
   }
 
   if (compileError && pdfUrl) {
@@ -65,9 +75,10 @@ function getStatusText(compiling: boolean, compileError: string | null, pdfUrl: 
 }
 
 function LatexWorkspacePanel({
+  hidden = false,
   initialSource,
   label,
-  onClose,
+  onHide,
   open,
 }: LatexWorkspacePanelProps) {
   const [source, setSource] = useState(initialSource)
@@ -161,7 +172,7 @@ function LatexWorkspacePanel({
   }, [])
 
   useEffect(() => {
-    if (!open || !autoCompile) {
+    if (!open || hidden || !autoCompile) {
       return
     }
 
@@ -176,7 +187,7 @@ function LatexWorkspacePanel({
     return () => {
       window.clearTimeout(timeoutId)
     }
-  }, [autoCompile, compileSource, open, source])
+  }, [autoCompile, compileSource, hidden, open, source])
 
   function onSplitterMouseDown(event: ReactMouseEvent<HTMLDivElement>) {
     event.preventDefault()
@@ -218,7 +229,11 @@ function LatexWorkspacePanel({
     return null
   }
 
-  const statusText = getStatusText(compiling, compileError, pdfUrl)
+  if (hidden) {
+    return null
+  }
+
+  const statusText = getStatusText(compiling, compileError, pdfUrl, hidden)
   const pdfFileName = `${sanitizeFilename(label || 'latex-document')}.pdf`
 
   return createPortal(
@@ -226,7 +241,7 @@ function LatexWorkspacePanel({
       <header className="latex-workspace-header">
         <div className="latex-workspace-heading">
           <span className="latex-workspace-kicker">{label || 'LaTeX'} workspace</span>
-          <strong className="latex-workspace-title">Live XeTeX preview</strong>
+          <strong className="latex-workspace-title">Live PDF preview</strong>
         </div>
 
         <div className="latex-workspace-actions">
@@ -263,8 +278,9 @@ function LatexWorkspacePanel({
             <span>{compiling ? 'Compiling…' : 'Compile'}</span>
           </button>
 
-          <button className="code-runner-action-btn" type="button" onClick={onClose} title="Close">
-            <X size={13} />
+          <button className="latex-workspace-btn" type="button" onClick={onHide} title="Hide workspace">
+            <ChevronRight size={14} />
+            <span>Hide</span>
           </button>
         </div>
       </header>
@@ -343,7 +359,7 @@ function LatexWorkspacePanel({
               </div>
             ) : (
               <div className="latex-workspace-placeholder">
-                <span>Open the workspace or edit the source to generate a PDF preview.</span>
+                <span>Edit the source or run a compile to generate a PDF preview.</span>
               </div>
             )}
           </div>
