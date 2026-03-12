@@ -244,8 +244,8 @@ type CreateOpenRouterChatCompletionStreamOptions =
     onProgress?: (reply: OpenRouterAssistantReply) => void
   }
 
-const OPENROUTER_MODELS_URL = 'https://holy-union-290f.jeynarayan2010.workers.dev/api/v1/models'
-const OPENROUTER_CHAT_URL = 'https://holy-union-290f.jeynarayan2010.workers.dev/api/v1/chat/completions'
+const OPENROUTER_MODELS_URL = 'https://app.gphmt.org/api/v1/models'
+const OPENROUTER_CHAT_URL = 'https://app.gphmt.org/api/v1/chat/completions'
 const APP_TITLE = 'Argue'
 
 function getAppOrigin() {
@@ -279,7 +279,7 @@ function normalizeOpenRouterModel(model: OpenRouterModel): OpenRouterModel {
 }
 
 async function getBundledOpenRouterModels() {
-  const { BUNDLED_OPENROUTER_MODELS } = await import('./openrouterCatalog')
+  const { BUNDLED_OPENROUTER_MODELS } = await import('./fallbackCatalog')
 
   return BUNDLED_OPENROUTER_MODELS.map((model) =>
     normalizeOpenRouterModel(model as OpenRouterModel),
