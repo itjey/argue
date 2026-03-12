@@ -27,6 +27,7 @@ Formatting rules:
 - **Math**: Use $...$ for inline math and $$...$$ for display/block equations. Do NOT use \\( \\) or \\[ \\] — use $ and $$ only.
 - **Tables**: Use GFM Markdown tables (pipes | and dashes ---) for any tabular data.
 - **Code**: Use fenced code blocks with a language hint, e.g. \`\`\`python.
+- **LaTeX documents**: When a rendered document is useful, return the full document in a fenced \`\`\`latex block. Argue renders \`latex\` blocks in a live preview workspace, so do not tell the user to save files or run \`pdflatex\` unless they explicitly ask for terminal instructions.
 - **Lists**: Use - for bullet lists, 1. for numbered lists.
 - **Bold/italic**: Use **bold** and *italic* for emphasis.
 Keep responses clear and well-structured.`

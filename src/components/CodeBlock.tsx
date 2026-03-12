@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, type ReactNode, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Play, X, Loader, RotateCcw, Terminal } from 'lucide-react'
+import { LatexWorkspacePanel } from './LatexWorkspacePanel'
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Panel coordination — only one output panel open at a time
@@ -70,8 +71,6 @@ function ensureMinimizedTab() {
 const HTML_LANGS = new Set(['html', 'svg', 'xml'])
 const JS_LANGS   = new Set(['javascript', 'js', 'jsx'])
 const LATEX_LANGS = new Set(['latex', 'tex'])
-const LATEX_JS_BASE_URL = 'https://cdn.jsdelivr.net/npm/latex.js/dist/'
-const LATEX_JS_MODULE_URL = `${LATEX_JS_BASE_URL}latex.mjs`
 
 const GODBOLT: Record<string, { compiler: string; lang: string }> = {
   cpp:     { compiler: 'g152',        lang: 'c++' },
@@ -94,139 +93,6 @@ const GODBOLT: Record<string, { compiler: string; lang: string }> = {
 function isRunnable(langId: string): boolean {
   const id = langId.toLowerCase()
   return HTML_LANGS.has(id) || JS_LANGS.has(id) || LATEX_LANGS.has(id) || id === 'python' || id === 'py' || id in GODBOLT
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;')
-}
-
-function normalizeLatexDocument(source: string) {
-  const trimmed = source.trim()
-
-  if (!trimmed) {
-    return '\\documentclass{article}\n\\begin{document}\n\\end{document}\n'
-  }
-
-  if (/\\documentclass(?:\[[^\]]*\])?\{[^}]+\}/.test(trimmed) || /\\begin\{document\}/.test(trimmed)) {
-    return trimmed
-  }
-
-  return `\\documentclass{article}\n\\begin{document}\n${trimmed}\n\\end{document}\n`
-}
-
-function buildLatexPreviewHtml(source: string) {
-  const latexSource = escapeHtml(normalizeLatexDocument(source))
-
-  return `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LaTeX preview</title>
-    <style>
-      :root {
-        color-scheme: light;
-        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-
-      body {
-        margin: 0;
-        min-height: 100vh;
-        background:
-          radial-gradient(circle at top, rgba(255, 255, 255, 0.68), transparent 44%),
-          linear-gradient(180deg, #d9dce2 0%, #c3c8d0 100%);
-        color: #111827;
-        padding: 1.5rem;
-      }
-
-      .latex-preview-shell {
-        min-height: calc(100vh - 3rem);
-        display: flex;
-        justify-content: center;
-        align-items: flex-start;
-      }
-
-      .latex-preview-page,
-      .latex-preview-status,
-      .latex-preview-error {
-        width: min(100%, 8.5in);
-        background: #fff;
-        border-radius: 0.25rem;
-        box-shadow:
-          0 18px 48px rgba(15, 23, 42, 0.18),
-          0 1px 0 rgba(255, 255, 255, 0.9) inset;
-      }
-
-      .latex-preview-page {
-        min-height: 11in;
-        padding: 0.75in 0.85in;
-      }
-
-      .latex-preview-page latex-js {
-        display: block;
-      }
-
-      .latex-preview-status,
-      .latex-preview-error {
-        padding: 1.25rem;
-        white-space: pre-wrap;
-        line-height: 1.6;
-      }
-
-      .latex-preview-status {
-        color: #475569;
-      }
-
-      .latex-preview-error {
-        color: #b91c1c;
-        font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="latex-preview-root" class="latex-preview-shell">
-      <div class="latex-preview-status">Rendering LaTeX…</div>
-    </div>
-    <template id="latex-preview-source">${latexSource}</template>
-    <script type="module">
-      const root = document.getElementById('latex-preview-root')
-      const source = document.getElementById('latex-preview-source')?.textContent ?? ''
-
-      try {
-        const { LaTeXJSComponent } = await import(${JSON.stringify(LATEX_JS_MODULE_URL)})
-
-        if (!customElements.get('latex-js')) {
-          customElements.define('latex-js', LaTeXJSComponent)
-        }
-
-        const page = document.createElement('div')
-        page.className = 'latex-preview-page'
-
-        const latex = document.createElement('latex-js')
-        latex.setAttribute('baseURL', ${JSON.stringify(LATEX_JS_BASE_URL)})
-        latex.setAttribute('hyphenate', 'false')
-        latex.textContent = source
-
-        page.appendChild(latex)
-        root.replaceChildren(page)
-      } catch (error) {
-        const failure = document.createElement('pre')
-        failure.className = 'latex-preview-error'
-        failure.textContent = error instanceof Error ? error.message : String(error)
-        root.replaceChildren(failure)
-      }
-    </script>
-  </body>
-</html>`
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -365,7 +231,6 @@ type RunResult =
 
 type PreviewState =
   | { kind: 'html'; content: string }
-  | { kind: 'latex'; content: string }
 
 function runJavaScript(code: string): Promise<RunResult> {
   return new Promise(resolve => {
@@ -546,6 +411,13 @@ export function CodeBlock({ code, langId, label, children }: Props) {
   async function run() {
     registerPanel(closeFnRef.current, reopenFn)
     setOpen(true)
+
+    const id = langId.toLowerCase()
+
+    if (LATEX_LANGS.has(id)) {
+      return
+    }
+
     setRunning(true)
     setLines([])
     setPlots([])
@@ -556,15 +428,9 @@ export function CodeBlock({ code, langId, label, children }: Props) {
     setErrorMsg(null)
     setStatusMsg('Starting…')
 
-    const id = langId.toLowerCase()
-
     try {
       if (HTML_LANGS.has(id)) {
         setPreview({ kind: 'html', content: code })
-
-      } else if (LATEX_LANGS.has(id)) {
-        setStatusMsg('Rendering LaTeX…')
-        setPreview({ kind: 'latex', content: buildLatexPreviewHtml(code) })
 
       } else if (JS_LANGS.has(id)) {
         const r = await runJavaScript(code)
@@ -702,20 +568,24 @@ except: []
   const isLatex = LATEX_LANGS.has(normalizedLangId)
   const showTerminal =
     !preview &&
-    !isLatex &&
     (lines.length > 0 || plots.length > 0 || running || exitCode !== null || errorMsg !== null)
-  const panelTitle = isLatex ? `${label || 'LaTeX'} PDF Preview` : (label || 'Output')
+  const panelTitle = label || 'Output'
 
-  const panel = open ? createPortal(
+  const panel = isLatex ? (
+    <LatexWorkspacePanel
+      initialSource={code}
+      label={label}
+      onClose={close}
+      open={open}
+    />
+  ) : open ? createPortal(
     <div
-      className={`code-runner-panel${isLatex ? ' code-runner-panel-right' : ''}`}
-      style={isLatex ? undefined : { height: `${panelHeight}vh` }}
+      className="code-runner-panel"
+      style={{ height: `${panelHeight}vh` }}
     >
-      {!isLatex ? (
-        <div className="code-runner-drag-handle" onMouseDown={onDragStart}>
-          <div className="code-runner-drag-bar" />
-        </div>
-      ) : null}
+      <div className="code-runner-drag-handle" onMouseDown={onDragStart}>
+        <div className="code-runner-drag-bar" />
+      </div>
       <div className="code-runner-header">
         <span className="code-runner-title">{panelTitle}</span>
         <div className="code-runner-header-actions">
@@ -728,22 +598,13 @@ except: []
         </div>
       </div>
 
-      <div className={`code-runner-body${isLatex ? ' code-runner-body-document' : ''}`}>
+      <div className="code-runner-body">
         {preview?.kind === 'html' && (
           <iframe
             className="code-canvas-iframe"
             sandbox="allow-scripts allow-pointer-lock allow-downloads allow-modals allow-forms allow-same-origin"
             srcDoc={preview.content}
             title="Preview"
-          />
-        )}
-
-        {preview?.kind === 'latex' && (
-          <iframe
-            className="code-canvas-iframe code-canvas-iframe-document"
-            sandbox="allow-scripts"
-            srcDoc={preview.content}
-            title="LaTeX preview"
           />
         )}
 
@@ -806,7 +667,7 @@ except: []
                 type="button"
                 onClick={run}
                 disabled={running}
-                title={running ? 'Running…' : 'Run'}
+                title={isLatex ? 'Open LaTeX workspace' : (running ? 'Running…' : 'Run')}
               >
                 {running
                   ? <Loader size={11} className="code-run-spinner" />
