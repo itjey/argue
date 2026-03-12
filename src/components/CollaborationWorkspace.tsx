@@ -689,16 +689,14 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                           )}
                         </div>
                       )}
-                      {msg.webSearch?.enabled && (
+                      {msg.webSearch?.enabled && (msg.webSearch.searching || msg.webSearch.citations.length > 0) && (
                         <div className="chat-web-search-panel">
                           <div className="chat-web-search-header">
                             <span className="chat-web-search-badge">Web search</span>
                             <span className="chat-web-search-state">
                               {msg.webSearch.searching
                                 ? 'Searching OpenRouter web sources'
-                                : msg.webSearch.citations.length > 0
-                                  ? `${msg.webSearch.citations.length} sources used`
-                                  : 'Search enabled'}
+                                : `${msg.webSearch.citations.length} sources used`}
                             </span>
                           </div>
                           <p className="chat-web-search-query">{msg.webSearch.approximateQuery}</p>
