@@ -610,9 +610,15 @@ function extractSsePayload(rawEvent: string) {
 
 async function fetchOpenRouterModels() {
   try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 3500)
+
     const response = await fetch(OPENROUTER_MODELS_URL, {
+      signal: controller.signal,
       headers: requestHeaders(),
     })
+
+    clearTimeout(timeoutId)
 
     if (!response.ok) {
       throw new Error('OpenRouter model catalog could not be loaded right now.')
