@@ -171,13 +171,7 @@ function getWebSearchModelProfile(model: OpenRouterModel | null) {
   }
 }
 
-function getCitationHost(url: string) {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '')
-  } catch {
-    return url
-  }
-}
+
 
 export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
