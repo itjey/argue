@@ -501,7 +501,7 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
     }
   }
 
-  async function runGroupStream(historyBefore: ChatMessage[], userMsg: ChatMessage) {
+  async function runGroupStream(_historyBefore: ChatMessage[], userMsg: ChatMessage) {
     const apiKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
     if (!apiKey.trim()) return
 
@@ -805,7 +805,6 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
   }
 
   const supportsFiles = selectedModel ? (selectedModel.id !== GROUP_ONE_ID && isMultimodal(selectedModel)) : false
-  const isGroupMode = selectedModel?.id === GROUP_ONE_ID
   const hasMessages = messages.length > 0
   const reasoningStyle = selectedModel ? getReasoningStyle(selectedModel) : 'none'
   const selectedWebSearchProfile = getWebSearchModelProfile(selectedModel)
