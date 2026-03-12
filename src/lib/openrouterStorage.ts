@@ -1,1 +1,6 @@
 export const OPENROUTER_KEY_STORAGE = 'argue-openrouter-api-key'
+export const OPENROUTER_URL_STORAGE = 'argue-openrouter-url'
+export const GPHMT_GATEWAY_ENDPOINT_STORAGE = 'argue-gphmt-gateway-endpoint'
+export const GPHMT_GATEWAY_USER_STORAGE = 'argue-gphmt-gateway-user'
+export const GPHMT_GATEWAY_PASSWORD_STORAGE = 'argue-gphmt-gateway-password'
+export const DEFAULT_GPHMT_GATEWAY_ENDPOINT = 'https://app.gphmt.org/api/ping'

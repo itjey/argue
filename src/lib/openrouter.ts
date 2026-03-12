@@ -1,3 +1,11 @@
+import {
+  DEFAULT_GPHMT_GATEWAY_ENDPOINT,
+  GPHMT_GATEWAY_ENDPOINT_STORAGE,
+  GPHMT_GATEWAY_PASSWORD_STORAGE,
+  GPHMT_GATEWAY_USER_STORAGE,
+  OPENROUTER_URL_STORAGE,
+} from './openrouterStorage'
+
 type OpenRouterPricing = Record<string, string | undefined>
 type OpenRouterInputModality = 'text' | 'image' | 'file' | 'audio' | 'video'
 type OpenRouterOutputModality = 'text' | 'image' | 'audio'
@@ -244,9 +252,58 @@ type CreateOpenRouterChatCompletionStreamOptions =
     onProgress?: (reply: OpenRouterAssistantReply) => void
   }
 
-const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models'
-const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions'
 const APP_TITLE = 'Argue'
+
+function getOpenRouterUrl(path: string): string {
+  if (typeof window !== 'undefined') {
+    let custom = window.localStorage.getItem(OPENROUTER_URL_STORAGE)
+    if (custom && custom.trim().length > 0) {
+      custom = custom.trim().replace(/\/+$/, '')
+      return `${custom}${path}`
+    }
+  }
+  return `https://openrouter.ai/api/v1${path}`
+}
+
+const PUBLIC_PROXIES = [
+  '', // Direct
+  'https://corsproxy.io/?' // Proxy fallback
+]
+
+async function fetchOpenRouter(path: string, options: RequestInit): Promise<Response> {
+  const custom = typeof window !== 'undefined' ? window.localStorage.getItem(OPENROUTER_URL_STORAGE) : null
+  
+  if (custom && custom.trim().length > 0) {
+    return fetch(getOpenRouterUrl(path), options)
+  }
+
+  let lastError: unknown
+  let lastResponse: Response | null = null
+
+  // Fallback through known methods if no custom URL is provided
+  for (const proxy of PUBLIC_PROXIES) {
+    try {
+      const url = proxy ? `${proxy}${getOpenRouterUrl(path)}` : getOpenRouterUrl(path)
+      const response = await fetch(url, options)
+      lastResponse = response
+
+      // Sometimes school proxies return 200 with an HTML block page
+      const contentType = response.headers.get('content-type') || ''
+      if (response.ok && contentType.includes('text/html')) {
+        throw new Error('Received HTML instead of API response (Firewall/Proxy block)')
+      }
+
+      // If it actually hit OpenRouter (or we get a typical API error like 400), return it
+      return response
+    } catch (error) {
+      lastError = error
+      console.warn(`[OpenRouter] Failed to fetch via proxy: ${proxy || 'direct'}`, error)
+    }
+  }
+
+  if (lastResponse) return lastResponse
+  throw lastError || new Error('Failed to fetch from OpenRouter')
+}
 
 function getAppOrigin() {
   if (typeof window === 'undefined') {
@@ -268,6 +325,231 @@ function requestHeaders(apiKey?: string) {
   }
 
   return headers
+}
+
+type GphmtGatewayConfig = {
+  endpoint: string
+  user: string
+  password: string
+}
+
+function readGphmtGatewayConfig(): GphmtGatewayConfig | null {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  const endpoint =
+    window.localStorage.getItem(GPHMT_GATEWAY_ENDPOINT_STORAGE)?.trim() ||
+    DEFAULT_GPHMT_GATEWAY_ENDPOINT
+  const user = window.localStorage.getItem(GPHMT_GATEWAY_USER_STORAGE)?.trim() || ''
+  const password =
+    window.localStorage.getItem(GPHMT_GATEWAY_PASSWORD_STORAGE)?.trim() || ''
+
+  if (!endpoint || !user || !password) {
+    return null
+  }
+
+  return {
+    endpoint,
+    user,
+    password,
+  }
+}
+
+async function sha256Hex(value: string) {
+  try {
+    const bytes = new TextEncoder().encode(value)
+    const digest = await crypto.subtle.digest('SHA-256', bytes)
+    return Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('')
+  } catch {
+    let hash = 5381
+
+    for (let index = 0; index < value.length; index += 1) {
+      hash = ((hash << 5) + hash) ^ value.charCodeAt(index)
+    }
+
+    return `fh_${(hash >>> 0).toString(16)}`
+  }
+}
+
+function delay(milliseconds: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds))
+}
+
+function serializeGatewayContent(
+  content: string | OpenRouterChatContentPart[] | null | undefined,
+) {
+  if (typeof content === 'string') {
+    return content
+  }
+
+  if (!content || content.length === 0) {
+    return ''
+  }
+
+  return content
+    .map((part) => {
+      if (part.type === 'text') {
+        return part.text
+      }
+
+      if (part.type === 'image_url') {
+        return '[Image attached]'
+      }
+
+      if (part.type === 'file') {
+        return `[File attached${part.file.filename ? `: ${part.file.filename}` : ''}]`
+      }
+
+      if (part.type === 'input_audio') {
+        return '[Audio attached]'
+      }
+
+      if (part.type === 'video_url') {
+        return '[Video attached]'
+      }
+
+      if (part.type === 'citation') {
+        return `[Citation: ${part.url_citation.url}]`
+      }
+
+      return ''
+    })
+    .filter(Boolean)
+    .join('\n')
+}
+
+function buildGphmtGatewayPrompt({
+  messages,
+  model,
+  includeReasoning,
+  reasoning,
+  webSearchOptions,
+}: CreateOpenRouterChatCompletionOptions) {
+  const transcript = messages
+    .map((message) => {
+      const role = message.role.toUpperCase()
+      const body = serializeGatewayContent(message.content)
+      return `${role}: ${body}`.trim()
+    })
+    .filter(Boolean)
+    .join('\n\n')
+
+  return [
+    'You are the chat backend for the Argue app.',
+    'Return only the assistant reply in Markdown.',
+    `Requested model: ${model}`,
+    includeReasoning ? 'Reasoning requested: yes' : 'Reasoning requested: no',
+    reasoning ? `Reasoning config: ${JSON.stringify(reasoning)}` : '',
+    webSearchOptions ? `Web search options: ${JSON.stringify(webSearchOptions)}` : '',
+    '',
+    'Conversation:',
+    transcript,
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+async function requestGphmtGateway(
+  config: GphmtGatewayConfig,
+  body: Record<string, unknown>,
+) {
+  const response = await fetch(config.endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-User': config.user,
+      'X-Password': config.password,
+    },
+    body: JSON.stringify(body),
+  })
+
+  const payload = (await response.json().catch(async () => ({
+    error: await response.text(),
+  }))) as {
+    error?: string
+    status?: string
+    message?: string
+  }
+
+  if (!response.ok) {
+    throw new Error(payload.error || 'The gphmt gateway request failed.')
+  }
+
+  return payload
+}
+
+async function createGphmtGatewayChatCompletion(
+  options: CreateOpenRouterChatCompletionOptions,
+) {
+  const config = readGphmtGatewayConfig()
+
+  if (!config) {
+    throw new Error('The gphmt gateway is not configured in Settings.')
+  }
+
+  const prompt = buildGphmtGatewayPrompt(options)
+  const cacheKey = await sha256Hex(
+    JSON.stringify({
+      model: options.model,
+      prompt,
+      timestamp: Date.now(),
+    }),
+  )
+
+  const storeResult = await requestGphmtGateway(config, {
+    prompt,
+    context: {
+      source: 'argue',
+      model: options.model,
+      includeReasoning: options.includeReasoning,
+      reasoning: options.reasoning,
+      webSearchOptions: options.webSearchOptions,
+      messages: options.messages,
+    },
+    mode: 'mode2',
+    action: 'store',
+    cacheKey,
+    requestedModel: options.model,
+  })
+
+  if (storeResult.error) {
+    throw new Error(storeResult.error)
+  }
+
+  if (storeResult.status !== 'stored') {
+    throw new Error('The gphmt gateway did not accept the request.')
+  }
+
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    await delay(1500)
+
+    const fetchResult = await requestGphmtGateway(config, {
+      mode: 'mode2',
+      action: 'fetch',
+      cacheKey,
+    })
+
+    if (fetchResult.error) {
+      throw new Error(fetchResult.error)
+    }
+
+    if (fetchResult.status === 'missing') {
+      continue
+    }
+
+    const text = fetchResult.message?.trim() || '(No message returned)'
+
+    return {
+      ...createEmptyAssistantReply(),
+      text,
+      contentParts: [{ type: 'text', text }],
+    } satisfies OpenRouterAssistantReply
+  }
+
+  throw new Error('The gphmt gateway timed out waiting for a response.')
 }
 
 function normalizeOpenRouterModel(model: OpenRouterModel): OpenRouterModel {
@@ -610,7 +892,7 @@ function extractSsePayload(rawEvent: string) {
 
 async function fetchOpenRouterModels() {
   try {
-    const response = await fetch(OPENROUTER_MODELS_URL, {
+    const response = await fetchOpenRouter('/models', {
       headers: requestHeaders(),
     })
 
@@ -645,31 +927,51 @@ async function createOpenRouterChatCompletion({
   plugins,
   webSearchOptions,
 }: CreateOpenRouterChatCompletionOptions) {
-  const response = await fetch(OPENROUTER_CHAT_URL, {
-    method: 'POST',
-    headers: requestHeaders(apiKey),
-    body: JSON.stringify({
-      model,
+  try {
+    const response = await fetchOpenRouter('/chat/completions', {
+      method: 'POST',
+      headers: requestHeaders(apiKey),
+      body: JSON.stringify({
+        model,
+        messages,
+        include_reasoning: includeReasoning,
+        max_tokens: maxTokens,
+        modalities,
+        reasoning,
+        image_config: imageConfig,
+        plugins,
+        web_search_options: webSearchOptions,
+      }),
+    })
+
+    const payload = (await response.json()) as OpenRouterChatResponse
+
+    if (!response.ok) {
+      throw new Error(
+        payload.error?.message ?? 'OpenRouter rejected the chat request.',
+      )
+    }
+
+    return extractAssistantReply(payload)
+  } catch (error) {
+    if (!readGphmtGatewayConfig()) {
+      throw error
+    }
+
+    console.warn('[OpenRouter] Falling back to gphmt gateway chat.', error)
+    return createGphmtGatewayChatCompletion({
+      apiKey,
+      includeReasoning,
+      maxTokens,
       messages,
-      include_reasoning: includeReasoning,
-      max_tokens: maxTokens,
+      model,
       modalities,
       reasoning,
-      image_config: imageConfig,
+      imageConfig,
       plugins,
-      web_search_options: webSearchOptions,
-    }),
-  })
-
-  const payload = (await response.json()) as OpenRouterChatResponse
-
-  if (!response.ok) {
-    throw new Error(
-      payload.error?.message ?? 'OpenRouter rejected the chat request.',
-    )
+      webSearchOptions,
+    })
   }
-
-  return extractAssistantReply(payload)
 }
 
 async function createOpenRouterChatCompletionStream({
@@ -685,122 +987,144 @@ async function createOpenRouterChatCompletionStream({
   plugins,
   webSearchOptions,
 }: CreateOpenRouterChatCompletionStreamOptions) {
-  const response = await fetch(OPENROUTER_CHAT_URL, {
-    method: 'POST',
-    headers: requestHeaders(apiKey),
-    body: JSON.stringify({
-      model,
-      stream: true,
+  try {
+    const response = await fetchOpenRouter('/chat/completions', {
+      method: 'POST',
+      headers: requestHeaders(apiKey),
+      body: JSON.stringify({
+        model,
+        stream: true,
+        messages,
+        include_reasoning: includeReasoning,
+        max_tokens: maxTokens,
+        modalities,
+        reasoning,
+        image_config: imageConfig,
+        plugins,
+        web_search_options: webSearchOptions,
+      }),
+    })
+
+    if (!response.ok) {
+      const payload = (await response.json().catch(async () => ({
+        error: {
+          message: await response.text(),
+        },
+      }))) as OpenRouterChatResponse
+
+      throw new Error(
+        payload.error?.message ?? 'OpenRouter rejected the streaming chat request.',
+      )
+    }
+
+    if (!response.body) {
+      throw new Error('The browser could not read the streaming chat response.')
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let aggregatedReply = createEmptyAssistantReply()
+    let streamFinished = false
+
+    function processEvent(rawEvent: string) {
+      const normalizedEvent = rawEvent.replace(/\r\n/g, '\n').trim()
+
+      if (!normalizedEvent) {
+        return
+      }
+
+      const payload = extractSsePayload(normalizedEvent)
+
+      if (!payload) {
+        return
+      }
+
+      if (payload === '[DONE]') {
+        streamFinished = true
+        return
+      }
+
+      const chunk = JSON.parse(payload) as OpenRouterChatStreamChunk
+
+      if (chunk.error?.message) {
+        throw new Error(chunk.error.message)
+      }
+
+      const delta = chunk.choices?.[0]?.delta
+
+      if (!delta) {
+        if (chunk.usage) {
+          aggregatedReply = {
+            ...aggregatedReply,
+            usage: chunk.usage,
+          }
+        }
+        return
+      }
+
+      aggregatedReply = applyStreamDelta(aggregatedReply, delta, chunk.usage)
+      onProgress?.(aggregatedReply)
+    }
+
+    while (!streamFinished) {
+      const { done, value } = await reader.read()
+
+      if (done) {
+        buffer += decoder.decode()
+        break
+      }
+
+      buffer += decoder.decode(value, { stream: true })
+
+      let separatorIndex = buffer.indexOf('\n\n')
+
+      while (separatorIndex >= 0) {
+        const rawEvent = buffer.slice(0, separatorIndex)
+        buffer = buffer.slice(separatorIndex + 2)
+        processEvent(rawEvent)
+        separatorIndex = buffer.indexOf('\n\n')
+      }
+    }
+
+    if (buffer.trim()) {
+      processEvent(buffer)
+    }
+
+    if (
+      !aggregatedReply.text &&
+      aggregatedReply.images.length === 0 &&
+      !aggregatedReply.audio?.data &&
+      !aggregatedReply.audio?.transcript &&
+      !aggregatedReply.reasoning &&
+      aggregatedReply.reasoningDetails.length === 0 &&
+      !aggregatedReply.refusal
+    ) {
+      throw new Error('The selected model returned an empty response.')
+    }
+
+    return aggregatedReply
+  } catch (error) {
+    if (!readGphmtGatewayConfig()) {
+      throw error
+    }
+
+    console.warn('[OpenRouter] Falling back to gphmt gateway stream.', error)
+    const reply = await createGphmtGatewayChatCompletion({
+      apiKey,
+      includeReasoning,
+      maxTokens,
       messages,
-      include_reasoning: includeReasoning,
-      max_tokens: maxTokens,
+      model,
       modalities,
       reasoning,
-      image_config: imageConfig,
+      imageConfig,
       plugins,
-      web_search_options: webSearchOptions,
-    }),
-  })
-
-  if (!response.ok) {
-    const payload = (await response.json().catch(async () => ({
-      error: {
-        message: await response.text(),
-      },
-    }))) as OpenRouterChatResponse
-
-    throw new Error(
-      payload.error?.message ?? 'OpenRouter rejected the streaming chat request.',
-    )
+      webSearchOptions,
+    })
+    onProgress?.(reply)
+    return reply
   }
-
-  if (!response.body) {
-    throw new Error('The browser could not read the streaming chat response.')
-  }
-
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-  let aggregatedReply = createEmptyAssistantReply()
-  let streamFinished = false
-
-  function processEvent(rawEvent: string) {
-    const normalizedEvent = rawEvent.replace(/\r\n/g, '\n').trim()
-
-    if (!normalizedEvent) {
-      return
-    }
-
-    const payload = extractSsePayload(normalizedEvent)
-
-    if (!payload) {
-      return
-    }
-
-    if (payload === '[DONE]') {
-      streamFinished = true
-      return
-    }
-
-    const chunk = JSON.parse(payload) as OpenRouterChatStreamChunk
-
-    if (chunk.error?.message) {
-      throw new Error(chunk.error.message)
-    }
-
-    const delta = chunk.choices?.[0]?.delta
-
-    if (!delta) {
-      if (chunk.usage) {
-        aggregatedReply = {
-          ...aggregatedReply,
-          usage: chunk.usage,
-        }
-      }
-      return
-    }
-
-    aggregatedReply = applyStreamDelta(aggregatedReply, delta, chunk.usage)
-    onProgress?.(aggregatedReply)
-  }
-
-  while (!streamFinished) {
-    const { done, value } = await reader.read()
-
-    if (done) {
-      buffer += decoder.decode()
-      break
-    }
-
-    buffer += decoder.decode(value, { stream: true })
-
-    let separatorIndex = buffer.indexOf('\n\n')
-
-    while (separatorIndex >= 0) {
-      const rawEvent = buffer.slice(0, separatorIndex)
-      buffer = buffer.slice(separatorIndex + 2)
-      processEvent(rawEvent)
-      separatorIndex = buffer.indexOf('\n\n')
-    }
-  }
-
-  if (buffer.trim()) {
-    processEvent(buffer)
-  }
-
-  if (
-    !aggregatedReply.text &&
-    aggregatedReply.images.length === 0 &&
-    !aggregatedReply.audio?.data &&
-    !aggregatedReply.audio?.transcript &&
-    !aggregatedReply.reasoning &&
-    aggregatedReply.reasoningDetails.length === 0 &&
-    !aggregatedReply.refusal
-  ) {
-    throw new Error('The selected model returned an empty response.')
-  }
-
-  return aggregatedReply
 }
 
 function getRecentOpenRouterModels(models: OpenRouterModel[], limit = 12) {

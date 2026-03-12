@@ -12,7 +12,14 @@ import {
   User as UserIcon,
   X,
 } from 'lucide-react'
-import { OPENROUTER_KEY_STORAGE } from '../lib/openrouterStorage'
+import {
+  DEFAULT_GPHMT_GATEWAY_ENDPOINT,
+  GPHMT_GATEWAY_ENDPOINT_STORAGE,
+  GPHMT_GATEWAY_PASSWORD_STORAGE,
+  GPHMT_GATEWAY_USER_STORAGE,
+  OPENROUTER_KEY_STORAGE,
+  OPENROUTER_URL_STORAGE,
+} from '../lib/openrouterStorage'
 
 type AuthMode = 'sign-in' | 'sign-up'
 
@@ -80,6 +87,14 @@ function AuthDialog({
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [apiKeyDraft, setApiKeyDraft] = useState('')
   const [hasSavedApiKey, setHasSavedApiKey] = useState(false)
+  const [urlDraft, setUrlDraft] = useState('')
+  const [hasSavedUrl, setHasSavedUrl] = useState(false)
+  const [gatewayEndpointDraft, setGatewayEndpointDraft] = useState(
+    DEFAULT_GPHMT_GATEWAY_ENDPOINT,
+  )
+  const [gatewayUserDraft, setGatewayUserDraft] = useState('')
+  const [gatewayPasswordDraft, setGatewayPasswordDraft] = useState('')
+  const [hasSavedGateway, setHasSavedGateway] = useState(false)
 
   useEffect(() => {
     if (!open) {
@@ -88,8 +103,24 @@ function AuthDialog({
     }
 
     const storedKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
+    const storedUrl = window.localStorage.getItem(OPENROUTER_URL_STORAGE) ?? ''
+    const storedGatewayEndpoint =
+      window.localStorage.getItem(GPHMT_GATEWAY_ENDPOINT_STORAGE) ??
+      DEFAULT_GPHMT_GATEWAY_ENDPOINT
+    const storedGatewayUser =
+      window.localStorage.getItem(GPHMT_GATEWAY_USER_STORAGE) ?? ''
+    const storedGatewayPassword =
+      window.localStorage.getItem(GPHMT_GATEWAY_PASSWORD_STORAGE) ?? ''
     setApiKeyDraft(storedKey)
     setHasSavedApiKey(storedKey.trim().length > 0)
+    setUrlDraft(storedUrl)
+    setHasSavedUrl(storedUrl.trim().length > 0)
+    setGatewayEndpointDraft(storedGatewayEndpoint)
+    setGatewayUserDraft(storedGatewayUser)
+    setGatewayPasswordDraft(storedGatewayPassword)
+    setHasSavedGateway(
+      storedGatewayUser.trim().length > 0 && storedGatewayPassword.trim().length > 0,
+    )
   }, [open])
 
   function applyApiKey(nextValue: string) {
@@ -104,12 +135,70 @@ function AuthDialog({
     window.dispatchEvent(new Event('argue-openrouter-key-changed'))
   }
 
+  function applyUrl(nextValue: string) {
+    if (nextValue) {
+      window.localStorage.setItem(OPENROUTER_URL_STORAGE, nextValue)
+    } else {
+      window.localStorage.removeItem(OPENROUTER_URL_STORAGE)
+    }
+
+    setUrlDraft(nextValue)
+    setHasSavedUrl(nextValue.trim().length > 0)
+    window.dispatchEvent(new Event('argue-openrouter-key-changed')) // same event triggers openrouter to check
+  }
+
+  function applyGateway(endpointValue: string, userValue: string, passwordValue: string) {
+    const normalizedEndpoint = endpointValue.trim() || DEFAULT_GPHMT_GATEWAY_ENDPOINT
+    const normalizedUser = userValue.trim()
+    const normalizedPassword = passwordValue.trim()
+
+    if (normalizedEndpoint === DEFAULT_GPHMT_GATEWAY_ENDPOINT) {
+      window.localStorage.removeItem(GPHMT_GATEWAY_ENDPOINT_STORAGE)
+    } else {
+      window.localStorage.setItem(GPHMT_GATEWAY_ENDPOINT_STORAGE, normalizedEndpoint)
+    }
+
+    if (normalizedUser) {
+      window.localStorage.setItem(GPHMT_GATEWAY_USER_STORAGE, normalizedUser)
+    } else {
+      window.localStorage.removeItem(GPHMT_GATEWAY_USER_STORAGE)
+    }
+
+    if (normalizedPassword) {
+      window.localStorage.setItem(GPHMT_GATEWAY_PASSWORD_STORAGE, normalizedPassword)
+    } else {
+      window.localStorage.removeItem(GPHMT_GATEWAY_PASSWORD_STORAGE)
+    }
+
+    setGatewayEndpointDraft(normalizedEndpoint)
+    setGatewayUserDraft(normalizedUser)
+    setGatewayPasswordDraft(normalizedPassword)
+    setHasSavedGateway(Boolean(normalizedUser && normalizedPassword))
+    window.dispatchEvent(new Event('argue-openrouter-key-changed'))
+  }
+
   function handleSaveApiKey() {
     applyApiKey(apiKeyDraft.trim())
   }
 
   function handleClearApiKey() {
     applyApiKey('')
+  }
+
+  function handleSaveUrl() {
+    applyUrl(urlDraft.trim())
+  }
+
+  function handleClearUrl() {
+    applyUrl('')
+  }
+
+  function handleSaveGateway() {
+    applyGateway(gatewayEndpointDraft, gatewayUserDraft, gatewayPasswordDraft)
+  }
+
+  function handleClearGateway() {
+    applyGateway(DEFAULT_GPHMT_GATEWAY_ENDPOINT, '', '')
   }
 
   if (!open) {
@@ -200,46 +289,156 @@ function AuthDialog({
             </button>
 
             {settingsOpen ? (
-              <div className="auth-card auth-settings-card">
-                <p className="auth-label">OpenRouter API key</p>
-                <label className="auth-field">
-                  <span>API key</span>
-                  <input
-                    autoComplete="off"
-                    className="auth-input"
-                    onChange={(event) => setApiKeyDraft(event.target.value)}
-                    placeholder="sk-or-v1-..."
-                    spellCheck={false}
-                    type="password"
-                    value={apiKeyDraft}
-                  />
-                </label>
-                <div className="auth-inline-actions">
-                  <button
-                    className="auth-primary-button"
-                    onClick={handleSaveApiKey}
-                    type="button"
+              <>
+                <div className="auth-card auth-settings-card">
+                  <p className="auth-label">OpenRouter API key</p>
+                  <label className="auth-field">
+                    <span>API key</span>
+                    <input
+                      autoComplete="off"
+                      className="auth-input"
+                      onChange={(event) => setApiKeyDraft(event.target.value)}
+                      placeholder="sk-or-v1-..."
+                      spellCheck={false}
+                      type="password"
+                      value={apiKeyDraft}
+                    />
+                  </label>
+                  <div className="auth-inline-actions">
+                    <button
+                      className="auth-primary-button"
+                      onClick={handleSaveApiKey}
+                      type="button"
+                    >
+                      Save key
+                    </button>
+                    <button
+                      className="auth-secondary-button"
+                      onClick={handleClearApiKey}
+                      type="button"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <p
+                    className={`auth-settings-status${
+                      hasSavedApiKey
+                        ? ' auth-settings-status-ok'
+                        : ' auth-settings-status-missing'
+                    }`}
                   >
-                    Save key
-                  </button>
-                  <button
-                    className="auth-secondary-button"
-                    onClick={handleClearApiKey}
-                    type="button"
-                  >
-                    Clear
-                  </button>
+                    {hasSavedApiKey ? 'API key saved' : 'API key missing'}
+                  </p>
                 </div>
-                <p
-                  className={`auth-settings-status${
-                    hasSavedApiKey
-                      ? ' auth-settings-status-ok'
-                      : ' auth-settings-status-missing'
-                  }`}
+                <div
+                  className="auth-card auth-settings-card"
+                  style={{ marginTop: '1rem' }}
                 >
-                  {hasSavedApiKey ? 'API key saved' : 'API key missing'}
-                </p>
-              </div>
+                  <p className="auth-label">API Base URL (optional)</p>
+                  <label className="auth-field">
+                    <span>Base URL</span>
+                    <input
+                      autoComplete="off"
+                      className="auth-input"
+                      onChange={(event) => setUrlDraft(event.target.value)}
+                      placeholder="https://openrouter.ai/api/v1"
+                      spellCheck={false}
+                      type="text"
+                      value={urlDraft}
+                    />
+                  </label>
+                  <div className="auth-inline-actions">
+                    <button
+                      className="auth-primary-button"
+                      onClick={handleSaveUrl}
+                      type="button"
+                    >
+                      Save URL
+                    </button>
+                    <button
+                      className="auth-secondary-button"
+                      onClick={handleClearUrl}
+                      type="button"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <p
+                    className={`auth-settings-status${
+                      hasSavedUrl ? ' auth-settings-status-ok' : ''
+                    }`}
+                  >
+                    {hasSavedUrl ? 'Custom URL saved' : 'Using default URL'}
+                  </p>
+                </div>
+                <div
+                  className="auth-card auth-settings-card"
+                  style={{ marginTop: '1rem' }}
+                >
+                  <p className="auth-label">gphmt Gateway Fallback</p>
+                  <label className="auth-field">
+                    <span>Endpoint</span>
+                    <input
+                      autoComplete="off"
+                      className="auth-input"
+                      onChange={(event) => setGatewayEndpointDraft(event.target.value)}
+                      placeholder={DEFAULT_GPHMT_GATEWAY_ENDPOINT}
+                      spellCheck={false}
+                      type="text"
+                      value={gatewayEndpointDraft}
+                    />
+                  </label>
+                  <label className="auth-field">
+                    <span>User</span>
+                    <input
+                      autoComplete="off"
+                      className="auth-input"
+                      onChange={(event) => setGatewayUserDraft(event.target.value)}
+                      placeholder="gateway username"
+                      spellCheck={false}
+                      type="text"
+                      value={gatewayUserDraft}
+                    />
+                  </label>
+                  <label className="auth-field">
+                    <span>Password</span>
+                    <input
+                      autoComplete="off"
+                      className="auth-input"
+                      onChange={(event) => setGatewayPasswordDraft(event.target.value)}
+                      placeholder="gateway password"
+                      spellCheck={false}
+                      type="password"
+                      value={gatewayPasswordDraft}
+                    />
+                  </label>
+                  <div className="auth-inline-actions">
+                    <button
+                      className="auth-primary-button"
+                      onClick={handleSaveGateway}
+                      type="button"
+                    >
+                      Save gateway
+                    </button>
+                    <button
+                      className="auth-secondary-button"
+                      onClick={handleClearGateway}
+                      type="button"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <p
+                    className={`auth-settings-status${
+                      hasSavedGateway ? ' auth-settings-status-ok' : ''
+                    }`}
+                  >
+                    {hasSavedGateway
+                      ? 'Gateway fallback saved'
+                      : 'Gateway fallback disabled'}
+                  </p>
+                </div>
+              </>
             ) : null}
 
             {showVerificationActions ? (

@@ -10,6 +10,11 @@ import {
   type OpenRouterReasoningEffort,
   type OpenRouterUrlCitation,
 } from '../lib/openrouter'
+import {
+  GPHMT_GATEWAY_PASSWORD_STORAGE,
+  GPHMT_GATEWAY_USER_STORAGE,
+  OPENROUTER_KEY_STORAGE,
+} from '../lib/openrouterStorage'
 import { MarkdownBlock } from './RichMessageContent'
 import {
   fetchOpenRouterStatsSnapshot,
@@ -19,7 +24,7 @@ import {
 } from '../lib/openrouterStats'
 import { ModelStatsPanel } from './ModelStatsPanel'
 
-const OPENROUTER_KEY_STORAGE = 'argue-openrouter-api-key'
+const WEB_SEARCH_PREFERENCES_STORAGE = 'argue-web-search-preferences'
 
 const SYSTEM_PROMPT = `You are a helpful assistant. Format your responses using Markdown.
 
@@ -171,12 +176,42 @@ function getWebSearchModelProfile(model: OpenRouterModel | null) {
   }
 }
 
-function getCitationHost(url: string) {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '')
-  } catch {
-    return url
+function readWebSearchPreferences() {
+  if (typeof window === 'undefined') {
+    return {} as Record<string, boolean>
   }
+
+  try {
+    const rawValue = window.localStorage.getItem(WEB_SEARCH_PREFERENCES_STORAGE)
+
+    if (!rawValue) {
+      return {} as Record<string, boolean>
+    }
+
+    const parsed = JSON.parse(rawValue) as Record<string, unknown>
+
+    return Object.fromEntries(
+      Object.entries(parsed).filter((entry): entry is [string, boolean] => typeof entry[1] === 'boolean'),
+    )
+  } catch {
+    return {} as Record<string, boolean>
+  }
+}
+
+function writeWebSearchPreference(modelId: string, enabled: boolean) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  const nextPreferences = {
+    ...readWebSearchPreferences(),
+    [modelId]: enabled,
+  }
+
+  window.localStorage.setItem(
+    WEB_SEARCH_PREFERENCES_STORAGE,
+    JSON.stringify(nextPreferences),
+  )
 }
 
 export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
@@ -217,8 +252,20 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
   const abortedRef = useRef(false)
 
   useEffect(() => {
-    fetchOpenRouterModels().then((list) => setModels(list)).catch(() => {})
+    fetchOpenRouterModels()
+      .then((list) => {
+        setModels(list)
+      })
+      .catch(() => {
+        setModels([])
+      })
   }, [])
+
+  useEffect(() => {
+    if (!selectedModel && models.length > 0) {
+      setSelectedModel(models[0])
+    }
+  }, [models, selectedModel])
 
   useEffect(() => {
     function onPointerDown(e: PointerEvent) {
@@ -237,6 +284,28 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
   useEffect(() => {
     if (modelOpen) setTimeout(() => modelSearchRef.current?.focus(), 40)
   }, [modelOpen])
+
+  useEffect(() => {
+    const profile = getWebSearchModelProfile(selectedModel)
+
+    if (!selectedModel || !profile.supported) {
+      setWebSearchEnabled(false)
+      return
+    }
+
+    const savedPreferences = readWebSearchPreferences()
+    setWebSearchEnabled(savedPreferences[selectedModel.id] ?? true)
+  }, [selectedModel])
+
+  useEffect(() => {
+    const profile = getWebSearchModelProfile(selectedModel)
+
+    if (!selectedModel || !profile.supported) {
+      return
+    }
+
+    writeWebSearchPreference(selectedModel.id, webSearchEnabled)
+  }, [selectedModel, webSearchEnabled])
 
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -337,7 +406,13 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
 
   async function runStream(historyBefore: ChatMessage[], userMsg: ChatMessage) {
     const apiKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
-    if (!apiKey.trim() || !selectedModel) return
+    const gatewayUser = window.localStorage.getItem(GPHMT_GATEWAY_USER_STORAGE) ?? ''
+    const gatewayPassword =
+      window.localStorage.getItem(GPHMT_GATEWAY_PASSWORD_STORAGE) ?? ''
+
+    if ((!apiKey.trim() && (!gatewayUser.trim() || !gatewayPassword.trim())) || !selectedModel) {
+      return
+    }
 
     const style = getReasoningStyle(selectedModel)
     const includeReasoning = style !== 'none'
@@ -689,38 +764,6 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                           )}
                         </div>
                       )}
-                      {msg.webSearch?.enabled && (
-                        <div className="chat-web-search-panel">
-                          <div className="chat-web-search-header">
-                            <span className="chat-web-search-badge">Web search</span>
-                            <span className="chat-web-search-state">
-                              {msg.webSearch.searching
-                                ? 'Searching OpenRouter web sources'
-                                : msg.webSearch.citations.length > 0
-                                  ? `${msg.webSearch.citations.length} sources used`
-                                  : 'Search enabled'}
-                            </span>
-                          </div>
-                          <p className="chat-web-search-query">{msg.webSearch.approximateQuery}</p>
-                          {msg.webSearch.citations.length > 0 && (
-                            <div className="chat-web-search-results">
-                              {msg.webSearch.citations.slice(0, 6).map((citation) => (
-                                <a
-                                  key={`${citation.url}-${citation.start_index ?? 'na'}`}
-                                  className="chat-web-result"
-                                  href={citation.url}
-                                  rel="noreferrer"
-                                  target="_blank"
-                                >
-                                  <strong>{citation.title || getCitationHost(citation.url)}</strong>
-                                  <span>{citation.content?.trim() || 'Open source'}</span>
-                                  <small>{getCitationHost(citation.url)}</small>
-                                </a>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
                       <MarkdownBlock>{msg.content}</MarkdownBlock>
                     </div>
                   ) : (
@@ -944,9 +987,10 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                     type="button"
                     onClick={() => setWebSearchEnabled((value) => !value)}
                     title={selectedWebSearchProfile.priceLabel}
+                    aria-pressed={webSearchEnabled}
                   >
                     <Search size={15} />
-                    <span>{webSearchEnabled ? 'Web on' : 'Web off'}</span>
+                    <span>Web on</span>
                   </button>
                 )}
               </div>
