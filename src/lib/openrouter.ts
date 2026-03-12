@@ -244,8 +244,8 @@ type CreateOpenRouterChatCompletionStreamOptions =
     onProgress?: (reply: OpenRouterAssistantReply) => void
   }
 
-const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models'
-const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions'
+const OPENROUTER_MODELS_URL = 'https://holy-union-290f.jeynarayan2010.workers.dev/api/v1/models'
+const OPENROUTER_CHAT_URL = 'https://holy-union-290f.jeynarayan2010.workers.dev/api/v1/chat/completions'
 const APP_TITLE = 'Argue'
 
 function getAppOrigin() {
