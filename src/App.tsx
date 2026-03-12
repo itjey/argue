@@ -52,8 +52,6 @@ import {
   syncUserProfile,
 } from './lib/firebase'
 import {
-  GPHMT_GATEWAY_PASSWORD_STORAGE,
-  GPHMT_GATEWAY_USER_STORAGE,
   OPENROUTER_KEY_STORAGE,
 } from './lib/openrouterStorage'
 import './App.css'
@@ -374,14 +372,7 @@ function App() {
   useEffect(() => {
     const syncSavedApiKey = () => {
       const storedKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
-      const storedGatewayUser =
-        window.localStorage.getItem(GPHMT_GATEWAY_USER_STORAGE) ?? ''
-      const storedGatewayPassword =
-        window.localStorage.getItem(GPHMT_GATEWAY_PASSWORD_STORAGE) ?? ''
-      setHasSavedApiKey(
-        storedKey.trim().length > 0 ||
-          (storedGatewayUser.trim().length > 0 && storedGatewayPassword.trim().length > 0),
-      )
+      setHasSavedApiKey(storedKey.trim().length > 0)
     }
 
     const handleVisibilityChange = () => {
@@ -863,7 +854,7 @@ function App() {
               <strong>{currentUser.email ?? 'Account'}</strong>
               {!hasSavedApiKey ? (
                 <small className="topbar-api-key-warning">
-                  Add API key or gateway in Settings
+                  Add API key in Settings
                 </small>
               ) : !isVerified ? (
                 <small className="topbar-account-warning">Unverified account</small>
