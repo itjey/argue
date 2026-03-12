@@ -42,9 +42,9 @@ function MinimizedTab() {
   }, [])
   if (!visible) return null
   return createPortal(
-    <button className="code-runner-minimized-tab" type="button" onClick={tryReopen} title="Restore terminal">
+    <button className="code-runner-minimized-tab" type="button" onClick={tryReopen} title="Restore output">
       <Terminal size={13} />
-      <span>Terminal</span>
+      <span>Output</span>
     </button>,
     document.body
   )
@@ -69,6 +69,9 @@ function ensureMinimizedTab() {
    ═══════════════════════════════════════════════════════════════════════════ */
 const HTML_LANGS = new Set(['html', 'svg', 'xml'])
 const JS_LANGS   = new Set(['javascript', 'js', 'jsx'])
+const LATEX_LANGS = new Set(['latex', 'tex'])
+const LATEX_JS_BASE_URL = 'https://cdn.jsdelivr.net/npm/latex.js/dist/'
+const LATEX_JS_MODULE_URL = `${LATEX_JS_BASE_URL}latex.mjs`
 
 const GODBOLT: Record<string, { compiler: string; lang: string }> = {
   cpp:     { compiler: 'g152',        lang: 'c++' },
@@ -88,9 +91,142 @@ const GODBOLT: Record<string, { compiler: string; lang: string }> = {
   rb:      { compiler: 'ruby347',     lang: 'ruby' },
 }
 
-export function isRunnable(langId: string): boolean {
+function isRunnable(langId: string): boolean {
   const id = langId.toLowerCase()
-  return HTML_LANGS.has(id) || JS_LANGS.has(id) || id === 'python' || id === 'py' || id in GODBOLT
+  return HTML_LANGS.has(id) || JS_LANGS.has(id) || LATEX_LANGS.has(id) || id === 'python' || id === 'py' || id in GODBOLT
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
+}
+
+function normalizeLatexDocument(source: string) {
+  const trimmed = source.trim()
+
+  if (!trimmed) {
+    return '\\documentclass{article}\n\\begin{document}\n\\end{document}\n'
+  }
+
+  if (/\\documentclass(?:\[[^\]]*\])?\{[^}]+\}/.test(trimmed) || /\\begin\{document\}/.test(trimmed)) {
+    return trimmed
+  }
+
+  return `\\documentclass{article}\n\\begin{document}\n${trimmed}\n\\end{document}\n`
+}
+
+function buildLatexPreviewHtml(source: string) {
+  const latexSource = escapeHtml(normalizeLatexDocument(source))
+
+  return `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LaTeX preview</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top, rgba(255, 255, 255, 0.68), transparent 44%),
+          linear-gradient(180deg, #d9dce2 0%, #c3c8d0 100%);
+        color: #111827;
+        padding: 1.5rem;
+      }
+
+      .latex-preview-shell {
+        min-height: calc(100vh - 3rem);
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+      }
+
+      .latex-preview-page,
+      .latex-preview-status,
+      .latex-preview-error {
+        width: min(100%, 8.5in);
+        background: #fff;
+        border-radius: 0.25rem;
+        box-shadow:
+          0 18px 48px rgba(15, 23, 42, 0.18),
+          0 1px 0 rgba(255, 255, 255, 0.9) inset;
+      }
+
+      .latex-preview-page {
+        min-height: 11in;
+        padding: 0.75in 0.85in;
+      }
+
+      .latex-preview-page latex-js {
+        display: block;
+      }
+
+      .latex-preview-status,
+      .latex-preview-error {
+        padding: 1.25rem;
+        white-space: pre-wrap;
+        line-height: 1.6;
+      }
+
+      .latex-preview-status {
+        color: #475569;
+      }
+
+      .latex-preview-error {
+        color: #b91c1c;
+        font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="latex-preview-root" class="latex-preview-shell">
+      <div class="latex-preview-status">Rendering LaTeX…</div>
+    </div>
+    <template id="latex-preview-source">${latexSource}</template>
+    <script type="module">
+      const root = document.getElementById('latex-preview-root')
+      const source = document.getElementById('latex-preview-source')?.textContent ?? ''
+
+      try {
+        const { LaTeXJSComponent } = await import(${JSON.stringify(LATEX_JS_MODULE_URL)})
+
+        if (!customElements.get('latex-js')) {
+          customElements.define('latex-js', LaTeXJSComponent)
+        }
+
+        const page = document.createElement('div')
+        page.className = 'latex-preview-page'
+
+        const latex = document.createElement('latex-js')
+        latex.setAttribute('baseURL', ${JSON.stringify(LATEX_JS_BASE_URL)})
+        latex.setAttribute('hyphenate', 'false')
+        latex.textContent = source
+
+        page.appendChild(latex)
+        root.replaceChildren(page)
+      } catch (error) {
+        const failure = document.createElement('pre')
+        failure.className = 'latex-preview-error'
+        failure.textContent = error instanceof Error ? error.message : String(error)
+        root.replaceChildren(failure)
+      }
+    </script>
+  </body>
+</html>`
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -105,7 +241,7 @@ let _worker: Worker | null = null
 let _workerReady = false
 let _workerError: string | null = null
 let _sharedBuf: SharedArrayBuffer | null = null
-let _workerReadyCbs: Array<() => void> = []
+const _workerReadyCbs: Array<() => void> = []
 
 // Per-run callbacks registered by the active CodeBlock
 let _onStdout: ((text: string) => void) | null = null
@@ -227,6 +363,10 @@ type RunResult =
   | { type: 'text'; stdout: string; stderr: string; exitCode: number; plots?: string[] }
   | { type: 'error'; message: string }
 
+type PreviewState =
+  | { kind: 'html'; content: string }
+  | { kind: 'latex'; content: string }
+
 function runJavaScript(code: string): Promise<RunResult> {
   return new Promise(resolve => {
     const execId = ++_jsExecId
@@ -241,7 +381,7 @@ console.info=console.log
 var __X=0
 try{${code}}catch(e){__E.push(e.message);__X=1}
 window.parent.postMessage({__jsId:${execId},l:__L,e:__E,x:__X},'*')
-<\/script></body></html>`
+</script></body></html>`
 
     const iframe = document.createElement('iframe')
     iframe.setAttribute('sandbox', 'allow-scripts')
@@ -325,7 +465,7 @@ export function CodeBlock({ code, langId, label, children }: Props) {
   const [exitCode, setExitCode] = useState<number | null>(null)
   const [inputPrompt, setInputPrompt] = useState<string | null>(null)
   const [inputDraft, setInputDraft] = useState('')
-  const [htmlContent, setHtmlContent] = useState<string | null>(null)
+  const [preview, setPreview] = useState<PreviewState | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   // Resizable panel height (in vh)
@@ -412,7 +552,7 @@ export function CodeBlock({ code, langId, label, children }: Props) {
     setExitCode(null)
     setInputPrompt(null)
     setInputDraft('')
-    setHtmlContent(null)
+    setPreview(null)
     setErrorMsg(null)
     setStatusMsg('Starting…')
 
@@ -420,7 +560,11 @@ export function CodeBlock({ code, langId, label, children }: Props) {
 
     try {
       if (HTML_LANGS.has(id)) {
-        setHtmlContent(code)
+        setPreview({ kind: 'html', content: code })
+
+      } else if (LATEX_LANGS.has(id)) {
+        setStatusMsg('Rendering LaTeX…')
+        setPreview({ kind: 'latex', content: buildLatexPreviewHtml(code) })
 
       } else if (JS_LANGS.has(id)) {
         const r = await runJavaScript(code)
@@ -456,7 +600,7 @@ export function CodeBlock({ code, langId, label, children }: Props) {
   }
 
   async function runPython(src: string) {
-    let runId = Date.now()
+    const runId = Date.now()
 
     try {
       setStatusMsg('Loading Python…')
@@ -504,9 +648,8 @@ export function CodeBlock({ code, langId, label, children }: Props) {
     const py = await ensurePyodideMain()
     setStatusMsg('Running…')
 
-    let stdout = '', stderr = ''
-    py.setStdout({ batched: (s: string) => { stdout += s + '\n'; appendLine('out', s) } })
-    py.setStderr({ batched: (s: string) => { stderr += s + '\n'; appendLine('err', s) } })
+    py.setStdout({ batched: (s: string) => { appendLine('out', s) } })
+    py.setStderr({ batched: (s: string) => { appendLine('err', s) } })
 
     let exitCode = 0
     try {
@@ -534,7 +677,7 @@ try:
 except: []
 `)
       if (proxy?.toJs) { plots.push(...proxy.toJs()); proxy.destroy() }
-    } catch (_) { /* fine */ }
+    } catch { /* fine */ }
 
     setExitCode(exitCode)
     if (plots.length) setPlots(plots)
@@ -554,17 +697,27 @@ except: []
   }
 
   const runnable = isRunnable(langId)
-  const isPython = langId.toLowerCase() === 'python' || langId.toLowerCase() === 'py'
-  const showTerminal = !htmlContent && (lines.length > 0 || plots.length > 0 || running || exitCode !== null || errorMsg !== null)
+  const normalizedLangId = langId.toLowerCase()
+  const isPython = normalizedLangId === 'python' || normalizedLangId === 'py'
+  const isLatex = LATEX_LANGS.has(normalizedLangId)
+  const showTerminal =
+    !preview &&
+    !isLatex &&
+    (lines.length > 0 || plots.length > 0 || running || exitCode !== null || errorMsg !== null)
+  const panelTitle = isLatex ? `${label || 'LaTeX'} PDF Preview` : (label || 'Output')
 
   const panel = open ? createPortal(
-    <div className="code-runner-panel" style={{ height: `${panelHeight}vh` }}>
-      {/* Drag handle for resizing */}
-      <div className="code-runner-drag-handle" onMouseDown={onDragStart}>
-        <div className="code-runner-drag-bar" />
-      </div>
+    <div
+      className={`code-runner-panel${isLatex ? ' code-runner-panel-right' : ''}`}
+      style={isLatex ? undefined : { height: `${panelHeight}vh` }}
+    >
+      {!isLatex ? (
+        <div className="code-runner-drag-handle" onMouseDown={onDragStart}>
+          <div className="code-runner-drag-bar" />
+        </div>
+      ) : null}
       <div className="code-runner-header">
-        <span className="code-runner-title">{label || 'Output'}</span>
+        <span className="code-runner-title">{panelTitle}</span>
         <div className="code-runner-header-actions">
           <button className="code-runner-action-btn" type="button" onClick={run} disabled={running} title="Re-run">
             {running ? <Loader size={12} className="code-run-spinner" /> : <RotateCcw size={12} />}
@@ -575,19 +728,26 @@ except: []
         </div>
       </div>
 
-      <div className="code-runner-body">
-        {/* ── HTML preview ── */}
-        {htmlContent && (
+      <div className={`code-runner-body${isLatex ? ' code-runner-body-document' : ''}`}>
+        {preview?.kind === 'html' && (
           <iframe
             className="code-canvas-iframe"
             sandbox="allow-scripts allow-pointer-lock allow-downloads allow-modals allow-forms allow-same-origin"
-            srcDoc={htmlContent}
+            srcDoc={preview.content}
             title="Preview"
           />
         )}
 
-        {/* ── Terminal ── */}
-        {(showTerminal || (isPython && running) || !htmlContent) && (
+        {preview?.kind === 'latex' && (
+          <iframe
+            className="code-canvas-iframe code-canvas-iframe-document"
+            sandbox="allow-scripts"
+            srcDoc={preview.content}
+            title="LaTeX preview"
+          />
+        )}
+
+        {(showTerminal || (isPython && running)) && (
           <div className="code-terminal">
             <div className="code-terminal-output" onMouseDown={focusLiveInput}>
               {lines.map((l, i) => (
@@ -623,8 +783,7 @@ except: []
           </div>
         )}
 
-        {/* ── Initial loading spinner ── */}
-        {running && !showTerminal && !htmlContent && (
+        {running && !showTerminal && !preview && (
           <div className="code-canvas-loading">
             <Loader size={14} className="code-run-spinner" />
             <span>{statusMsg || 'Running…'}</span>
