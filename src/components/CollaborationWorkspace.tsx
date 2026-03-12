@@ -43,6 +43,31 @@ interface AttachedFile {
   mimeType: string
 }
 
+// ---- Group collaboration types ----
+interface GroupModelRun {
+  modelId: string
+  modelName: string
+  roleLabel: string
+  content: string
+  reasoning?: string
+  thinkingMs?: number
+  status: 'pending' | 'thinking' | 'done'
+}
+
+interface GroupPhase {
+  label: string
+  runs: GroupModelRun[]
+}
+
+interface GroupData {
+  phases: GroupPhase[]
+  currentPhaseIndex: number   // 0=Build, 1=Critique, 2=Synthesis
+  currentRunLabel: string     // e.g. "GPT-5.4 is thinking…"
+  synthesis: string
+  synthesisStreaming: boolean
+  complete: boolean
+}
+
 interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
@@ -61,6 +86,7 @@ interface ChatMessage {
     citations: OpenRouterUrlCitation[]
     searching: boolean
   }
+  groupData?: GroupData
 }
 
 declare global {
@@ -98,6 +124,26 @@ const EFFORT_LEVELS: { value: OpenRouterReasoningEffort; label: string; desc: st
   { value: 'low',     label: 'Low',     desc: 'Best for simple Q&A, quick lookups, and straightforward tasks. Fast responses.' },
   { value: 'minimal', label: 'Minimal', desc: 'Near-instant responses with almost no internal reasoning. Best for trivial tasks and autocomplete-style use.' },
 ]
+
+const GROUP_ONE_ID = '__group_1__'
+const GROUP_ONE: OpenRouterModel = {
+  id: GROUP_ONE_ID,
+  name: 'Group 1',
+  description: 'GPT-5.4 · Claude Opus 4.6 · Gemini 3.1 Pro — Adversarial collaboration at max reasoning',
+  pricing: { prompt: '0', completion: '0', web_search: '0' },
+  supported_parameters: ['reasoning'],
+  architecture: { input_modalities: ['text'], output_modalities: ['text'] },
+}
+
+const GROUP_MODELS_CONFIG = [
+  { id: 'openai/gpt-5.4',                name: 'GPT-5.4',         role: 'Builder',   useReasoning: true  },
+  { id: 'google/gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro',  role: 'Analyst',   useReasoning: false },
+  { id: 'anthropic/claude-opus-4.6',     name: 'Claude Opus 4.6', role: 'Adversary', useReasoning: true  },
+]
+
+const GROUP_SYSTEM_PROMPT = `You are participating in a multi-model collaborative problem-solving session.
+Format responses using Markdown. Use $...\$ for inline math and $$...$$ for block equations.
+Use fenced code blocks with language hints (e.g. \`\`\`python). Be thorough and precise.`
 
 /** Ensure **Title** section headers in reasoning text appear on their own paragraph. */
 function normalizeReasoningText(text: string): string {
@@ -455,9 +501,234 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
     }
   }
 
+  async function runGroupStream(historyBefore: ChatMessage[], userMsg: ChatMessage) {
+    const apiKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
+    if (!apiKey.trim()) return
+
+    const assistantId = crypto.randomUUID()
+
+    // Initialize local mutable state (used for logic; synced to React state via syncGroup)
+    const group: GroupData = {
+      phases: [
+        {
+          label: 'Build',
+          runs: GROUP_MODELS_CONFIG.map((m) => ({
+            modelId: m.id, modelName: m.name, roleLabel: m.role,
+            content: '', status: 'pending' as const,
+          })),
+        },
+        {
+          label: 'Critique',
+          runs: GROUP_MODELS_CONFIG.map((m) => ({
+            modelId: m.id, modelName: m.name, roleLabel: m.role,
+            content: '', status: 'pending' as const,
+          })),
+        },
+      ],
+      currentPhaseIndex: 0,
+      currentRunLabel: '',
+      synthesis: '',
+      synthesisStreaming: false,
+      complete: false,
+    }
+
+    function syncGroup() {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, groupData: { ...group, phases: group.phases.map((p) => ({ ...p, runs: p.runs.map((r) => ({ ...r })) })) } }
+            : m
+        )
+      )
+    }
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: assistantId,
+        role: 'assistant' as const,
+        content: '',
+        streaming: true,
+        isReasoningModel: false,
+        groupData: { ...group },
+      },
+    ])
+    setStreaming(true)
+    abortedRef.current = false
+
+    const userText = userMsg.content.trim()
+
+    function phase1SystemFor(roleLabel: string): string {
+      if (roleLabel === 'Builder') return `${GROUP_SYSTEM_PROMPT}\n\nYour role in this collaboration is: BUILDER\nYour job: Provide a thorough, complete solution to the user's request. Think deeply, show your reasoning, and produce your best possible answer.`
+      if (roleLabel === 'Analyst') return `${GROUP_SYSTEM_PROMPT}\n\nYour role in this collaboration is: ANALYST\nYour job: Deeply analyze the problem. Break it down into key components, identify edge cases, underlying patterns, and important considerations others might miss. Then provide your complete take.`
+      return `${GROUP_SYSTEM_PROMPT}\n\nYour role in this collaboration is: ADVERSARY\nYour job: Provide a complete, independent answer. In the next round you will aggressively challenge the other models' responses — but for now, give your best answer first.`
+    }
+
+    function phase2SystemFor(roleLabel: string, buildRuns: GroupModelRun[]): string {
+      const summaries = buildRuns.map((r) => `## ${r.modelName} (${r.roleLabel})\n${r.content}`).join('\n\n---\n\n')
+      const base = `${GROUP_SYSTEM_PROMPT}\n\nYou are in Round 2 of a collaborative session. All three models completed Round 1. Here are all Round 1 responses:\n\n${summaries}\n\n---\n\nUSER'S ORIGINAL REQUEST: ${userText}`
+      if (roleLabel === 'Adversary') {
+        return `${base}\n\nYour task: Be ruthlessly specific. Find everything wrong or missing across ALL responses (including your own). Identify incorrect logic, unhandled edge cases, missing parts of the user's request. Then produce an improved answer that fixes all these issues. Explain what you changed and why.`
+      }
+      return `${base}\n\nYour task: Review all responses critically. What is incorrect or incomplete? What did you miss that others caught? Now produce an improved, corrected version of your answer incorporating the best insights from all three. Be specific about what you changed and why.`
+    }
+
+    function buildPhaseMessages(systemPrompt: string, userText: string): OpenRouterChatMessage[] {
+      return [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userText },
+      ]
+    }
+
+    try {
+      // ── Phase 1: Build ──────────────────────────────────────────
+      group.currentPhaseIndex = 0
+      for (const run of group.phases[0].runs) {
+        if (abortedRef.current) break
+        group.currentRunLabel = `${run.modelName} is thinking…`
+        run.status = 'thinking'
+        syncGroup()
+
+        const cfg = GROUP_MODELS_CONFIG.find((c) => c.id === run.modelId)!
+        const sysPrompt = phase1SystemFor(run.roleLabel)
+        const msgs = buildPhaseMessages(sysPrompt, userText)
+        const startMs = Date.now()
+
+        try {
+          await createOpenRouterChatCompletionStream({
+            apiKey,
+            model: run.modelId,
+            messages: msgs,
+            includeReasoning: cfg.useReasoning,
+            reasoning: cfg.useReasoning ? { effort: 'high' } : undefined,
+            plugins: webSearchEnabled ? [{ id: 'web' }] : undefined,
+            webSearchOptions: webSearchEnabled ? { search_context_size: 'high' } : undefined,
+            onProgress: (reply) => {
+              if (abortedRef.current) return
+              run.content = reply.text
+              run.reasoning = reply.reasoning || run.reasoning
+              syncGroup()
+            },
+          })
+        } catch (e) {
+          run.content = `Error: ${e instanceof Error ? e.message : 'Failed'}`
+        }
+        run.status = 'done'
+        run.thinkingMs = Date.now() - startMs
+        syncGroup()
+      }
+
+      // ── Phase 2: Critique ───────────────────────────────────────
+      group.currentPhaseIndex = 1
+      for (const run of group.phases[1].runs) {
+        if (abortedRef.current) break
+        group.currentRunLabel = `${run.modelName} is thinking…`
+        run.status = 'thinking'
+        syncGroup()
+
+        const cfg = GROUP_MODELS_CONFIG.find((c) => c.id === run.modelId)!
+        const sysPrompt = phase2SystemFor(run.roleLabel, group.phases[0].runs)
+        const msgs = buildPhaseMessages(sysPrompt, userText)
+        const startMs = Date.now()
+
+        try {
+          await createOpenRouterChatCompletionStream({
+            apiKey,
+            model: run.modelId,
+            messages: msgs,
+            includeReasoning: cfg.useReasoning,
+            reasoning: cfg.useReasoning ? { effort: 'high' } : undefined,
+            plugins: webSearchEnabled ? [{ id: 'web' }] : undefined,
+            webSearchOptions: webSearchEnabled ? { search_context_size: 'high' } : undefined,
+            onProgress: (reply) => {
+              if (abortedRef.current) return
+              run.content = reply.text
+              run.reasoning = reply.reasoning || run.reasoning
+              syncGroup()
+            },
+          })
+        } catch (e) {
+          run.content = `Error: ${e instanceof Error ? e.message : 'Failed'}`
+        }
+        run.status = 'done'
+        run.thinkingMs = Date.now() - startMs
+        syncGroup()
+      }
+
+      // ── Phase 3: Synthesis (GPT-5.4 only) ──────────────────────
+      if (!abortedRef.current) {
+        group.currentPhaseIndex = 2
+        group.currentRunLabel = 'GPT-5.4 is synthesizing…'
+        group.synthesisStreaming = true
+        syncGroup()
+
+        const phase2Summaries = group.phases[1].runs
+          .map((r) => `## ${r.modelName} (${r.roleLabel}) — Round 2\n${r.content}`)
+          .join('\n\n---\n\n')
+
+        const synthesisSystem = `${GROUP_SYSTEM_PROMPT}\n\nYou are synthesizing the results of a 2-round collaborative problem-solving session.\n\nUSER'S ORIGINAL REQUEST: ${userText}\n\n${phase2Summaries}\n\n---\n\nYour task: Synthesize the best final answer. Take the strongest elements from each model, resolve any contradictions, and produce a single comprehensive, correct, complete response to the user's original request. This is the answer the user will see — make it excellent.`
+
+        const msgs: OpenRouterChatMessage[] = [
+          { role: 'system', content: synthesisSystem },
+          { role: 'user', content: 'Please provide the final synthesized answer.' },
+        ]
+
+        try {
+          await createOpenRouterChatCompletionStream({
+            apiKey,
+            model: 'openai/gpt-5.4',
+            messages: msgs,
+            includeReasoning: true,
+            reasoning: { effort: 'high' },
+            onProgress: (reply) => {
+              if (abortedRef.current) return
+              group.synthesis = reply.text
+              syncGroup()
+            },
+          })
+        } catch (e) {
+          group.synthesis = `Error during synthesis: ${e instanceof Error ? e.message : 'Failed'}`
+        }
+        group.synthesisStreaming = false
+      }
+
+      group.complete = true
+      group.currentRunLabel = ''
+      syncGroup()
+
+      if (!abortedRef.current) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: group.synthesis,
+                  streaming: false,
+                  groupData: { ...group, phases: group.phases.map((p) => ({ ...p, runs: p.runs.map((r) => ({ ...r })) })) },
+                }
+              : m
+          )
+        )
+      }
+    } catch (err) {
+      if (!abortedRef.current) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? { ...m, content: String(err), streaming: false, error: true }
+              : m
+          )
+        )
+      }
+    } finally {
+      setStreaming(false)
+    }
+  }
+
   async function handleSubmit() {
     const text = prompt.trim()
     if (!text && attachments.length === 0) return
+    if (!selectedModel) return
     if (streaming) return
 
     shouldAutoScrollRef.current = true
@@ -479,7 +750,11 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
     setEditingId(null)
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
 
-    await runStream(historyBefore, userMsg)
+    if (selectedModel?.id === GROUP_ONE_ID) {
+      await runGroupStream(historyBefore, userMsg)
+    } else {
+      await runStream(historyBefore, userMsg)
+    }
   }
 
   function startEdit(msg: ChatMessage) {
@@ -529,7 +804,8 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
     })
   }
 
-  const supportsFiles = selectedModel ? isMultimodal(selectedModel) : false
+  const supportsFiles = selectedModel ? (selectedModel.id !== GROUP_ONE_ID && isMultimodal(selectedModel)) : false
+  const isGroupMode = selectedModel?.id === GROUP_ONE_ID
   const hasMessages = messages.length > 0
   const reasoningStyle = selectedModel ? getReasoningStyle(selectedModel) : 'none'
   const selectedWebSearchProfile = getWebSearchModelProfile(selectedModel)
@@ -655,37 +931,92 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                   )}
                   {msg.role === 'assistant' ? (
                     <div className="chat-markdown">
-                      {/* thinking / reasoning block — shown for reasoning models only */}
-                      {msg.isReasoningModel && (
-                        <div className="chat-thinking-row">
-                          <button
-                            className={`chat-thinking-toggle${hasReasoningTrace ? '' : ' chat-thinking-toggle-disabled'}`}
-                            type="button"
-                            disabled={!hasReasoningTrace}
-                            aria-expanded={isThinkingExpanded}
-                            onClick={() => toggleThinking(msg.id)}
-                          >
-                            {msg.streaming && !msg.content && !msg.reasoning ? (
-                              <span className="chat-thinking-pulse">Thinking…</span>
-                            ) : msg.stoppedThinking ? (
-                              <span className="chat-thinking-stopped">Stopped thinking</span>
-                            ) : msg.thinkingDuration != null ? (
-                              <span>Thought for {Math.round(msg.thinkingDuration / 1000)}s</span>
-                            ) : msg.streaming ? (
-                              <span className="chat-thinking-pulse">Thinking…</span>
-                            ) : (
-                              <span>Thoughts</span>
-                            )}
-                          </button>
-                          {isThinkingExpanded && (
-                            <div className="chat-thinking-content">
-                              <MarkdownBlock>{normalizeReasoningText(msg.reasoning ?? '')}</MarkdownBlock>
+                      {msg.groupData ? (
+                        /* ── Group 1 collaborative message ── */
+                        <>
+                          {/* Live thinking indicator */}
+                          {msg.streaming && msg.groupData.currentRunLabel && (
+                            <div className="chat-thinking-row">
+                              <span className="chat-thinking-pulse">{msg.groupData.currentRunLabel}</span>
+                              {msg.groupData.currentPhaseIndex < 2 && (
+                                <span className="group-phase-indicator">Phase {msg.groupData.currentPhaseIndex + 1}/2</span>
+                              )}
                             </div>
                           )}
-                        </div>
-                      )}
 
-                      <MarkdownBlock>{msg.content}</MarkdownBlock>
+                          {/* Phase outputs — collapsible */}
+                          {msg.groupData.phases.map((phase, pi) => {
+                            const activeRuns = phase.runs.filter((r) => r.status !== 'pending')
+                            if (activeRuns.length === 0) return null
+                            return (
+                              <details key={pi} className="group-phase-details">
+                                <summary className="group-phase-summary">
+                                  <span className="group-phase-label">Phase {pi + 1}: {phase.label}</span>
+                                  <span className="group-phase-meta">{activeRuns.filter(r => r.status === 'done').length}/{phase.runs.length} models</span>
+                                </summary>
+                                <div className="group-phase-runs">
+                                  {activeRuns.map((run) => (
+                                    <div key={run.modelId} className={`group-run group-run-${run.status}`}>
+                                      <div className="group-run-header">
+                                        <span className="group-run-model">{run.modelName}</span>
+                                        <span className="group-run-role">{run.roleLabel}</span>
+                                        {run.status === 'thinking' && <span className="chat-thinking-pulse group-run-thinking">thinking…</span>}
+                                        {run.thinkingMs != null && <span className="group-run-time">Thought for {Math.round(run.thinkingMs / 1000)}s</span>}
+                                      </div>
+                                      {run.content && <MarkdownBlock>{run.content}</MarkdownBlock>}
+                                    </div>
+                                  ))}
+                                </div>
+                              </details>
+                            )
+                          })}
+
+                          {/* Synthesis */}
+                          {(msg.groupData.synthesisStreaming || msg.groupData.synthesis) && (
+                            <div className="group-synthesis">
+                              <div className="group-synthesis-header">
+                                <span>✦ Final Answer</span>
+                                {msg.groupData.synthesisStreaming && <span className="chat-thinking-pulse">GPT-5.4 synthesizing…</span>}
+                              </div>
+                              <MarkdownBlock>{msg.groupData.synthesis}</MarkdownBlock>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        /* ── Normal single-model message ── */
+                        <>
+                          {/* thinking / reasoning block — shown for reasoning models only */}
+                          {msg.isReasoningModel && (
+                            <div className="chat-thinking-row">
+                              <button
+                                className={`chat-thinking-toggle${hasReasoningTrace ? '' : ' chat-thinking-toggle-disabled'}`}
+                                type="button"
+                                disabled={!hasReasoningTrace}
+                                aria-expanded={isThinkingExpanded}
+                                onClick={() => toggleThinking(msg.id)}
+                              >
+                                {msg.streaming && !msg.content && !msg.reasoning ? (
+                                  <span className="chat-thinking-pulse">Thinking…</span>
+                                ) : msg.stoppedThinking ? (
+                                  <span className="chat-thinking-stopped">Stopped thinking</span>
+                                ) : msg.thinkingDuration != null ? (
+                                  <span>Thought for {Math.round(msg.thinkingDuration / 1000)}s</span>
+                                ) : msg.streaming ? (
+                                  <span className="chat-thinking-pulse">Thinking…</span>
+                                ) : (
+                                  <span>Thoughts</span>
+                                )}
+                              </button>
+                              {isThinkingExpanded && (
+                                <div className="chat-thinking-content">
+                                  <MarkdownBlock>{normalizeReasoningText(msg.reasoning ?? '')}</MarkdownBlock>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <MarkdownBlock>{msg.content}</MarkdownBlock>
+                        </>
+                      )}
                     </div>
                   ) : (
                     <p className="chat-user-text">{msg.content}</p>
@@ -799,6 +1130,31 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                         />
                       </div>
                       <div className="model-list">
+                        {/* Group 1 — pinned at top */}
+                        {(!modelSearch.trim() || 'group 1'.includes(modelSearch.toLowerCase()) || 'group1'.includes(modelSearch.toLowerCase())) && (
+                          <div className="model-list-group">
+                            <p className="model-list-group-label">Collaboration</p>
+                            <div className={`model-list-item${selectedModel?.id === GROUP_ONE_ID ? ' model-list-item-active' : ''}`}>
+                              <button
+                                className="model-list-select"
+                                type="button"
+                                onClick={() => {
+                                  setSelectedModel(GROUP_ONE)
+                                  setModelOpen(false)
+                                  setModelSearch('')
+                                  setAttachments([])
+                                }}
+                              >
+                                <span className="model-list-name">Group 1</span>
+                                <span className="model-list-id">GPT-5.4 · Claude Opus 4.6 · Gemini 3.1 Pro</span>
+                                <div className="model-list-badges">
+                                  <span className="model-list-badge model-list-badge-free">Free web search</span>
+                                  <span className="model-list-badge model-list-badge-group">3 models</span>
+                                </div>
+                              </button>
+                            </div>
+                          </div>
+                        )}
                         {filteredModels.length === 0 && (
                           <p className="model-list-empty">No models found</p>
                         )}
@@ -855,7 +1211,7 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                 </div>
 
                 {/* Reasoning effort selector — styled like model selector pill */}
-                {(reasoningStyle === 'effort' || reasoningStyle === 'include') && (
+                {selectedModel?.id !== GROUP_ONE_ID && (reasoningStyle === 'effort' || reasoningStyle === 'include') && (
                   <div className="model-selector effort-selector" ref={effortDropRef}>
                     <button
                       className="model-selector-trigger"
@@ -902,7 +1258,7 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                   </div>
                 )}
 
-                {supportsWebSearch && (
+                {(supportsWebSearch || selectedModel?.id === GROUP_ONE_ID) && (
                   <button
                     className={`prompt-pill-btn${webSearchEnabled ? ' prompt-pill-btn-active' : ''}`}
                     type="button"
@@ -912,6 +1268,12 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                     <Search size={15} />
                     <span>{webSearchEnabled ? 'Web on' : 'Web off'}</span>
                   </button>
+                )}
+                {selectedModel?.id === GROUP_ONE_ID && (
+                  <div className="group-disclaimer">
+                    <span className="group-disclaimer-icon">⚡</span>
+                    <span>GPT-5.4 · Claude Opus 4.6 · Gemini 3.1 Pro · Max reasoning</span>
+                  </div>
                 )}
               </div>
 

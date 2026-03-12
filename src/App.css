@@ -6061,3 +6061,151 @@
 .effort-option-info:hover .effort-tooltip {
   display: block;
 }
+
+/* ─── Group 1 collaboration styles ─────────────────────────── */
+
+.model-list-badge-group {
+  background: rgba(138, 92, 246, 0.15);
+  color: #a78bfa;
+  border: 1px solid rgba(138, 92, 246, 0.25);
+}
+
+.group-disclaimer {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.45);
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+.group-disclaimer-icon {
+  color: #a78bfa;
+  font-size: 12px;
+}
+
+.group-phase-indicator {
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+  margin-left: 8px;
+}
+
+/* Phase collapsible */
+.group-phase-details {
+  margin: 6px 0;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.group-phase-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  background: rgba(255,255,255,0.03);
+  list-style: none;
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+  gap: 8px;
+}
+
+.group-phase-summary::-webkit-details-marker { display: none; }
+
+.group-phase-summary::before {
+  content: '▶';
+  font-size: 9px;
+  color: rgba(255,255,255,0.3);
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+
+.group-phase-details[open] .group-phase-summary::before {
+  transform: rotate(90deg);
+}
+
+.group-phase-label {
+  font-weight: 600;
+  color: rgba(255,255,255,0.65);
+}
+
+.group-phase-meta {
+  font-size: 11px;
+  color: rgba(255,255,255,0.3);
+  margin-left: auto;
+}
+
+.group-phase-runs {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Individual model run */
+.group-run {
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.group-run-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.025);
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.group-run-model {
+  font-weight: 600;
+  color: rgba(255,255,255,0.75);
+}
+
+.group-run-role {
+  font-size: 11px;
+  color: rgba(255,255,255,0.35);
+  background: rgba(255,255,255,0.06);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.group-run-time {
+  font-size: 11px;
+  color: rgba(255,255,255,0.3);
+  margin-left: auto;
+}
+
+.group-run-thinking {
+  font-size: 11px;
+  margin-left: auto;
+}
+
+.group-run > .markdown-body,
+.group-run > * + * {
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+/* Synthesis section */
+.group-synthesis {
+  margin-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding-top: 12px;
+}
+
+.group-synthesis-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.5);
+  margin-bottom: 8px;
+  gap: 8px;
+}
