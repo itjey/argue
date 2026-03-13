@@ -1,3 +1,13 @@
+import { CORE_OPENROUTER_MODELS } from './coreFallbackCatalog'
+import {
+  fetchOpenRouterStatsSnapshot,
+  type OpenRouterModelStatsEntry,
+} from './openrouterStats'
+import {
+  getConfiguredOpenRouterApiBase,
+  isBrowserManagedOpenRouter,
+} from './runtimeConfig'
+
 type OpenRouterPricing = Record<string, string | undefined>
 type OpenRouterInputModality = 'text' | 'image' | 'file' | 'audio' | 'video'
 type OpenRouterOutputModality = 'text' | 'image' | 'audio'
@@ -152,8 +162,12 @@ type OpenRouterChatMessage = {
   phase?: string | null
 }
 
-type OpenRouterModelsResponse = {
-  data?: OpenRouterModel[]
+type OpenRouterModelCatalogSource = 'bundled' | 'snapshot' | 'core'
+
+type OpenRouterModelCatalogResult = {
+  models: OpenRouterModel[]
+  source: OpenRouterModelCatalogSource
+  warning?: string
 }
 
 type OpenRouterChatChoice = {
@@ -227,7 +241,7 @@ type OpenRouterAssistantReply = {
 }
 
 type CreateOpenRouterChatCompletionOptions = {
-  apiKey: string
+  apiKey?: string
   messages: OpenRouterChatMessage[]
   model: string
   includeReasoning?: boolean
@@ -244,37 +258,69 @@ type CreateOpenRouterChatCompletionStreamOptions =
     onProgress?: (reply: OpenRouterAssistantReply) => void
   }
 
-const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models'
-const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions'
-const PROXY_MODELS_URL = 'https://holy-union-290f.jeynarayan2010.workers.dev/api/v1/models'
-const PROXY_CHAT_URL = 'https://holy-union-290f.jeynarayan2010.workers.dev/api/v1/chat/completions'
+const OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1'
+const LEGACY_PROXY_API_BASE =
+  'https://holy-union-290f.jeynarayan2010.workers.dev/api/v1'
 
-let workingApiBase: 'direct' | 'proxy' | null = null;
-let baseTestPromise: Promise<'direct' | 'proxy'> | null = null;
+let workingApiBase: string | null = null
+let baseTestPromise: Promise<string> | null = null
 
-async function getWorkingApiBase(): Promise<'direct' | 'proxy'> {
-  if (workingApiBase) return workingApiBase;
-  if (!baseTestPromise) {
-    const testUrl = async (url: string, type: 'direct' | 'proxy') => {
-      const controller = new AbortController();
-      const id = setTimeout(() => controller.abort(), 1500);
-      try {
-        const res = await fetch(url, { signal: controller.signal, headers: { 'HTTP-Referer': getAppOrigin() } });
-        clearTimeout(id);
-        if (res.ok) return type;
-        throw new Error('Not ok');
-      } catch (err) {
-        clearTimeout(id);
-        throw err;
-      }
-    };
-    baseTestPromise = Promise.any([
-      testUrl(OPENROUTER_MODELS_URL, 'direct'),
-      testUrl(PROXY_MODELS_URL, 'proxy')
-    ]).catch(() => 'direct' as const); // fallback to direct if both timeout
+function normalizeApiBase(value: string) {
+  return value.replace(/\/+$/, '')
+}
+
+function getModelsUrl(base: string) {
+  return `${normalizeApiBase(base)}/models`
+}
+
+function getChatUrl(base: string) {
+  return `${normalizeApiBase(base)}/chat/completions`
+}
+
+function toAbsoluteApiBase(base: string) {
+  if (/^https?:\/\//i.test(base)) {
+    return normalizeApiBase(base)
   }
-  workingApiBase = await baseTestPromise;
-  return workingApiBase;
+
+  if (typeof window === 'undefined') {
+    return normalizeApiBase(base)
+  }
+
+  return normalizeApiBase(new URL(base, window.location.origin).toString())
+}
+
+async function getWorkingApiBase(): Promise<string> {
+  const configuredApiBase = getConfiguredOpenRouterApiBase()
+
+  if (configuredApiBase) {
+    return toAbsoluteApiBase(configuredApiBase)
+  }
+
+  if (workingApiBase) return workingApiBase
+  if (!baseTestPromise) {
+    const testUrl = async (base: string) => {
+      const controller = new AbortController()
+      const id = setTimeout(() => controller.abort(), 1500)
+      try {
+        const res = await fetch(getModelsUrl(base), {
+          signal: controller.signal,
+          headers: { 'HTTP-Referer': getAppOrigin() },
+        })
+        clearTimeout(id)
+        if (res.ok) return base
+        throw new Error('Not ok')
+      } catch (err) {
+        clearTimeout(id)
+        throw err
+      }
+    }
+    baseTestPromise = Promise.any([
+      testUrl(OPENROUTER_API_BASE),
+      testUrl(LEGACY_PROXY_API_BASE),
+    ]).catch(() => OPENROUTER_API_BASE)
+  }
+  workingApiBase = await baseTestPromise
+  return workingApiBase
 }
 const APP_TITLE = 'Argue'
 
@@ -300,6 +346,20 @@ function requestHeaders(apiKey?: string) {
   return headers
 }
 
+function assertOpenRouterCredentials(apiKey?: string) {
+  if (!isBrowserManagedOpenRouter()) {
+    return
+  }
+
+  if (apiKey?.trim()) {
+    return
+  }
+
+  throw new Error(
+    'Add your OpenRouter API key in Settings, or use a server-managed deployment.',
+  )
+}
+
 function normalizeOpenRouterModel(model: OpenRouterModel): OpenRouterModel {
   return {
     ...model,
@@ -308,12 +368,62 @@ function normalizeOpenRouterModel(model: OpenRouterModel): OpenRouterModel {
   }
 }
 
+function normalizeAndSortOpenRouterModels(models: OpenRouterModel[]) {
+  return models
+    .map((model) => normalizeOpenRouterModel(model))
+    .sort((left, right) => left.name.localeCompare(right.name))
+}
+
+function getInitialOpenRouterModels() {
+  return normalizeAndSortOpenRouterModels(CORE_OPENROUTER_MODELS)
+}
+
 async function getBundledOpenRouterModels() {
   const { BUNDLED_OPENROUTER_MODELS } = await import('./fallbackCatalog')
 
-  return BUNDLED_OPENROUTER_MODELS.map((model) =>
-    normalizeOpenRouterModel(model as OpenRouterModel),
-  ).sort((left, right) => left.name.localeCompare(right.name))
+  return normalizeAndSortOpenRouterModels(
+    BUNDLED_OPENROUTER_MODELS as OpenRouterModel[],
+  )
+}
+
+function mapStatsEntryToOpenRouterModel(entry: OpenRouterModelStatsEntry) {
+  const primaryEndpoint = entry.endpointStats[0] ?? null
+  const providerLabel =
+    primaryEndpoint?.providerDisplayName ??
+    entry.id.split('/')[0] ??
+    'OpenRouter'
+
+  return {
+    id: entry.id,
+    canonical_slug: entry.canonicalSlug || entry.id,
+    name: primaryEndpoint?.name?.trim() || entry.id,
+    description: `Cached OpenRouter catalog entry from ${providerLabel}.`,
+    context_length: primaryEndpoint?.contextLength ?? undefined,
+    pricing: primaryEndpoint
+      ? {
+          prompt: String(primaryEndpoint.pricing.prompt),
+          completion: String(primaryEndpoint.pricing.completion),
+          input_cache_read: String(primaryEndpoint.pricing.inputCacheRead),
+          web_search: String(primaryEndpoint.pricing.webSearch),
+        }
+      : undefined,
+    top_provider: primaryEndpoint
+      ? {
+          context_length: primaryEndpoint.contextLength ?? undefined,
+          max_completion_tokens:
+            primaryEndpoint.maxCompletionTokens ?? undefined,
+          is_moderated: primaryEndpoint.moderationRequired,
+        }
+      : undefined,
+  } satisfies OpenRouterModel
+}
+
+async function getSnapshotOpenRouterModels() {
+  const snapshot = await fetchOpenRouterStatsSnapshot()
+
+  return normalizeAndSortOpenRouterModels(
+    snapshot.models.map((entry) => mapStatsEntryToOpenRouterModel(entry)),
+  )
 }
 
 function extractChatText(
@@ -638,12 +748,48 @@ function extractSsePayload(rawEvent: string) {
   return dataLines.join('\n')
 }
 
-async function fetchOpenRouterModels() {
+async function fetchOpenRouterModels(): Promise<OpenRouterModelCatalogResult> {
   // Fire off the API reachability test in the background so chat doesn't lag later
   getWorkingApiBase().catch(() => {})
 
-  // Return bundled models INSTANTLY to remove the 3.5s loading delay for the user
-  return getBundledOpenRouterModels()
+  try {
+    const bundledModels = await getBundledOpenRouterModels()
+
+    if (bundledModels.length > 0) {
+      return {
+        models: bundledModels,
+        source: 'bundled',
+      }
+    }
+
+    throw new Error('The bundled OpenRouter model catalog was empty.')
+  } catch (error) {
+    console.warn('Could not load the bundled OpenRouter model catalog.', error)
+  }
+
+  try {
+    const snapshotModels = await getSnapshotOpenRouterModels()
+
+    if (snapshotModels.length > 0) {
+      return {
+        models: snapshotModels,
+        source: 'snapshot',
+        warning:
+          'Showing a cached model catalog because the full OpenRouter list could not be loaded on this network.',
+      }
+    }
+
+    throw new Error('The cached OpenRouter stats snapshot was empty.')
+  } catch (error) {
+    console.warn('Could not load the cached OpenRouter model snapshot.', error)
+  }
+
+  return {
+    models: getInitialOpenRouterModels(),
+    source: 'core',
+    warning:
+      'Showing the built-in starter catalog because this network blocked the full model catalog. You can still use Argue normally.',
+  }
 }
 
 async function createOpenRouterChatCompletion({
@@ -658,10 +804,11 @@ async function createOpenRouterChatCompletion({
   plugins,
   webSearchOptions,
 }: CreateOpenRouterChatCompletionOptions) {
+  assertOpenRouterCredentials(apiKey)
   const apiBase = await getWorkingApiBase()
-  const chatUrl = apiBase === 'proxy' ? PROXY_CHAT_URL : OPENROUTER_CHAT_URL
+  const chatUrl = getChatUrl(apiBase)
 
-  let response = await fetch(chatUrl, {
+  const response = await fetch(chatUrl, {
     method: 'POST',
     headers: requestHeaders(apiKey),
     body: JSON.stringify({
@@ -701,10 +848,11 @@ async function createOpenRouterChatCompletionStream({
   plugins,
   webSearchOptions,
 }: CreateOpenRouterChatCompletionStreamOptions) {
+  assertOpenRouterCredentials(apiKey)
   const apiBase = await getWorkingApiBase()
-  const chatUrl = apiBase === 'proxy' ? PROXY_CHAT_URL : OPENROUTER_CHAT_URL
+  const chatUrl = getChatUrl(apiBase)
 
-  let response = await fetch(chatUrl, {
+  const response = await fetch(chatUrl, {
     method: 'POST',
     headers: requestHeaders(apiKey),
     body: JSON.stringify({
@@ -863,6 +1011,7 @@ export {
   fetchOpenRouterModels,
   formatModelDate,
   formatOpenRouterPrice,
+  getInitialOpenRouterModels,
   getRecentOpenRouterModels,
 }
 
@@ -873,6 +1022,7 @@ export type {
   OpenRouterChatContentPart,
   OpenRouterChatMessage,
   OpenRouterInputModality,
+  OpenRouterModelCatalogResult,
   OpenRouterModel,
   OpenRouterOutputModality,
   OpenRouterPlugin,

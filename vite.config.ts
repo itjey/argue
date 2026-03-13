@@ -1,10 +1,24 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+function normalizeBase(value?: string) {
+  if (!value) {
+    return null
+  }
+
+  if (value === '/') {
+    return '/'
+  }
+
+  return value.endsWith('/') ? value : `${value}/`
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
   plugins: [react()],
-  base: mode === 'production' ? '/argue/' : '/',
+  base:
+    normalizeBase(process.env.VITE_PUBLIC_BASE) ??
+    (mode === 'production' ? '/argue/' : '/'),
   build: {
     rollupOptions: {
       output: {

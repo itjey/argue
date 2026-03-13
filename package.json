@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "start": "node server/index.mjs",
     "refresh:openrouter-stats": "node scripts/fetch-openrouter-stats.mjs"
   },
   "dependencies": {

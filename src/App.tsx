@@ -54,6 +54,10 @@ import {
 import {
   OPENROUTER_KEY_STORAGE,
 } from './lib/openrouterStorage'
+import {
+  isGuestModeEnabled,
+  isServerManagedOpenRouter,
+} from './lib/runtimeConfig'
 import './App.css'
 
 type FeatureCard = {
@@ -265,6 +269,8 @@ const thread: Message[] = [
 ]
 
 function App() {
+  const guestModeEnabled = isGuestModeEnabled()
+  const serverManagedOpenRouter = isServerManagedOpenRouter()
   const lastScrollYRef = useRef(0)
   const topbarHiddenRef = useRef(false)
   const scrollFrameRef = useRef<number | null>(null)
@@ -291,7 +297,7 @@ function App() {
   const [passwordResetMessage, setPasswordResetMessage] = useState('')
   const [passwordResetError, setPasswordResetError] = useState('')
   const [topbarHidden, setTopbarHidden] = useState(false)
-  const [hasSavedApiKey, setHasSavedApiKey] = useState(false)
+  const [hasSavedApiKey, setHasSavedApiKey] = useState(serverManagedOpenRouter)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
@@ -370,6 +376,11 @@ function App() {
   }, [authDialogOpen])
 
   useEffect(() => {
+    if (serverManagedOpenRouter) {
+      setHasSavedApiKey(true)
+      return undefined
+    }
+
     const syncSavedApiKey = () => {
       const storedKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
       setHasSavedApiKey(storedKey.trim().length > 0)
@@ -394,7 +405,7 @@ function App() {
       window.removeEventListener('storage', syncSavedApiKey)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [])
+  }, [serverManagedOpenRouter])
 
   function clearFeedback() {
     setStatusMessage('')
@@ -804,7 +815,7 @@ function App() {
   const providerLabels = getProviderLabels(currentUser)
   const canAddPassword = Boolean(currentUser?.email && !hasPasswordProvider(currentUser))
   const isVerified = currentUser?.emailVerified ?? false
-  const workspaceVisible = Boolean(currentUser)
+  const workspaceVisible = Boolean(currentUser) || guestModeEnabled
 
   return (
     <div className="app-shell">
@@ -852,7 +863,7 @@ function App() {
           {currentUser ? (
             <span className="topbar-account-copy">
               <strong>{currentUser.email ?? 'Account'}</strong>
-              {!hasSavedApiKey ? (
+              {!serverManagedOpenRouter && !hasSavedApiKey ? (
                 <small className="topbar-api-key-warning">
                   Add API key in Settings
                 </small>
@@ -874,7 +885,7 @@ function App() {
 
         <main className={`page${workspaceVisible ? ' page-workspace' : ''}`} id="top">
         {workspaceVisible ? (
-          <CollaborationWorkspace currentUser={currentUser!} />
+          <CollaborationWorkspace currentUser={currentUser} />
         ) : (
           <>
         <section className="hero section" id="concept">

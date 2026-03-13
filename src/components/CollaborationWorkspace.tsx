@@ -4,12 +4,17 @@ import type { User } from 'firebase/auth'
 import { ArrowUp, Square, Paperclip, Mic, ChevronDown, Search, X, Info, Copy, Pencil, Check } from 'lucide-react'
 import {
   fetchOpenRouterModels,
+  getInitialOpenRouterModels,
   createOpenRouterChatCompletionStream,
   type OpenRouterModel,
   type OpenRouterChatMessage,
   type OpenRouterReasoningEffort,
   type OpenRouterUrlCitation,
 } from '../lib/openrouter'
+import { OPENROUTER_KEY_STORAGE } from '../lib/openrouterStorage'
+import {
+  isBrowserManagedOpenRouter,
+} from '../lib/runtimeConfig'
 import { MarkdownBlock } from './RichMessageContent'
 import {
   fetchOpenRouterStatsSnapshot,
@@ -18,8 +23,6 @@ import {
   type OpenRouterModelStatsEntry,
 } from '../lib/openrouterStats'
 import { ModelStatsPanel } from './ModelStatsPanel'
-
-const OPENROUTER_KEY_STORAGE = 'argue-openrouter-api-key'
 
 const SYSTEM_PROMPT = `You are a helpful assistant. Format your responses using Markdown.
 
@@ -33,7 +36,7 @@ Formatting rules:
 Keep responses clear and well-structured.`
 
 interface CollaborationWorkspaceProps {
-  currentUser: User
+  currentUser?: User | null
 }
 
 interface AttachedFile {
@@ -142,7 +145,7 @@ const GROUP_MODELS_CONFIG = [
 ]
 
 const GROUP_SYSTEM_PROMPT = `You are participating in a multi-model collaborative problem-solving session.
-Format responses using Markdown. Use $...\$ for inline math and $$...$$ for block equations.
+Format responses using Markdown. Use $...$ for inline math and $$...$$ for block equations.
 Use fenced code blocks with language hints (e.g. \`\`\`python). Be thorough and precise.`
 
 /** Ensure **Title** section headers in reasoning text appear on their own paragraph. */
@@ -220,7 +223,8 @@ function getWebSearchModelProfile(model: OpenRouterModel | null) {
 
 
 
-export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
+export function CollaborationWorkspace({ currentUser }: CollaborationWorkspaceProps) {
+  void currentUser
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [prompt, setPrompt] = useState('')
   const [listening, setListening] = useState(false)
@@ -235,7 +239,10 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
   const effortDropRef = useRef<HTMLDivElement>(null)
 
   // model selector
-  const [models, setModels] = useState<OpenRouterModel[]>([])
+  const [models, setModels] = useState<OpenRouterModel[]>(() =>
+    getInitialOpenRouterModels(),
+  )
+  const [modelCatalogNotice, setModelCatalogNotice] = useState('')
   const [selectedModel, setSelectedModel] = useState<OpenRouterModel | null>(null)
   const [modelSearch, setModelSearch] = useState('')
   const [modelOpen, setModelOpen] = useState(false)
@@ -256,9 +263,32 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null)
   const abortedRef = useRef(false)
+  const userKeyRequired = isBrowserManagedOpenRouter()
 
   useEffect(() => {
-    fetchOpenRouterModels().then((list) => setModels(list)).catch(() => {})
+    let cancelled = false
+
+    fetchOpenRouterModels()
+      .then((result) => {
+        if (cancelled) return
+
+        setModels(result.models)
+        setModelCatalogNotice(result.warning ?? '')
+      })
+      .catch((error) => {
+        console.error('Failed to load the OpenRouter model catalog.', error)
+
+        if (cancelled) return
+
+        setModels(getInitialOpenRouterModels())
+        setModelCatalogNotice(
+          'Showing the built-in starter catalog because the model list could not be loaded on this network.',
+        )
+      })
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
@@ -365,6 +395,34 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
     setAttachments((prev) => prev.filter((a) => a.id !== id))
   }
 
+  function getStoredOpenRouterKey() {
+    if (!userKeyRequired) {
+      return ''
+    }
+
+    return window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
+  }
+
+  function pushAssistantError(message: string) {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: message,
+        error: true,
+      },
+    ])
+  }
+
+  function getMissingCredentialMessage() {
+    if (userKeyRequired) {
+      return 'Add your OpenRouter API key in Account -> Settings to start a run.'
+    }
+
+    return 'This deployment is missing its server-side OpenRouter key. Set OPENROUTER_API_KEY on the backend and redeploy.'
+  }
+
   function openInfoPanel(e: React.MouseEvent, model: OpenRouterModel) {
     e.stopPropagation()
     setInfoModel(model)
@@ -377,8 +435,8 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
   }
 
   async function runStream(historyBefore: ChatMessage[], userMsg: ChatMessage) {
-    const apiKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
-    if (!apiKey.trim() || !selectedModel) return
+    const apiKey = getStoredOpenRouterKey()
+    if ((userKeyRequired && !apiKey.trim()) || !selectedModel) return
 
     const style = getReasoningStyle(selectedModel)
     const includeReasoning = style !== 'none'
@@ -502,8 +560,8 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
   }
 
   async function runGroupStream(_historyBefore: ChatMessage[], userMsg: ChatMessage) {
-    const apiKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
-    if (!apiKey.trim()) return
+    const apiKey = getStoredOpenRouterKey()
+    if (userKeyRequired && !apiKey.trim()) return
 
     const assistantId = crypto.randomUUID()
 
@@ -730,6 +788,11 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
     if (!text && attachments.length === 0) return
     if (!selectedModel) return
     if (streaming) return
+
+    if (userKeyRequired && !getStoredOpenRouterKey().trim()) {
+      pushAssistantError(getMissingCredentialMessage())
+      return
+    }
 
     shouldAutoScrollRef.current = true
 
@@ -1154,8 +1217,15 @@ export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
                             </div>
                           </div>
                         )}
+                        {modelCatalogNotice && !modelSearch.trim() && (
+                          <p className="model-list-status">{modelCatalogNotice}</p>
+                        )}
                         {filteredModels.length === 0 && (
-                          <p className="model-list-empty">No models found</p>
+                          <p className="model-list-empty">
+                            {modelSearch.trim()
+                              ? 'No models match your search'
+                              : 'No models found'}
+                          </p>
                         )}
                         {groupedModels.map((group) => (
                           <div key={group.key} className="model-list-group">

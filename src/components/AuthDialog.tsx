@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { User } from 'firebase/auth'
 import {
   KeyRound,
@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react'
 import { OPENROUTER_KEY_STORAGE } from '../lib/openrouterStorage'
+import { isBrowserManagedOpenRouter } from '../lib/runtimeConfig'
 
 type AuthMode = 'sign-in' | 'sign-up'
 
@@ -77,20 +78,29 @@ function AuthDialog({
   onResendVerification,
   onSignOut,
 }: AuthDialogProps) {
+  const browserManagedOpenRouter = isBrowserManagedOpenRouter()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [apiKeyDraft, setApiKeyDraft] = useState('')
   const [hasSavedApiKey, setHasSavedApiKey] = useState(false)
 
-  useEffect(() => {
-    if (!open) {
-      setSettingsOpen(false)
-      return
-    }
-
+  function syncStoredApiKey() {
     const storedKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
     setApiKeyDraft(storedKey)
     setHasSavedApiKey(storedKey.trim().length > 0)
-  }, [open])
+  }
+
+  function handleClose() {
+    setSettingsOpen(false)
+    onClose()
+  }
+
+  function handleSettingsToggle() {
+    if (!settingsOpen) {
+      syncStoredApiKey()
+    }
+
+    setSettingsOpen((isOpen) => !isOpen)
+  }
 
   function applyApiKey(nextValue: string) {
     if (nextValue) {
@@ -119,7 +129,7 @@ function AuthDialog({
   const showVerificationActions = currentUser && !isVerified
 
   return (
-    <div className="auth-backdrop" onClick={onClose}>
+    <div className="auth-backdrop" onClick={handleClose}>
       <section
         aria-modal="true"
         aria-labelledby="auth-dialog-title"
@@ -139,7 +149,7 @@ function AuthDialog({
           <button
             aria-label="Close authentication panel"
             className="auth-close"
-            onClick={onClose}
+            onClick={handleClose}
             type="button"
           >
             <X size={18} />
@@ -190,57 +200,69 @@ function AuthDialog({
               </div>
             </div>
 
-            <button
-              className="auth-secondary-button auth-settings-toggle"
-              onClick={() => setSettingsOpen((isOpen) => !isOpen)}
-              type="button"
-            >
-              <Settings size={16} />
-              {settingsOpen ? 'Close settings' : 'Settings'}
-            </button>
-
-            {settingsOpen ? (
-              <div className="auth-card auth-settings-card">
-                <p className="auth-label">OpenRouter API key</p>
-                <label className="auth-field">
-                  <span>API key</span>
-                  <input
-                    autoComplete="off"
-                    className="auth-input"
-                    onChange={(event) => setApiKeyDraft(event.target.value)}
-                    placeholder="sk-or-v1-..."
-                    spellCheck={false}
-                    type="password"
-                    value={apiKeyDraft}
-                  />
-                </label>
-                <div className="auth-inline-actions">
-                  <button
-                    className="auth-primary-button"
-                    onClick={handleSaveApiKey}
-                    type="button"
-                  >
-                    Save key
-                  </button>
-                  <button
-                    className="auth-secondary-button"
-                    onClick={handleClearApiKey}
-                    type="button"
-                  >
-                    Clear
-                  </button>
-                </div>
-                <p
-                  className={`auth-settings-status${
-                    hasSavedApiKey
-                      ? ' auth-settings-status-ok'
-                      : ' auth-settings-status-missing'
-                  }`}
+            {browserManagedOpenRouter ? (
+              <>
+                <button
+                  className="auth-secondary-button auth-settings-toggle"
+                  onClick={handleSettingsToggle}
+                  type="button"
                 >
-                  {hasSavedApiKey ? 'API key saved' : 'API key missing'}
+                  <Settings size={16} />
+                  {settingsOpen ? 'Close settings' : 'Settings'}
+                </button>
+
+                {settingsOpen ? (
+                  <div className="auth-card auth-settings-card">
+                    <p className="auth-label">OpenRouter API key</p>
+                    <label className="auth-field">
+                      <span>API key</span>
+                      <input
+                        autoComplete="off"
+                        className="auth-input"
+                        onChange={(event) => setApiKeyDraft(event.target.value)}
+                        placeholder="sk-or-v1-..."
+                        spellCheck={false}
+                        type="password"
+                        value={apiKeyDraft}
+                      />
+                    </label>
+                    <div className="auth-inline-actions">
+                      <button
+                        className="auth-primary-button"
+                        onClick={handleSaveApiKey}
+                        type="button"
+                      >
+                        Save key
+                      </button>
+                      <button
+                        className="auth-secondary-button"
+                        onClick={handleClearApiKey}
+                        type="button"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    <p
+                      className={`auth-settings-status${
+                        hasSavedApiKey
+                          ? ' auth-settings-status-ok'
+                          : ' auth-settings-status-missing'
+                      }`}
+                    >
+                      {hasSavedApiKey ? 'API key saved' : 'API key missing'}
+                    </p>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <div className="auth-card auth-settings-card">
+                <p className="auth-label">Model access</p>
+                <p className="auth-copy">
+                  This deployment uses a server-managed model key, so students do not
+                  need to paste their own OpenRouter credentials.
                 </p>
               </div>
-            ) : null}
+            )}
 
             {showVerificationActions ? (
               <div className="auth-card">
