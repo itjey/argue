@@ -1,4 +1,6 @@
-const BUSYTEX_BASE_PATH = `${import.meta.env.BASE_URL}core/busytex`
+const BUSYTEX_BASE_PATH =
+  import.meta.env.VITE_BUSYTEX_BASE_PATH?.trim().replace(/\/+$/, '') ||
+  `${import.meta.env.BASE_URL}core/busytex`
 const BUSYTEX_PRELOAD_PACKAGE_FILES = [
   'texlive-basic.js',
   'texlive-latex-base_texlive-latex-recommended_texlive-science_texlive-fonts-recommended.js',
