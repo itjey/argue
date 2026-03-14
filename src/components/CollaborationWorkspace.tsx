@@ -1857,28 +1857,21 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
             >
               <div className="chat-thinking-panel-inner">
                 <div className="chat-thinking-panel-header">
-                  <div className="chat-thinking-panel-heading">
-                    <p className="chat-thinking-panel-kicker">Activity</p>
-                    <h2 id="chat-thinking-panel-title" className="chat-thinking-panel-title">
-                      {activeThinkingIndicator.label}
-                    </h2>
-                    <p className="chat-thinking-panel-note">
-                      Expanded reasoning trace for this response.
-                    </p>
-                  </div>
+                  <h2 id="chat-thinking-panel-title" className="chat-thinking-panel-title">
+                    {activeThinkingIndicator.label}
+                  </h2>
                   <button
                     className="chat-thinking-panel-close"
                     type="button"
                     aria-label="Close thinking panel"
                     onClick={() => setActiveThinkingMessageId(null)}
                   >
-                    <X size={16} />
+                    <X size={14} />
                   </button>
                 </div>
 
                 {activeThinkingMessage.content.trim() && (
                   <div className="chat-thinking-panel-preview">
-                    <span className="chat-thinking-panel-preview-label">Answer preview</span>
                     <p>{activeThinkingMessage.content.trim()}</p>
                   </div>
                 )}
