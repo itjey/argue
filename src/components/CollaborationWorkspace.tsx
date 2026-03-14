@@ -48,6 +48,7 @@ interface AttachedFile {
 
 // ---- Group collaboration types ----
 interface GroupModelRun {
+  participantId: string
   modelId: string
   modelName: string
   roleLabel: string
@@ -64,11 +65,27 @@ interface GroupPhase {
 
 interface GroupData {
   phases: GroupPhase[]
-  currentPhaseIndex: number   // 0=Build, 1=Critique, 2=Synthesis
+  currentPhaseIndex: number
   currentRunLabel: string     // e.g. "GPT-5.4 is thinking…"
   synthesis: string
   synthesisStreaming: boolean
+  synthesisModelName: string
   complete: boolean
+}
+
+interface GroupParticipantConfig {
+  id: string
+  enabled: boolean
+  lead: boolean
+  modelId: string
+  roleLabel: string
+  roleBrief: string
+  maxTokens: number
+  useReasoning: boolean
+}
+
+type ActiveGroupParticipant = GroupParticipantConfig & {
+  model: OpenRouterModel
 }
 
 interface ChatMessage {
@@ -132,16 +149,49 @@ const GROUP_ONE_ID = '__group_1__'
 const GROUP_ONE: OpenRouterModel = {
   id: GROUP_ONE_ID,
   name: 'Group 1',
-  description: 'GPT-5.4 · Claude Opus 4.6 · Gemini 3.1 Pro — Adversarial collaboration at max reasoning',
+  description: 'Configurable multi-model debate room with editable roles, budgets, and rounds.',
   pricing: { prompt: '0', completion: '0', web_search: '0' },
   supported_parameters: ['reasoning'],
   architecture: { input_modalities: ['text'], output_modalities: ['text'] },
 }
 
-const GROUP_MODELS_CONFIG = [
-  { id: 'openai/gpt-5.4',                name: 'GPT-5.4',         role: 'Builder',   useReasoning: true  },
-  { id: 'google/gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro',  role: 'Analyst',   useReasoning: false },
-  { id: 'anthropic/claude-opus-4.6',     name: 'Claude Opus 4.6', role: 'Adversary', useReasoning: true  },
+const MIN_GROUP_PARTICIPANTS = 2
+const MIN_GROUP_DEBATE_ROUNDS = 1
+const MAX_GROUP_DEBATE_ROUNDS = 4
+const MIN_GROUP_MAX_TOKENS = 256
+const MAX_GROUP_MAX_TOKENS = 8192
+
+const DEFAULT_GROUP_PARTICIPANTS: GroupParticipantConfig[] = [
+  {
+    id: 'lead',
+    enabled: true,
+    lead: true,
+    modelId: 'openai/gpt-5.4',
+    roleLabel: 'Builder',
+    roleBrief: 'Own the implementation path and deliver the most complete solution.',
+    maxTokens: 2200,
+    useReasoning: true,
+  },
+  {
+    id: 'analyst',
+    enabled: true,
+    lead: false,
+    modelId: 'google/gemini-3.1-pro-preview',
+    roleLabel: 'Analyst',
+    roleBrief: 'Break the problem down, surface edge cases, and stress-test assumptions.',
+    maxTokens: 1800,
+    useReasoning: false,
+  },
+  {
+    id: 'adversary',
+    enabled: true,
+    lead: false,
+    modelId: 'anthropic/claude-opus-4.6',
+    roleLabel: 'Adversary',
+    roleBrief: 'Challenge weak logic, find missing pieces, and push for a stronger final answer.',
+    maxTokens: 2200,
+    useReasoning: true,
+  },
 ]
 
 const GROUP_SYSTEM_PROMPT = `You are participating in a multi-model collaborative problem-solving session.
@@ -221,6 +271,79 @@ function getWebSearchModelProfile(model: OpenRouterModel | null) {
   }
 }
 
+function clampWholeNumber(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) {
+    return min
+  }
+
+  return Math.min(max, Math.max(min, Math.round(value)))
+}
+
+function findOpenRouterModelById(models: OpenRouterModel[], id: string) {
+  return (
+    models.find((model) => model.id === id) ??
+    getInitialOpenRouterModels().find((model) => model.id === id) ??
+    null
+  )
+}
+
+function normalizeGroupParticipants(participants: GroupParticipantConfig[]) {
+  const enabledParticipants = participants.filter((participant) => participant.enabled)
+  const leadId =
+    enabledParticipants.find((participant) => participant.lead)?.id ??
+    enabledParticipants[0]?.id ??
+    null
+
+  return participants.map((participant) => ({
+    ...participant,
+    lead: Boolean(leadId && participant.enabled && participant.id === leadId),
+    maxTokens: clampWholeNumber(
+      participant.maxTokens,
+      MIN_GROUP_MAX_TOKENS,
+      MAX_GROUP_MAX_TOKENS,
+    ),
+  }))
+}
+
+function getActiveGroupParticipants(
+  participants: GroupParticipantConfig[],
+  models: OpenRouterModel[],
+): ActiveGroupParticipant[] {
+  return participants
+    .filter((participant) => participant.enabled)
+    .map((participant) => {
+      const model = findOpenRouterModelById(models, participant.modelId)
+
+      if (!model) {
+        return null
+      }
+
+      return {
+        ...participant,
+        model,
+      } satisfies ActiveGroupParticipant
+    })
+    .filter((participant): participant is ActiveGroupParticipant => participant !== null)
+}
+
+function getLeadGroupParticipant(participants: ActiveGroupParticipant[]) {
+  return participants.find((participant) => participant.lead) ?? participants[0] ?? null
+}
+
+function getReasoningEffortLabel(value: OpenRouterReasoningEffort) {
+  return EFFORT_LEVELS.find((level) => level.value === value)?.label ?? 'High'
+}
+
+function getGroupModelSummary(
+  participants: GroupParticipantConfig[],
+  models: OpenRouterModel[],
+) {
+  const names = getActiveGroupParticipants(participants, models)
+    .map((participant) => participant.model.name)
+
+  return names.length > 0 ? names.join(' · ') : 'Choose at least two models'
+}
+
 
 
 export function CollaborationWorkspace({ currentUser }: CollaborationWorkspaceProps) {
@@ -235,6 +358,12 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
   const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set())
   const [reasoningEffort, setReasoningEffort] = useState<OpenRouterReasoningEffort>('high')
   const [webSearchEnabled, setWebSearchEnabled] = useState(true)
+  const [groupDebateRounds, setGroupDebateRounds] = useState(2)
+  const [groupReasoningEffort, setGroupReasoningEffort] = useState<OpenRouterReasoningEffort>('high')
+  const [groupCustomizationOpen, setGroupCustomizationOpen] = useState(true)
+  const [groupParticipants, setGroupParticipants] = useState<GroupParticipantConfig[]>(
+    () => normalizeGroupParticipants(DEFAULT_GROUP_PARTICIPANTS.map((participant) => ({ ...participant }))),
+  )
   const [effortOpen, setEffortOpen] = useState(false)
   const effortDropRef = useRef<HTMLDivElement>(null)
 
@@ -434,6 +563,30 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
     }
   }
 
+  function updateGroupParticipant(
+    participantId: string,
+    updater: (participant: GroupParticipantConfig) => GroupParticipantConfig,
+  ) {
+    setGroupParticipants((prev) =>
+      normalizeGroupParticipants(
+        prev.map((participant) =>
+          participant.id === participantId ? updater(participant) : participant,
+        ),
+      ),
+    )
+  }
+
+  function setGroupLead(participantId: string) {
+    setGroupParticipants((prev) =>
+      normalizeGroupParticipants(
+        prev.map((participant) => ({
+          ...participant,
+          lead: participant.id === participantId && participant.enabled,
+        })),
+      ),
+    )
+  }
+
   async function runStream(historyBefore: ChatMessage[], userMsg: ChatMessage) {
     const apiKey = getStoredOpenRouterKey()
     if ((userKeyRequired && !apiKey.trim()) || !selectedModel) return
@@ -563,30 +716,34 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
     const apiKey = getStoredOpenRouterKey()
     if (userKeyRequired && !apiKey.trim()) return
 
+    const activeParticipants = getActiveGroupParticipants(groupParticipants, models)
+    const leadParticipant = getLeadGroupParticipant(activeParticipants)
+
+    if (activeParticipants.length < MIN_GROUP_PARTICIPANTS || !leadParticipant) {
+      pushAssistantError('Enable at least two valid models in Group 1 before starting a debate.')
+      return
+    }
+
     const assistantId = crypto.randomUUID()
 
     // Initialize local mutable state (used for logic; synced to React state via syncGroup)
     const group: GroupData = {
-      phases: [
-        {
-          label: 'Build',
-          runs: GROUP_MODELS_CONFIG.map((m) => ({
-            modelId: m.id, modelName: m.name, roleLabel: m.role,
-            content: '', status: 'pending' as const,
-          })),
-        },
-        {
-          label: 'Critique',
-          runs: GROUP_MODELS_CONFIG.map((m) => ({
-            modelId: m.id, modelName: m.name, roleLabel: m.role,
-            content: '', status: 'pending' as const,
-          })),
-        },
-      ],
+      phases: Array.from({ length: groupDebateRounds }, (_, roundIndex) => ({
+        label: `Round ${roundIndex + 1}`,
+        runs: activeParticipants.map((participant) => ({
+          participantId: participant.id,
+          modelId: participant.model.id,
+          modelName: participant.model.name,
+          roleLabel: participant.roleLabel,
+          content: '',
+          status: 'pending' as const,
+        })),
+      })),
       currentPhaseIndex: 0,
       currentRunLabel: '',
       synthesis: '',
       synthesisStreaming: false,
+      synthesisModelName: leadParticipant.model.name,
       complete: false,
     }
 
@@ -616,115 +773,106 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
 
     const userText = userMsg.content.trim()
 
-    function phase1SystemFor(roleLabel: string): string {
-      if (roleLabel === 'Builder') return `${GROUP_SYSTEM_PROMPT}\n\nYour role in this collaboration is: BUILDER\nYour job: Provide a thorough, complete solution to the user's request. Think deeply, show your reasoning, and produce your best possible answer.`
-      if (roleLabel === 'Analyst') return `${GROUP_SYSTEM_PROMPT}\n\nYour role in this collaboration is: ANALYST\nYour job: Deeply analyze the problem. Break it down into key components, identify edge cases, underlying patterns, and important considerations others might miss. Then provide your complete take.`
-      return `${GROUP_SYSTEM_PROMPT}\n\nYour role in this collaboration is: ADVERSARY\nYour job: Provide a complete, independent answer. In the next round you will aggressively challenge the other models' responses — but for now, give your best answer first.`
-    }
-
-    function phase2SystemFor(roleLabel: string, buildRuns: GroupModelRun[]): string {
-      const summaries = buildRuns.map((r) => `## ${r.modelName} (${r.roleLabel})\n${r.content}`).join('\n\n---\n\n')
-      const base = `${GROUP_SYSTEM_PROMPT}\n\nYou are in Round 2 of a collaborative session. All three models completed Round 1. Here are all Round 1 responses:\n\n${summaries}\n\n---\n\nUSER'S ORIGINAL REQUEST: ${userText}`
-      if (roleLabel === 'Adversary') {
-        return `${base}\n\nYour task: Be ruthlessly specific. Find everything wrong or missing across ALL responses (including your own). Identify incorrect logic, unhandled edge cases, missing parts of the user's request. Then produce an improved answer that fixes all these issues. Explain what you changed and why.`
-      }
-      return `${base}\n\nYour task: Review all responses critically. What is incorrect or incomplete? What did you miss that others caught? Now produce an improved, corrected version of your answer incorporating the best insights from all three. Be specific about what you changed and why.`
-    }
-
-    function buildPhaseMessages(systemPrompt: string, userText: string): OpenRouterChatMessage[] {
+    function buildPhaseMessages(systemPrompt: string, promptText: string): OpenRouterChatMessage[] {
       return [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: userText },
+        { role: 'user', content: promptText },
       ]
     }
 
+    function buildRoundSystemPrompt(
+      participant: ActiveGroupParticipant,
+      roundIndex: number,
+      previousRuns: GroupModelRun[],
+    ) {
+      const roleHeader = `${GROUP_SYSTEM_PROMPT}\n\nYour role in this collaboration is: ${participant.roleLabel.toUpperCase()}\nYour approach: ${participant.roleBrief}\n\nUSER'S ORIGINAL REQUEST: ${userText}`
+
+      if (roundIndex === 0) {
+        return `${roleHeader}\n\nRound 1 instructions: Produce your best full answer from this perspective. Be concrete, rigorous, and complete.`
+      }
+
+      const priorRoundSummary = previousRuns
+        .map((run) => `## ${run.modelName} (${run.roleLabel})\n${run.content}`)
+        .join('\n\n---\n\n')
+
+      return `${roleHeader}\n\nYou are now in round ${roundIndex + 1}. Here are the responses from round ${roundIndex}:\n\n${priorRoundSummary}\n\nYour task: Critique the gaps, contradictions, and weak assumptions in the room, then produce an improved answer from your assigned perspective. Explain what changed and why when it matters.`
+    }
+
     try {
-      // ── Phase 1: Build ──────────────────────────────────────────
-      group.currentPhaseIndex = 0
-      for (const run of group.phases[0].runs) {
-        if (abortedRef.current) break
-        group.currentRunLabel = `${run.modelName} is thinking…`
-        run.status = 'thinking'
-        syncGroup()
+      for (const [phaseIndex, phase] of group.phases.entries()) {
+        group.currentPhaseIndex = phaseIndex
 
-        const cfg = GROUP_MODELS_CONFIG.find((c) => c.id === run.modelId)!
-        const sysPrompt = phase1SystemFor(run.roleLabel)
-        const msgs = buildPhaseMessages(sysPrompt, userText)
-        const startMs = Date.now()
+        for (const run of phase.runs) {
+          if (abortedRef.current) break
+          group.currentRunLabel = `${run.modelName} is thinking…`
+          run.status = 'thinking'
+          syncGroup()
 
-        try {
-          await createOpenRouterChatCompletionStream({
-            apiKey,
-            model: run.modelId,
-            messages: msgs,
-            includeReasoning: cfg.useReasoning,
-            reasoning: cfg.useReasoning ? { effort: 'high' } : undefined,
-            plugins: webSearchEnabled ? [{ id: 'web' }] : undefined,
-            webSearchOptions: webSearchEnabled ? { search_context_size: 'high' } : undefined,
-            onProgress: (reply) => {
-              if (abortedRef.current) return
-              run.content = reply.text
-              run.reasoning = reply.reasoning || run.reasoning
-              syncGroup()
-            },
-          })
-        } catch (e) {
-          run.content = `Error: ${e instanceof Error ? e.message : 'Failed'}`
+          const participant = activeParticipants.find(
+            (entry) => entry.id === run.participantId,
+          )
+
+          if (!participant) {
+            run.content = 'Error: This configured model is no longer available.'
+            run.status = 'done'
+            syncGroup()
+            continue
+          }
+
+          const previousRuns = phaseIndex > 0 ? group.phases[phaseIndex - 1].runs : []
+          const sysPrompt = buildRoundSystemPrompt(participant, phaseIndex, previousRuns)
+          const msgs = buildPhaseMessages(sysPrompt, userText)
+          const startMs = Date.now()
+
+          try {
+            await createOpenRouterChatCompletionStream({
+              apiKey,
+              model: participant.model.id,
+              messages: msgs,
+              includeReasoning: participant.useReasoning,
+              maxTokens: participant.maxTokens,
+              reasoning: participant.useReasoning
+                ? { effort: groupReasoningEffort }
+                : undefined,
+              plugins: webSearchEnabled ? [{ id: 'web' }] : undefined,
+              webSearchOptions: webSearchEnabled ? { search_context_size: 'high' } : undefined,
+              onProgress: (reply) => {
+                if (abortedRef.current) return
+                run.content = reply.text
+                run.reasoning = reply.reasoning || run.reasoning
+                syncGroup()
+              },
+            })
+          } catch (e) {
+            run.content = `Error: ${e instanceof Error ? e.message : 'Failed'}`
+          }
+          run.status = 'done'
+          run.thinkingMs = Date.now() - startMs
+          syncGroup()
         }
-        run.status = 'done'
-        run.thinkingMs = Date.now() - startMs
-        syncGroup()
+
+        if (abortedRef.current) {
+          break
+        }
       }
 
-      // ── Phase 2: Critique ───────────────────────────────────────
-      group.currentPhaseIndex = 1
-      for (const run of group.phases[1].runs) {
-        if (abortedRef.current) break
-        group.currentRunLabel = `${run.modelName} is thinking…`
-        run.status = 'thinking'
-        syncGroup()
-
-        const cfg = GROUP_MODELS_CONFIG.find((c) => c.id === run.modelId)!
-        const sysPrompt = phase2SystemFor(run.roleLabel, group.phases[0].runs)
-        const msgs = buildPhaseMessages(sysPrompt, userText)
-        const startMs = Date.now()
-
-        try {
-          await createOpenRouterChatCompletionStream({
-            apiKey,
-            model: run.modelId,
-            messages: msgs,
-            includeReasoning: cfg.useReasoning,
-            reasoning: cfg.useReasoning ? { effort: 'high' } : undefined,
-            plugins: webSearchEnabled ? [{ id: 'web' }] : undefined,
-            webSearchOptions: webSearchEnabled ? { search_context_size: 'high' } : undefined,
-            onProgress: (reply) => {
-              if (abortedRef.current) return
-              run.content = reply.text
-              run.reasoning = reply.reasoning || run.reasoning
-              syncGroup()
-            },
-          })
-        } catch (e) {
-          run.content = `Error: ${e instanceof Error ? e.message : 'Failed'}`
-        }
-        run.status = 'done'
-        run.thinkingMs = Date.now() - startMs
-        syncGroup()
-      }
-
-      // ── Phase 3: Synthesis (GPT-5.4 only) ──────────────────────
+      // ── Final synthesis (lead model) ────────────────────────────
       if (!abortedRef.current) {
-        group.currentPhaseIndex = 2
-        group.currentRunLabel = 'GPT-5.4 is synthesizing…'
+        group.currentPhaseIndex = group.phases.length
+        group.currentRunLabel = `${leadParticipant.model.name} is synthesizing…`
         group.synthesisStreaming = true
         syncGroup()
 
-        const phase2Summaries = group.phases[1].runs
-          .map((r) => `## ${r.modelName} (${r.roleLabel}) — Round 2\n${r.content}`)
+        const phaseSummaries = group.phases
+          .map(
+            (phase) =>
+              `# ${phase.label}\n\n${phase.runs
+                .map((run) => `## ${run.modelName} (${run.roleLabel})\n${run.content}`)
+                .join('\n\n---\n\n')}`,
+          )
           .join('\n\n---\n\n')
 
-        const synthesisSystem = `${GROUP_SYSTEM_PROMPT}\n\nYou are synthesizing the results of a 2-round collaborative problem-solving session.\n\nUSER'S ORIGINAL REQUEST: ${userText}\n\n${phase2Summaries}\n\n---\n\nYour task: Synthesize the best final answer. Take the strongest elements from each model, resolve any contradictions, and produce a single comprehensive, correct, complete response to the user's original request. This is the answer the user will see — make it excellent.`
+        const synthesisSystem = `${GROUP_SYSTEM_PROMPT}\n\nYou are the lead synthesizer for a collaborative ${groupDebateRounds}-round problem-solving session.\nYour role in the room is: ${leadParticipant.roleLabel}\nYour approach is: ${leadParticipant.roleBrief}\n\nUSER'S ORIGINAL REQUEST: ${userText}\n\n${phaseSummaries}\n\n---\n\nYour task: Synthesize the best final answer. Take the strongest elements from the room, resolve contradictions, and produce a single comprehensive response to the user's original request. Make clear decisions where the room disagreed.`
 
         const msgs: OpenRouterChatMessage[] = [
           { role: 'system', content: synthesisSystem },
@@ -734,10 +882,13 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
         try {
           await createOpenRouterChatCompletionStream({
             apiKey,
-            model: 'openai/gpt-5.4',
+            model: leadParticipant.model.id,
             messages: msgs,
-            includeReasoning: true,
-            reasoning: { effort: 'high' },
+            includeReasoning: leadParticipant.useReasoning,
+            maxTokens: leadParticipant.maxTokens,
+            reasoning: leadParticipant.useReasoning
+              ? { effort: groupReasoningEffort }
+              : undefined,
             onProgress: (reply) => {
               if (abortedRef.current) return
               group.synthesis = reply.text
@@ -814,6 +965,21 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
 
     if (selectedModel?.id === GROUP_ONE_ID) {
+      if (activeGroupParticipants.length < MIN_GROUP_PARTICIPANTS) {
+        pushAssistantError('Enable at least two models in Group 1 before starting a debate.')
+        return
+      }
+
+      if (missingGroupModels.length > 0) {
+        pushAssistantError('One or more Group 1 participants use a model that is not available in the current catalog.')
+        return
+      }
+
+      if (new Set(activeGroupParticipants.map((participant) => participant.model.id)).size !== activeGroupParticipants.length) {
+        pushAssistantError('Choose a different model for each active Group 1 participant.')
+        return
+      }
+
       await runGroupStream(historyBefore, userMsg)
     } else {
       await runStream(historyBefore, userMsg)
@@ -872,6 +1038,14 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
   const reasoningStyle = selectedModel ? getReasoningStyle(selectedModel) : 'none'
   const selectedWebSearchProfile = getWebSearchModelProfile(selectedModel)
   const supportsWebSearch = selectedWebSearchProfile.supported
+  const activeGroupParticipants = getActiveGroupParticipants(groupParticipants, models)
+  const groupLeadParticipant = getLeadGroupParticipant(activeGroupParticipants)
+  const groupSummary = getGroupModelSummary(groupParticipants, models)
+  const groupReasoningLabel = getReasoningEffortLabel(groupReasoningEffort)
+  const missingGroupModels = groupParticipants.filter(
+    (participant) =>
+      participant.enabled && !findOpenRouterModelById(models, participant.modelId),
+  )
 
   const filteredModels = modelSearch.trim()
     ? models.filter((m) =>
@@ -1000,9 +1174,11 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
                           {msg.streaming && msg.groupData.currentRunLabel && (
                             <div className="chat-thinking-row">
                               <span className="chat-thinking-pulse">{msg.groupData.currentRunLabel}</span>
-                              {msg.groupData.currentPhaseIndex < 2 && (
-                                <span className="group-phase-indicator">Phase {msg.groupData.currentPhaseIndex + 1}/2</span>
-                              )}
+                              <span className="group-phase-indicator">
+                                {msg.groupData.currentPhaseIndex < msg.groupData.phases.length
+                                  ? `Round ${msg.groupData.currentPhaseIndex + 1}/${msg.groupData.phases.length}`
+                                  : 'Synthesis'}
+                              </span>
                             </div>
                           )}
 
@@ -1013,7 +1189,7 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
                             return (
                               <details key={pi} className="group-phase-details">
                                 <summary className="group-phase-summary">
-                                  <span className="group-phase-label">Phase {pi + 1}: {phase.label}</span>
+                                  <span className="group-phase-label">{phase.label}</span>
                                   <span className="group-phase-meta">{activeRuns.filter(r => r.status === 'done').length}/{phase.runs.length} models</span>
                                 </summary>
                                 <div className="group-phase-runs">
@@ -1038,7 +1214,7 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
                             <div className="group-synthesis">
                               <div className="group-synthesis-header">
                                 <span>✦ Final Answer</span>
-                                {msg.groupData.synthesisStreaming && <span className="chat-thinking-pulse">GPT-5.4 synthesizing…</span>}
+                                {msg.groupData.synthesisStreaming && <span className="chat-thinking-pulse">{msg.groupData.synthesisModelName} synthesizing…</span>}
                               </div>
                               <MarkdownBlock>{msg.groupData.synthesis}</MarkdownBlock>
                             </div>
@@ -1208,10 +1384,12 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
                                 }}
                               >
                                 <span className="model-list-name">Group 1</span>
-                                <span className="model-list-id">GPT-5.4 · Claude Opus 4.6 · Gemini 3.1 Pro</span>
+                                <span className="model-list-id">{groupSummary}</span>
                                 <div className="model-list-badges">
                                   <span className="model-list-badge model-list-badge-free">Free web search</span>
-                                  <span className="model-list-badge model-list-badge-group">3 models</span>
+                                  <span className="model-list-badge model-list-badge-group">
+                                    {activeGroupParticipants.length} models
+                                  </span>
                                 </div>
                               </button>
                             </div>
@@ -1340,8 +1518,11 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
                 )}
                 {selectedModel?.id === GROUP_ONE_ID && (
                   <div className="group-disclaimer">
-                    <span className="group-disclaimer-icon">⚡</span>
-                    <span>GPT-5.4 · Claude Opus 4.6 · Gemini 3.1 Pro · Max reasoning</span>
+                    <span>{groupSummary}</span>
+                    <span className="group-disclaimer-separator">•</span>
+                    <span>{groupDebateRounds} {groupDebateRounds === 1 ? 'round' : 'rounds'}</span>
+                    <span className="group-disclaimer-separator">•</span>
+                    <span>{groupReasoningLabel} reasoning</span>
                   </div>
                 )}
               </div>
@@ -1366,6 +1547,225 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
                 </button>
               </div>
             </div>
+
+            {selectedModel?.id === GROUP_ONE_ID && (
+              <div className="group-config-panel">
+                <button
+                  className="group-config-summary"
+                  type="button"
+                  onClick={() => setGroupCustomizationOpen((open) => !open)}
+                  aria-expanded={groupCustomizationOpen}
+                >
+                  <span className="group-config-summary-copy">
+                    <span className="group-config-summary-title">Customize Group 1</span>
+                    <span className="group-config-summary-meta">
+                      {activeGroupParticipants.length} models · {groupDebateRounds} {groupDebateRounds === 1 ? 'round' : 'rounds'} · {groupReasoningLabel} reasoning
+                    </span>
+                  </span>
+                  <ChevronDown size={14} className={`model-selector-chevron${groupCustomizationOpen ? ' model-selector-chevron-open' : ''}`} />
+                </button>
+
+                {groupCustomizationOpen && (
+                  <div className="group-config-content">
+                    <div className="group-config-grid">
+                      <label className="group-config-field">
+                        <span>Debate rounds</span>
+                        <input
+                          className="group-config-input"
+                          type="number"
+                          min={MIN_GROUP_DEBATE_ROUNDS}
+                          max={MAX_GROUP_DEBATE_ROUNDS}
+                          value={groupDebateRounds}
+                          onChange={(e) =>
+                            setGroupDebateRounds(
+                              clampWholeNumber(
+                                Number(e.target.value),
+                                MIN_GROUP_DEBATE_ROUNDS,
+                                MAX_GROUP_DEBATE_ROUNDS,
+                              ),
+                            )
+                          }
+                        />
+                      </label>
+
+                      <label className="group-config-field">
+                        <span>Reasoning depth</span>
+                        <select
+                          className="group-config-input"
+                          value={groupReasoningEffort}
+                          onChange={(e) =>
+                            setGroupReasoningEffort(
+                              e.target.value as OpenRouterReasoningEffort,
+                            )
+                          }
+                        >
+                          {EFFORT_LEVELS.map((level) => (
+                            <option key={level.value} value={level.value}>
+                              {level.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+
+                    <p className="group-config-note">
+                      Choose the debating models, set response budgets, and assign specialized roles. The lead model writes the final synthesis.
+                    </p>
+
+                    {missingGroupModels.length > 0 && (
+                      <p className="group-config-warning">
+                        One or more configured models are not in the current catalog snapshot. Pick another model before running.
+                      </p>
+                    )}
+
+                    <div className="group-config-participants">
+                      {groupParticipants.map((participant, index) => {
+                        const currentModel = findOpenRouterModelById(
+                          models,
+                          participant.modelId,
+                        )
+
+                        return (
+                          <article
+                            key={participant.id}
+                            className={`group-config-card${participant.enabled ? ' group-config-card-active' : ''}`}
+                          >
+                            <div className="group-config-card-header">
+                              <div>
+                                <p className="group-config-card-label">
+                                  Participant {index + 1}
+                                </p>
+                                <h4>{currentModel?.name ?? participant.modelId}</h4>
+                              </div>
+                              <div className="group-config-card-controls">
+                                <label className="group-config-check">
+                                  <input
+                                    type="checkbox"
+                                    checked={participant.enabled}
+                                    onChange={(e) =>
+                                      updateGroupParticipant(participant.id, (current) => ({
+                                        ...current,
+                                        enabled: e.target.checked,
+                                      }))
+                                    }
+                                  />
+                                  <span>Enabled</span>
+                                </label>
+                                <label className="group-config-check">
+                                  <input
+                                    type="radio"
+                                    name="group-lead"
+                                    checked={participant.enabled && participant.lead}
+                                    disabled={!participant.enabled}
+                                    onChange={() => setGroupLead(participant.id)}
+                                  />
+                                  <span>Lead synth</span>
+                                </label>
+                              </div>
+                            </div>
+
+                            <div className="group-config-card-grid">
+                              <label className="group-config-field group-config-field-full">
+                                <span>Model</span>
+                                <select
+                                  className="group-config-input"
+                                  value={participant.modelId}
+                                  onChange={(e) =>
+                                    updateGroupParticipant(participant.id, (current) => ({
+                                      ...current,
+                                      modelId: e.target.value,
+                                    }))
+                                  }
+                                >
+                                  {models.map((model) => (
+                                    <option key={model.id} value={model.id}>
+                                      {model.name} ({model.id})
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+
+                              <label className="group-config-field">
+                                <span>Role</span>
+                                <input
+                                  className="group-config-input"
+                                  type="text"
+                                  value={participant.roleLabel}
+                                  onChange={(e) =>
+                                    updateGroupParticipant(participant.id, (current) => ({
+                                      ...current,
+                                      roleLabel: e.target.value,
+                                    }))
+                                  }
+                                  placeholder="Builder"
+                                />
+                              </label>
+
+                              <label className="group-config-field">
+                                <span>Token budget</span>
+                                <input
+                                  className="group-config-input"
+                                  type="number"
+                                  min={MIN_GROUP_MAX_TOKENS}
+                                  max={MAX_GROUP_MAX_TOKENS}
+                                  value={participant.maxTokens}
+                                  onChange={(e) =>
+                                    updateGroupParticipant(participant.id, (current) => ({
+                                      ...current,
+                                      maxTokens: clampWholeNumber(
+                                        Number(e.target.value),
+                                        MIN_GROUP_MAX_TOKENS,
+                                        MAX_GROUP_MAX_TOKENS,
+                                      ),
+                                    }))
+                                  }
+                                />
+                              </label>
+
+                              <label className="group-config-field group-config-field-full">
+                                <span>Approach</span>
+                                <textarea
+                                  className="group-config-input group-config-textarea"
+                                  rows={3}
+                                  value={participant.roleBrief}
+                                  onChange={(e) =>
+                                    updateGroupParticipant(participant.id, (current) => ({
+                                      ...current,
+                                      roleBrief: e.target.value,
+                                    }))
+                                  }
+                                  placeholder="Focus this model on a specific style of thinking."
+                                />
+                              </label>
+                            </div>
+
+                            <label className="group-config-check group-config-check-inline">
+                              <input
+                                type="checkbox"
+                                checked={participant.useReasoning}
+                                onChange={(e) =>
+                                  updateGroupParticipant(participant.id, (current) => ({
+                                    ...current,
+                                    useReasoning: e.target.checked,
+                                  }))
+                                }
+                              />
+                              <span>Use provider reasoning for this participant</span>
+                            </label>
+                          </article>
+                        )
+                      })}
+                    </div>
+
+                    {groupLeadParticipant && (
+                      <p className="group-config-footnote">
+                        Final synthesis lead: {groupLeadParticipant.model.name} as {groupLeadParticipant.roleLabel}.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {editingId && (

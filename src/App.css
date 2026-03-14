@@ -6081,22 +6081,192 @@
 .group-disclaimer {
   display: flex;
   align-items: center;
-  gap: 5px;
+  flex-wrap: wrap;
+  gap: 0.35rem;
   font-size: 11px;
   color: rgba(255,255,255,0.45);
   padding: 0 4px;
-  white-space: nowrap;
 }
 
-.group-disclaimer-icon {
-  color: #a78bfa;
-  font-size: 12px;
+.group-disclaimer-separator {
+  color: rgba(255,255,255,0.24);
 }
 
 .group-phase-indicator {
   font-size: 11px;
   color: rgba(255,255,255,0.4);
   margin-left: 8px;
+}
+
+.group-config-panel {
+  margin-top: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.025);
+  overflow: hidden;
+}
+
+.group-config-summary {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.82);
+  text-align: left;
+  cursor: pointer;
+}
+
+.group-config-summary-copy {
+  display: grid;
+  gap: 0.22rem;
+  min-width: 0;
+}
+
+.group-config-summary-title {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.group-config-summary-meta {
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 0.76rem;
+}
+
+.group-config-content {
+  display: grid;
+  gap: 1rem;
+  padding: 0 1rem 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.group-config-grid,
+.group-config-card-grid {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.group-config-note,
+.group-config-warning,
+.group-config-footnote {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.group-config-note,
+.group-config-footnote {
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.group-config-warning {
+  color: rgba(255, 206, 132, 0.92);
+}
+
+.group-config-participants {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.group-config-card {
+  display: grid;
+  gap: 0.95rem;
+  padding: 0.95rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.group-config-card-active {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.group-config-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+}
+
+.group-config-card-header h4 {
+  margin: 0.18rem 0 0;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.92rem;
+}
+
+.group-config-card-label {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.38);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.group-config-card-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.8rem;
+}
+
+.group-config-field {
+  display: grid;
+  gap: 0.42rem;
+}
+
+.group-config-field span {
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.group-config-field-full {
+  grid-column: 1 / -1;
+}
+
+.group-config-input {
+  width: 100%;
+  min-height: 2.8rem;
+  padding: 0.72rem 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.9);
+  font: inherit;
+}
+
+.group-config-input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.group-config-textarea {
+  min-height: 6.6rem;
+  resize: vertical;
+}
+
+.group-config-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.78rem;
+}
+
+.group-config-check input {
+  margin: 0;
+}
+
+.group-config-check-inline {
+  justify-self: flex-start;
 }
 
 /* Phase collapsible */
