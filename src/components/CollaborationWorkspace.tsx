@@ -203,6 +203,28 @@ function normalizeReasoningText(text: string): string {
   return text.replace(/([^\n])(\*\*[A-Z][^*\n]{0,80}\*\*)/g, '$1\n\n$2')
 }
 
+type ThinkingIndicatorTone = 'default' | 'pulse' | 'stopped'
+
+function getThinkingIndicator(message: ChatMessage): { label: string; tone: ThinkingIndicatorTone } {
+  if (message.streaming && !message.content && !message.reasoning) {
+    return { label: 'Thinking…', tone: 'pulse' }
+  }
+
+  if (message.stoppedThinking) {
+    return { label: 'Stopped thinking', tone: 'stopped' }
+  }
+
+  if (message.thinkingDuration != null) {
+    return { label: `Thought for ${Math.round(message.thinkingDuration / 1000)}s`, tone: 'default' }
+  }
+
+  if (message.streaming) {
+    return { label: 'Thinking…', tone: 'pulse' }
+  }
+
+  return { label: 'Thoughts', tone: 'default' }
+}
+
 function buildApiMessages(messages: ChatMessage[]): OpenRouterChatMessage[] {
   const history: OpenRouterChatMessage[] = messages
     .filter((m) => !m.streaming && !m.error)
@@ -355,7 +377,7 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
   const [streaming, setStreaming] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set())
+  const [activeThinkingMessageId, setActiveThinkingMessageId] = useState<string | null>(null)
   const [reasoningEffort, setReasoningEffort] = useState<OpenRouterReasoningEffort>('high')
   const [webSearchEnabled, setWebSearchEnabled] = useState(true)
   const [groupDebateRounds, setGroupDebateRounds] = useState(2)
@@ -419,6 +441,39 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    if (!activeThinkingMessageId) {
+      return
+    }
+
+    const hasSelectedThinkingTrace = messages.some(
+      (message) =>
+        message.id === activeThinkingMessageId &&
+        message.role === 'assistant' &&
+        message.isReasoningModel &&
+        Boolean(message.reasoning?.trim()),
+    )
+
+    if (!hasSelectedThinkingTrace) {
+      setActiveThinkingMessageId(null)
+    }
+  }, [messages, activeThinkingMessageId])
+
+  useEffect(() => {
+    if (!activeThinkingMessageId) {
+      return
+    }
+
+    function handleWindowKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setActiveThinkingMessageId(null)
+      }
+    }
+
+    window.addEventListener('keydown', handleWindowKeyDown)
+    return () => window.removeEventListener('keydown', handleWindowKeyDown)
+  }, [activeThinkingMessageId])
 
   useEffect(() => {
     function onPointerDown(e: PointerEvent) {
@@ -1025,12 +1080,7 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
   }
 
   function toggleThinking(id: string) {
-    setExpandedThinking((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+    setActiveThinkingMessageId((current) => (current === id ? null : id))
   }
 
   const supportsFiles = selectedModel ? (selectedModel.id !== GROUP_ONE_ID && isMultimodal(selectedModel)) : false
@@ -1046,6 +1096,21 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
     (participant) =>
       participant.enabled && !findOpenRouterModelById(models, participant.modelId),
   )
+  const activeThinkingMessage =
+    activeThinkingMessageId == null
+      ? null
+      : messages.find(
+          (message) =>
+            message.id === activeThinkingMessageId &&
+            message.role === 'assistant' &&
+            message.isReasoningModel,
+        ) ?? null
+  const activeThinkingIndicator = activeThinkingMessage
+    ? getThinkingIndicator(activeThinkingMessage)
+    : null
+  const activeThinkingTrace = activeThinkingMessage
+    ? normalizeReasoningText(activeThinkingMessage.reasoning ?? '')
+    : ''
 
   const filteredModels = modelSearch.trim()
     ? models.filter((m) =>
@@ -1140,15 +1205,23 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
         </div>
       )}
 
-      <div className={`prompt-page${hasMessages ? ' prompt-page-chat' : ''}`}>
-        {/* Chat history */}
-        {hasMessages && (
-          <div className="chat-container" ref={chatContainerRef}>
-            {messages.map((msg) => {
-              const hasReasoningTrace = Boolean(msg.reasoning?.trim())
-              const isThinkingExpanded = hasReasoningTrace && expandedThinking.has(msg.id)
+      <div className={`prompt-page${hasMessages ? ' prompt-page-chat' : ''}${activeThinkingMessage ? ' prompt-page-chat-thinking-open' : ''}`}>
+        <div className="prompt-chat-shell">
+          {/* Chat history */}
+          {hasMessages && (
+            <div className="chat-container" ref={chatContainerRef}>
+              {messages.map((msg) => {
+                const hasReasoningTrace = Boolean(msg.reasoning?.trim())
+                const isThinkingExpanded = hasReasoningTrace && activeThinkingMessageId === msg.id
+                const thinkingIndicator = getThinkingIndicator(msg)
+                const thinkingIndicatorClassName =
+                  thinkingIndicator.tone === 'pulse'
+                    ? 'chat-thinking-pulse'
+                    : thinkingIndicator.tone === 'stopped'
+                      ? 'chat-thinking-stopped'
+                      : undefined
 
-              return (
+                return (
               <div key={msg.id} className={`chat-row chat-row-${msg.role}`}>
                 <div className={`chat-bubble chat-bubble-${msg.role}${msg.error ? ' chat-bubble-error' : ''}`}>
                   {msg.role === 'user' && msg.attachments && msg.attachments.length > 0 && (
@@ -1227,29 +1300,15 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
                           {msg.isReasoningModel && (
                             <div className="chat-thinking-row">
                               <button
-                                className={`chat-thinking-toggle${hasReasoningTrace ? '' : ' chat-thinking-toggle-disabled'}`}
+                                className={`chat-thinking-toggle${hasReasoningTrace ? '' : ' chat-thinking-toggle-disabled'}${isThinkingExpanded ? ' chat-thinking-toggle-active' : ''}`}
                                 type="button"
                                 disabled={!hasReasoningTrace}
                                 aria-expanded={isThinkingExpanded}
+                                aria-controls={hasReasoningTrace ? 'chat-thinking-panel' : undefined}
                                 onClick={() => toggleThinking(msg.id)}
                               >
-                                {msg.streaming && !msg.content && !msg.reasoning ? (
-                                  <span className="chat-thinking-pulse">Thinking…</span>
-                                ) : msg.stoppedThinking ? (
-                                  <span className="chat-thinking-stopped">Stopped thinking</span>
-                                ) : msg.thinkingDuration != null ? (
-                                  <span>Thought for {Math.round(msg.thinkingDuration / 1000)}s</span>
-                                ) : msg.streaming ? (
-                                  <span className="chat-thinking-pulse">Thinking…</span>
-                                ) : (
-                                  <span>Thoughts</span>
-                                )}
+                                <span className={thinkingIndicatorClassName}>{thinkingIndicator.label}</span>
                               </button>
-                              {isThinkingExpanded && (
-                                <div className="chat-thinking-content">
-                                  <MarkdownBlock>{normalizeReasoningText(msg.reasoning ?? '')}</MarkdownBlock>
-                                </div>
-                              )}
                             </div>
                           )}
                           <MarkdownBlock>{msg.content}</MarkdownBlock>
@@ -1284,10 +1343,10 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
                   )}
                 </div>
               </div>
-              )
-            })}
-          </div>
-        )}
+                )
+              })}
+            </div>
+          )}
 
         {/* Input area */}
         <div className={`prompt-center${hasMessages ? ' prompt-center-sticky' : ''}`}>
@@ -1781,6 +1840,62 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
             </p>
           )}
         </div>
+        </div>
+
+        {activeThinkingMessage && activeThinkingIndicator && (
+          <>
+            <button
+              className="chat-thinking-backdrop"
+              type="button"
+              aria-label="Close thinking panel"
+              onClick={() => setActiveThinkingMessageId(null)}
+            />
+            <aside
+              id="chat-thinking-panel"
+              className="chat-thinking-panel"
+              aria-labelledby="chat-thinking-panel-title"
+            >
+              <div className="chat-thinking-panel-inner">
+                <div className="chat-thinking-panel-header">
+                  <div className="chat-thinking-panel-heading">
+                    <p className="chat-thinking-panel-kicker">Activity</p>
+                    <h2 id="chat-thinking-panel-title" className="chat-thinking-panel-title">
+                      {activeThinkingIndicator.label}
+                    </h2>
+                    <p className="chat-thinking-panel-note">
+                      Expanded reasoning trace for this response.
+                    </p>
+                  </div>
+                  <button
+                    className="chat-thinking-panel-close"
+                    type="button"
+                    aria-label="Close thinking panel"
+                    onClick={() => setActiveThinkingMessageId(null)}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {activeThinkingMessage.content.trim() && (
+                  <div className="chat-thinking-panel-preview">
+                    <span className="chat-thinking-panel-preview-label">Answer preview</span>
+                    <p>{activeThinkingMessage.content.trim()}</p>
+                  </div>
+                )}
+
+                <div className="chat-thinking-panel-body">
+                  {activeThinkingTrace ? (
+                    <div className="chat-thinking-panel-content">
+                      <MarkdownBlock>{activeThinkingTrace}</MarkdownBlock>
+                    </div>
+                  ) : (
+                    <p className="chat-thinking-empty">This response did not return a visible reasoning trace.</p>
+                  )}
+                </div>
+              </div>
+            </aside>
+          </>
+        )}
       </div>
     </>
   )
