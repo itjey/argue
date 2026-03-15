@@ -5,14 +5,13 @@ import {
   confirmPasswordReset,
   createUserWithEmailAndPassword,
   EmailAuthProvider,
-  getRedirectResult,
   GoogleAuthProvider,
   linkWithCredential,
   onAuthStateChanged,
   reload,
   sendEmailVerification,
   signInWithEmailAndPassword,
-  signInWithRedirect,
+  signInWithCredential,
   signOut,
   type OAuthCredential,
   type User,
@@ -47,8 +46,8 @@ import { AuthDialog, type AuthMode } from './components/AuthDialog'
 import { CollaborationWorkspace } from './components/CollaborationWorkspace'
 import {
   auth,
+  createGoogleSignInUrl,
   getProviderLabels,
-  googleProvider,
   hasPasswordProvider,
   syncUserProfile,
 } from './lib/firebase'
@@ -98,6 +97,9 @@ type PendingGoogleLink = {
   credential: OAuthCredential
   email: string
 }
+
+const GOOGLE_AUTH_PENDING_STORAGE_KEY = 'argue-google-auth-pending'
+const GOOGLE_AUTH_STATE_STORAGE_KEY = 'argue-google-auth-state'
 
 function buildVerificationUrl() {
   return `${window.location.origin}${import.meta.env.BASE_URL}`
@@ -301,35 +303,6 @@ function App() {
   const [hasSavedApiKey, setHasSavedApiKey] = useState(serverManagedOpenRouter)
 
   useEffect(() => {
-    // Handle redirect result from Google sign-in
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result?.user) {
-          void syncUserProfile(result.user, { lastAuthMethod: 'google' })
-          setPendingGoogleLink(null)
-          resetCredentialForms()
-          setAuthDialogOpen(false)
-        }
-      })
-      .catch((error) => {
-        const firebaseError = error as FirebaseError
-        if (firebaseError.code === 'auth/account-exists-with-different-credential') {
-          const credential = GoogleAuthProvider.credentialFromError(
-            firebaseError,
-          ) as OAuthCredential | null
-          const conflictEmail = String(firebaseError.customData?.email ?? '').trim()
-          if (credential && conflictEmail) {
-            setPendingGoogleLink({ credential, email: conflictEmail })
-            setAuthEmail(conflictEmail)
-          }
-          setAuthMode('sign-in')
-          setAuthDialogOpen(true)
-          setStatusMessage(
-            'Google found an existing account for this email. Sign in with the matching email account first and Argue will merge Google into it.',
-          )
-        }
-      })
-
     const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
       setCurrentUser(nextUser)
 
@@ -470,6 +443,104 @@ function App() {
   }
 
   useEffect(() => {
+    const rawHash = window.location.hash.startsWith('#')
+      ? window.location.hash.slice(1)
+      : ''
+
+    if (!rawHash) {
+      return
+    }
+
+    const params = new URLSearchParams(rawHash)
+    const idToken = params.get('id_token')
+    const returnedState = params.get('state')
+    const authError = params.get('error')
+    const authErrorDescription = params.get('error_description')
+    const hadPendingGoogleAuth =
+      window.sessionStorage.getItem(GOOGLE_AUTH_PENDING_STORAGE_KEY) === '1'
+
+    if (!hadPendingGoogleAuth && !idToken && !authError) {
+      return
+    }
+
+    window.history.replaceState({}, document.title, buildVerificationUrl())
+    window.sessionStorage.removeItem(GOOGLE_AUTH_PENDING_STORAGE_KEY)
+
+    if (authError) {
+      window.sessionStorage.removeItem(GOOGLE_AUTH_STATE_STORAGE_KEY)
+      clearFeedback()
+      setAuthMode('sign-in')
+      setAuthDialogOpen(true)
+      setErrorMessage(
+        authError === 'access_denied'
+          ? 'Google sign-in was cancelled before it finished.'
+          : authErrorDescription || 'Google sign-in failed. Please try again.',
+      )
+      return
+    }
+
+    if (!idToken) {
+      window.sessionStorage.removeItem(GOOGLE_AUTH_STATE_STORAGE_KEY)
+      clearFeedback()
+      setAuthMode('sign-in')
+      setAuthDialogOpen(true)
+      setErrorMessage('Google sign-in did not return an ID token. Please try again.')
+      return
+    }
+
+    const expectedState = window.sessionStorage.getItem(GOOGLE_AUTH_STATE_STORAGE_KEY)
+    window.sessionStorage.removeItem(GOOGLE_AUTH_STATE_STORAGE_KEY)
+
+    if (expectedState && returnedState !== expectedState) {
+      clearFeedback()
+      setAuthMode('sign-in')
+      setAuthDialogOpen(true)
+      setErrorMessage('Google sign-in could not be verified. Please try again.')
+      return
+    }
+
+    clearFeedback()
+    setBusyAction('google')
+
+    void (async () => {
+      try {
+        const credential = GoogleAuthProvider.credential(idToken)
+        const result = await signInWithCredential(auth, credential)
+        await syncUserState(result.user, { lastAuthMethod: 'google' })
+        setPendingGoogleLink(null)
+        resetCredentialForms()
+        setAuthDialogOpen(false)
+      } catch (error) {
+        const firebaseError = error as FirebaseError
+
+        if (firebaseError.code === 'auth/account-exists-with-different-credential') {
+          const credential = GoogleAuthProvider.credentialFromError(
+            firebaseError,
+          ) as OAuthCredential | null
+          const conflictEmail = String(firebaseError.customData?.email ?? '').trim()
+
+          if (credential && conflictEmail) {
+            setPendingGoogleLink({ credential, email: conflictEmail })
+            setAuthEmail(conflictEmail)
+          }
+
+          setAuthMode('sign-in')
+          setAuthDialogOpen(true)
+          setStatusMessage(
+            'Google found an existing account for this email. Sign in with the matching email account first and Argue will merge Google into it.',
+          )
+        } else {
+          setAuthMode('sign-in')
+          setAuthDialogOpen(true)
+          setErrorMessage(formatAuthError(firebaseError))
+        }
+      } finally {
+        setBusyAction(null)
+      }
+    })()
+  }, [])
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const mode = params.get('mode')
     const oobCode = params.get('oobCode')
@@ -568,10 +639,21 @@ function App() {
     setBusyAction('google')
 
     try {
-      await signInWithRedirect(auth, googleProvider)
+      const authUrl = await createGoogleSignInUrl(buildVerificationUrl())
+      const state = new URL(authUrl).searchParams.get('state')
+
+      if (!state) {
+        throw new Error('Google sign-in did not provide a state value.')
+      }
+
+      window.sessionStorage.setItem(GOOGLE_AUTH_PENDING_STORAGE_KEY, '1')
+      window.sessionStorage.setItem(GOOGLE_AUTH_STATE_STORAGE_KEY, state)
+      window.location.assign(authUrl)
     } catch (error) {
-      const firebaseError = error as FirebaseError
-      setErrorMessage(formatAuthError(firebaseError))
+      const nextMessage =
+        error instanceof Error ? error.message : 'Google sign-in failed to start.'
+
+      setErrorMessage(nextMessage)
       setBusyAction(null)
     }
   }
