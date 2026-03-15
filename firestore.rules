@@ -9,6 +9,11 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, create, update: if isOwner(userId);
       allow delete: if false;
+
+      match /chats/{chatId} {
+        allow read, create, update: if isOwner(userId);
+        allow delete: if isOwner(userId);
+      }
     }
   }
 }

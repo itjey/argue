@@ -3,6 +3,16 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ChangeEvent } fro
 import type { User } from 'firebase/auth'
 import { ArrowUp, Square, Paperclip, Mic, ChevronDown, Search, X, Info, Copy, Pencil, Check } from 'lucide-react'
 import {
+  collection,
+  doc,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  Timestamp,
+} from 'firebase/firestore'
+import {
   fetchOpenRouterModels,
   getInitialOpenRouterModels,
   createOpenRouterChatCompletionStream,
@@ -23,6 +33,7 @@ import {
   type OpenRouterModelStatsEntry,
 } from '../lib/openrouterStats'
 import { ModelStatsPanel } from './ModelStatsPanel'
+import { db } from '../lib/firebase'
 
 const SYSTEM_PROMPT = `You are a helpful assistant. Format your responses using Markdown.
 
@@ -40,6 +51,13 @@ interface CollaborationWorkspaceProps {
 }
 
 interface AttachedFile {
+  id: string
+  name: string
+  dataUrl: string
+  mimeType: string
+}
+
+type SavedAttachment = {
   id: string
   name: string
   dataUrl: string
@@ -107,6 +125,37 @@ interface ChatMessage {
     searching: boolean
   }
   groupData?: GroupData
+}
+
+type SavedChatMessage = {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  attachments?: SavedAttachment[]
+  streaming?: boolean
+  error?: boolean
+  reasoning?: string
+  isReasoningModel?: boolean
+  thinkingDuration?: number
+  stoppedThinking?: boolean
+  webSearch?: {
+    enabled: boolean
+    approximateQuery: string
+    citations: OpenRouterUrlCitation[]
+    searching: boolean
+  }
+  groupData?: GroupData
+}
+
+type SavedChat = {
+  id: string
+  title: string
+  preview: string
+  modelId: string | null
+  modelName: string | null
+  createdAt: number
+  updatedAt: number
+  messages: ChatMessage[]
 }
 
 declare global {
@@ -366,11 +415,92 @@ function getGroupModelSummary(
   return names.length > 0 ? names.join(' · ') : 'Choose at least two models'
 }
 
+function normalizeChatTitle(messages: ChatMessage[]) {
+  const firstUserMessage = messages.find((message) => message.role === 'user')
+  const text = firstUserMessage?.content.trim() ?? ''
+  if (!text) {
+    return 'New chat'
+  }
+  return text.length > 48 ? `${text.slice(0, 48).trimEnd()}…` : text
+}
+
+function normalizeChatPreview(messages: ChatMessage[]) {
+  const latestMessage = [...messages]
+    .reverse()
+    .find((message) => message.content.trim() || (message.attachments?.length ?? 0) > 0)
+  if (!latestMessage) {
+    return 'Empty'
+  }
+  const base =
+    latestMessage.content.trim() ||
+    latestMessage.attachments?.map((file) => file.name).join(', ') ||
+    'Attachment'
+  return base.length > 80 ? `${base.slice(0, 80).trimEnd()}…` : base
+}
+
+function timestampToMillis(value: Timestamp | null | undefined) {
+  return value instanceof Timestamp ? value.toMillis() : 0
+}
+
+function serializeMessages(messages: ChatMessage[]): SavedChatMessage[] {
+  return messages.map((message) => ({
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    attachments: message.attachments?.map((attachment) => ({
+      id: attachment.id,
+      name: attachment.name,
+      dataUrl: attachment.dataUrl,
+      mimeType: attachment.mimeType,
+    })),
+    streaming: message.streaming,
+    error: message.error,
+    reasoning: message.reasoning,
+    isReasoningModel: message.isReasoningModel,
+    thinkingDuration: message.thinkingDuration,
+    stoppedThinking: message.stoppedThinking,
+    webSearch: message.webSearch,
+    groupData: message.groupData,
+  }))
+}
+
+function deserializeMessages(messages: SavedChatMessage[] | undefined): ChatMessage[] {
+  return (messages ?? []).map((message) => ({
+    ...message,
+    attachments: message.attachments?.map((attachment) => ({ ...attachment })),
+    webSearch: message.webSearch
+      ? {
+          ...message.webSearch,
+          citations: [...message.webSearch.citations],
+        }
+      : undefined,
+    groupData: message.groupData
+      ? {
+          ...message.groupData,
+          phases: message.groupData.phases.map((phase) => ({
+            ...phase,
+            runs: phase.runs.map((run) => ({ ...run })),
+          })),
+        }
+      : undefined,
+  }))
+}
+
+function formatChatTime(value: number) {
+  if (!value) {
+    return ''
+  }
+  return new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
 
 
 export function CollaborationWorkspace({ currentUser }: CollaborationWorkspaceProps) {
-  void currentUser
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [chats, setChats] = useState<SavedChat[]>([])
+  const [activeChatId, setActiveChatId] = useState<string | null>(null)
+  const [chatListReady, setChatListReady] = useState(false)
+  const [chatSyncError, setChatSyncError] = useState('')
   const [prompt, setPrompt] = useState('')
   const [listening, setListening] = useState(false)
   const [attachments, setAttachments] = useState<AttachedFile[]>([])
@@ -415,6 +545,8 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
   const recognitionRef = useRef<any>(null)
   const abortedRef = useRef(false)
   const userKeyRequired = isBrowserManagedOpenRouter()
+  const hydratedChatIdRef = useRef<string | null>(null)
+  const saveTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -441,6 +573,179 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    if (!currentUser) {
+      setChats([])
+      setActiveChatId(null)
+      setMessages([])
+      setChatListReady(false)
+      return
+    }
+
+    const chatsQuery = query(
+      collection(db, 'users', currentUser.uid, 'chats'),
+      orderBy('updatedAt', 'desc'),
+    )
+
+    const unsubscribe = onSnapshot(
+      chatsQuery,
+      (snapshot) => {
+        const nextChats = snapshot.docs.map((chatDoc) => {
+          const data = chatDoc.data() as {
+            title?: string
+            preview?: string
+            modelId?: string | null
+            modelName?: string | null
+            createdAt?: Timestamp
+            updatedAt?: Timestamp
+            messages?: SavedChatMessage[]
+          }
+
+          return {
+            id: chatDoc.id,
+            title: data.title ?? 'New chat',
+            preview: data.preview ?? 'Empty',
+            modelId: data.modelId ?? null,
+            modelName: data.modelName ?? null,
+            createdAt: timestampToMillis(data.createdAt),
+            updatedAt: timestampToMillis(data.updatedAt),
+            messages: deserializeMessages(data.messages),
+          }
+        })
+
+        setChats(nextChats)
+        setChatListReady(true)
+        setChatSyncError('')
+
+        if (nextChats.length === 0) {
+          hydratedChatIdRef.current = null
+          setActiveChatId(null)
+          setMessages([])
+          return
+        }
+
+        setActiveChatId((currentChatId) => {
+          if (currentChatId && nextChats.some((chat) => chat.id === currentChatId)) {
+            return currentChatId
+          }
+          return nextChats[0].id
+        })
+      },
+      () => {
+        setChatListReady(true)
+        setChatSyncError('Could not load chats.')
+      },
+    )
+
+    return unsubscribe
+  }, [currentUser])
+
+  useEffect(() => {
+    if (!activeChatId) {
+      if (!chatListReady) {
+        return
+      }
+      hydratedChatIdRef.current = null
+      setMessages([])
+      return
+    }
+
+    if (hydratedChatIdRef.current === activeChatId) {
+      return
+    }
+
+    const activeChat = chats.find((chat) => chat.id === activeChatId)
+    if (!activeChat) {
+      return
+    }
+
+    hydratedChatIdRef.current = activeChatId
+    setMessages(deserializeMessages(activeChat.messages))
+    setPrompt('')
+    setAttachments([])
+    setEditingId(null)
+
+    if (activeChat.modelId) {
+      const nextModel =
+        activeChat.modelId === GROUP_ONE_ID
+          ? GROUP_ONE
+          : findOpenRouterModelById(models, activeChat.modelId)
+      if (nextModel) {
+        setSelectedModel(nextModel)
+      }
+    }
+  }, [activeChatId, chatListReady, chats, models])
+
+  useEffect(() => {
+    if (!currentUser || !activeChatId || hydratedChatIdRef.current !== activeChatId) {
+      return
+    }
+
+    if (saveTimerRef.current != null) {
+      window.clearTimeout(saveTimerRef.current)
+    }
+
+    saveTimerRef.current = window.setTimeout(() => {
+      const activeChat = chats.find((chat) => chat.id === activeChatId)
+
+      void setDoc(
+        doc(db, 'users', currentUser.uid, 'chats', activeChatId),
+        {
+          title: normalizeChatTitle(messages),
+          preview: normalizeChatPreview(messages),
+          modelId: selectedModel?.id ?? activeChat?.modelId ?? null,
+          modelName: selectedModel?.name ?? activeChat?.modelName ?? null,
+          createdAt: activeChat?.createdAt
+            ? Timestamp.fromMillis(activeChat.createdAt)
+            : serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          messages: serializeMessages(messages),
+        },
+        { merge: true },
+      ).catch(() => {
+        setChatSyncError('Could not save chat.')
+      })
+    }, 300)
+
+    return () => {
+      if (saveTimerRef.current != null) {
+        window.clearTimeout(saveTimerRef.current)
+      }
+    }
+  }, [activeChatId, chats, currentUser, messages, selectedModel])
+
+  async function createChat() {
+    if (!currentUser || streaming) {
+      return
+    }
+
+    const chatRef = doc(collection(db, 'users', currentUser.uid, 'chats'))
+    await setDoc(chatRef, {
+      title: 'New chat',
+      preview: 'Empty',
+      modelId: selectedModel?.id ?? null,
+      modelName: selectedModel?.name ?? null,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      messages: [],
+    })
+
+    hydratedChatIdRef.current = chatRef.id
+    setActiveChatId(chatRef.id)
+    setMessages([])
+    setPrompt('')
+    setAttachments([])
+    setEditingId(null)
+  }
+
+  function openChat(chatId: string) {
+    if (streaming || chatId === activeChatId) {
+      return
+    }
+    hydratedChatIdRef.current = null
+    setActiveChatId(chatId)
+  }
 
   useEffect(() => {
     if (!activeThinkingMessageId) {
@@ -995,6 +1300,10 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
     if (!selectedModel) return
     if (streaming) return
 
+    if (!activeChatId) {
+      await createChat()
+    }
+
     if (userKeyRequired && !getStoredOpenRouterKey().trim()) {
       pushAssistantError(getMissingCredentialMessage())
       return
@@ -1144,6 +1453,7 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
 
   let statsEntry: OpenRouterModelStatsEntry | null = null
   if (statsSnapshot && infoModel) statsEntry = resolveOpenRouterModelStats(statsSnapshot, infoModel)
+  const activeChat = chats.find((chat) => chat.id === activeChatId) ?? null
 
   return (
     <>
@@ -1205,8 +1515,60 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
         </div>
       )}
 
-      <div className={`prompt-page${hasMessages ? ' prompt-page-chat' : ''}${activeThinkingMessage ? ' prompt-page-chat-thinking-open' : ''}`}>
+      <div className={`prompt-page prompt-page-chat${activeThinkingMessage ? ' prompt-page-chat-thinking-open' : ''}`}>
+        <aside className="chat-sidebar">
+          <div className="chat-sidebar-header">
+            <div>
+              <p className="chat-sidebar-kicker">Chats</p>
+              <strong>History</strong>
+            </div>
+            <button
+              className="chat-sidebar-new"
+              type="button"
+              onClick={() => {
+                void createChat()
+              }}
+              disabled={streaming}
+            >
+              New
+            </button>
+          </div>
+
+          {chatSyncError ? <p className="chat-sidebar-note">{chatSyncError}</p> : null}
+
+          <div className="chat-sidebar-list">
+            {!chatListReady ? (
+              <p className="chat-sidebar-note">Loading chats…</p>
+            ) : chats.length === 0 ? (
+              <p className="chat-sidebar-note">No saved chats yet.</p>
+            ) : (
+              chats.map((chat) => (
+                <button
+                  key={chat.id}
+                  className={`chat-sidebar-item${chat.id === activeChatId ? ' chat-sidebar-item-active' : ''}`}
+                  type="button"
+                  onClick={() => openChat(chat.id)}
+                  disabled={streaming}
+                >
+                  <span className="chat-sidebar-item-title">{chat.title}</span>
+                  <span className="chat-sidebar-item-preview">{chat.preview}</span>
+                  <span className="chat-sidebar-item-meta">
+                    {chat.modelName ?? 'No model'}
+                    {chat.updatedAt ? ` · ${formatChatTime(chat.updatedAt)}` : ''}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        </aside>
+
         <div className="prompt-chat-shell">
+          <div className="chat-main-header">
+            <div>
+              <p className="chat-main-kicker">Current chat</p>
+              <strong>{activeChat?.title ?? 'New chat'}</strong>
+            </div>
+          </div>
           {/* Chat history */}
           {hasMessages && (
             <div className="chat-container" ref={chatContainerRef}>
