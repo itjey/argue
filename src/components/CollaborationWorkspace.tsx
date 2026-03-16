@@ -16,6 +16,7 @@ import {
   fetchOpenRouterModels,
   getInitialOpenRouterModels,
   createOpenRouterChatCompletionStream,
+  createOpenRouterChatCompletion,
   type OpenRouterModel,
   type OpenRouterChatMessage,
   type OpenRouterReasoningEffort,
@@ -424,6 +425,29 @@ function normalizeChatTitle(messages: ChatMessage[]) {
   return text.length > 48 ? `${text.slice(0, 48).trimEnd()}…` : text
 }
 
+async function generateChatTitle(userMessage: string, assistantReply: string, apiKey: string): Promise<string | null> {
+  try {
+    const result = await createOpenRouterChatCompletion({
+      apiKey,
+      model: 'openai/gpt-4o-mini',
+      maxTokens: 20,
+      messages: [
+        {
+          role: 'system',
+          content: 'Generate a 2-5 word title for this conversation. No quotes, no punctuation at the end. Just the short title.',
+        },
+        { role: 'user', content: userMessage },
+        { role: 'assistant', content: assistantReply.slice(0, 200) },
+        { role: 'user', content: 'Title:' },
+      ],
+    })
+    const title = result.text?.trim().replace(/^["']|["']$/g, '').replace(/\.+$/, '')
+    return title && title.length > 0 && title.length <= 50 ? title : null
+  } catch {
+    return null
+  }
+}
+
 function normalizeChatPreview(messages: ChatMessage[]) {
   const latestMessage = [...messages]
     .reverse()
@@ -549,6 +573,7 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
   const userKeyRequired = isBrowserManagedOpenRouter()
   const hydratedChatIdRef = useRef<string | null>(null)
   const saveTimerRef = useRef<number | null>(null)
+  const titleGeneratedRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     let cancelled = false
@@ -708,6 +733,29 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
       ).catch(() => {
         setChatSyncError('Could not save chat.')
       })
+
+      // Generate AI title after first completed assistant message
+      const firstUser = messages.find((m) => m.role === 'user')
+      const firstAssistant = messages.find((m) => m.role === 'assistant' && !m.streaming && !m.error && m.content.trim())
+      if (
+        firstUser &&
+        firstAssistant &&
+        !titleGeneratedRef.current.has(activeChatId)
+      ) {
+        titleGeneratedRef.current.add(activeChatId)
+        const apiKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
+        if (apiKey) {
+          void generateChatTitle(firstUser.content, firstAssistant.content, apiKey).then((aiTitle) => {
+            if (aiTitle) {
+              void setDoc(
+                doc(db, 'users', currentUser.uid, 'chats', activeChatId),
+                { title: aiTitle },
+                { merge: true },
+              )
+            }
+          })
+        }
+      }
     }, 300)
 
     return () => {
@@ -1520,10 +1568,7 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
       <div className={`prompt-page prompt-page-chat${activeThinkingMessage ? ' prompt-page-chat-thinking-open' : ''}`}>
         <aside className="chat-sidebar">
           <div className="chat-sidebar-header">
-            <div>
-              <p className="chat-sidebar-kicker">Chats</p>
-              <strong>History</strong>
-            </div>
+            <strong>Chats</strong>
             <button
               className="chat-sidebar-new"
               type="button"
@@ -1553,7 +1598,6 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
                   disabled={streaming}
                 >
                   <span className="chat-sidebar-item-title">{chat.title}</span>
-                  <span className="chat-sidebar-item-preview">{chat.preview}</span>
                   <span className="chat-sidebar-item-meta">
                     {chat.modelName ?? 'No model'}
                     {chat.updatedAt ? ` · ${formatChatTime(chat.updatedAt)}` : ''}
@@ -1566,10 +1610,7 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
 
         <div className="prompt-chat-shell">
           <div className="chat-main-header">
-            <div>
-              <p className="chat-main-kicker">Current chat</p>
-              <strong>{activeChat?.title ?? 'New chat'}</strong>
-            </div>
+            <strong>{activeChat?.title ?? 'New chat'}</strong>
           </div>
           {/* Chat history */}
           {hasMessages && (
