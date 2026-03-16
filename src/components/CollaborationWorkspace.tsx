@@ -447,20 +447,22 @@ function serializeMessages(messages: ChatMessage[]): SavedChatMessage[] {
     id: message.id,
     role: message.role,
     content: message.content,
-    attachments: message.attachments?.map((attachment) => ({
-      id: attachment.id,
-      name: attachment.name,
-      dataUrl: attachment.dataUrl,
-      mimeType: attachment.mimeType,
-    })),
-    streaming: message.streaming,
-    error: message.error,
-    reasoning: message.reasoning,
-    isReasoningModel: message.isReasoningModel,
-    thinkingDuration: message.thinkingDuration,
-    stoppedThinking: message.stoppedThinking,
-    webSearch: message.webSearch,
-    groupData: message.groupData,
+    ...(message.attachments ? {
+      attachments: message.attachments.map((attachment) => ({
+        id: attachment.id,
+        name: attachment.name,
+        dataUrl: attachment.dataUrl,
+        mimeType: attachment.mimeType,
+      })),
+    } : {}),
+    ...(message.streaming !== undefined && { streaming: message.streaming }),
+    ...(message.error !== undefined && { error: message.error }),
+    ...(message.reasoning !== undefined && { reasoning: message.reasoning }),
+    ...(message.isReasoningModel !== undefined && { isReasoningModel: message.isReasoningModel }),
+    ...(message.thinkingDuration !== undefined && { thinkingDuration: message.thinkingDuration }),
+    ...(message.stoppedThinking !== undefined && { stoppedThinking: message.stoppedThinking }),
+    ...(message.webSearch ? { webSearch: message.webSearch } : {}),
+    ...(message.groupData ? { groupData: message.groupData } : {}),
   }))
 }
 

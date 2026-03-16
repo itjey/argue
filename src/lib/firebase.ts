@@ -24,10 +24,6 @@ void setPersistence(auth, browserLocalPersistence)
 
 const db = getFirestore(app)
 
-type CreateAuthUriResponse = {
-  authUri?: string
-}
-
 type SyncUserProfileOptions = {
   lastAuthMethod?: string
   linkedProvider?: string
@@ -100,39 +96,8 @@ async function syncUserProfile(user: User, options: SyncUserProfileOptions = {})
   await setDoc(profileRef, profilePayload, { merge: true })
 }
 
-async function createGoogleSignInUrl(continueUri: string) {
-  const response = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:createAuthUri?key=${firebaseConfig.apiKey}`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        continueUri,
-        providerId: 'google.com',
-      }),
-    },
-  )
-
-  if (!response.ok) {
-    throw new Error(`Unable to start Google sign-in (${response.status})`)
-  }
-
-  const data = (await response.json()) as CreateAuthUriResponse
-
-  if (!data.authUri) {
-    throw new Error('Google sign-in did not return an auth URL')
-  }
-
-  const authUrl = new URL(data.authUri)
-  authUrl.searchParams.set('prompt', 'select_account')
-  return authUrl.toString()
-}
-
 export {
   auth,
-  createGoogleSignInUrl,
   db,
   getProviderIds,
   getProviderLabels,
