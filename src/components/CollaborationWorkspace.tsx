@@ -573,7 +573,7 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
   const userKeyRequired = isBrowserManagedOpenRouter()
   const hydratedChatIdRef = useRef<string | null>(null)
   const saveTimerRef = useRef<number | null>(null)
-  const titleGeneratedRef = useRef<Set<string>>(new Set())
+  const aiTitlesRef = useRef<Map<string, string>>(new Map())
 
   useEffect(() => {
     let cancelled = false
@@ -715,11 +715,12 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
 
     saveTimerRef.current = window.setTimeout(() => {
       const activeChat = chats.find((chat) => chat.id === activeChatId)
+      const chatTitle = aiTitlesRef.current.get(activeChatId) ?? normalizeChatTitle(messages)
 
       void setDoc(
         doc(db, 'users', currentUser.uid, 'chats', activeChatId),
         {
-          title: normalizeChatTitle(messages),
+          title: chatTitle,
           preview: normalizeChatPreview(messages),
           modelId: selectedModel?.id ?? activeChat?.modelId ?? null,
           modelName: selectedModel?.name ?? activeChat?.modelName ?? null,
@@ -740,13 +741,14 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
       if (
         firstUser &&
         firstAssistant &&
-        !titleGeneratedRef.current.has(activeChatId)
+        !aiTitlesRef.current.has(activeChatId)
       ) {
-        titleGeneratedRef.current.add(activeChatId)
+        aiTitlesRef.current.set(activeChatId, '') // mark as pending
         const apiKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
         if (apiKey) {
           void generateChatTitle(firstUser.content, firstAssistant.content, apiKey).then((aiTitle) => {
             if (aiTitle) {
+              aiTitlesRef.current.set(activeChatId, aiTitle)
               void setDoc(
                 doc(db, 'users', currentUser.uid, 'chats', activeChatId),
                 { title: aiTitle },
