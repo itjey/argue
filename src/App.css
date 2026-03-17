@@ -6828,3 +6828,439 @@
   margin-bottom: 8px;
   gap: 8px;
 }
+
+/* ---- Config actions (Feature 2) ---- */
+.group-config-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0;
+  flex-wrap: wrap;
+}
+
+.group-config-active-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.55);
+  padding: 3px 8px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 6px;
+  margin-right: 4px;
+}
+
+.group-config-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.6);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.group-config-action-btn:hover {
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.85);
+}
+
+.group-config-action-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.group-config-action-btn-primary {
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.85);
+  font-weight: 600;
+}
+
+.group-config-action-btn-primary:hover {
+  background: rgba(255,255,255,0.18);
+}
+
+/* Save config dialog */
+.config-save-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.config-save-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* Load config dialog / config list */
+.config-load-dialog {
+  padding: 10px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.config-load-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.7);
+}
+
+.config-load-dialog-header button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.4);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.config-load-dialog-header button:hover {
+  color: rgba(255,255,255,0.8);
+  background: rgba(255,255,255,0.06);
+}
+
+.config-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.config-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.06);
+  transition: background 0.15s;
+}
+
+.config-list-item:hover {
+  background: rgba(255,255,255,0.07);
+}
+
+.config-list-item-active {
+  border-color: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.08);
+}
+
+.config-list-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.config-list-item-info strong {
+  font-size: 12px;
+  color: rgba(255,255,255,0.85);
+}
+
+.config-list-item-meta {
+  font-size: 10px;
+  color: rgba(255,255,255,0.45);
+}
+
+.config-list-item-desc {
+  font-size: 10px;
+  color: rgba(255,255,255,0.35);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.config-list-item-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.config-list-item-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: none;
+  border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.45);
+  cursor: pointer;
+  border-radius: 5px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.config-list-item-actions button:hover {
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.85);
+}
+
+/* ---- Rating (Feature 3) ---- */
+.debate-rating-prompt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.debate-rating-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.5);
+}
+
+.debate-rating-stars {
+  display: flex;
+  gap: 2px;
+}
+
+.debate-star {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.25);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.15s, transform 0.1s;
+}
+
+.debate-star:hover {
+  color: rgba(255,200,50,0.8);
+  transform: scale(1.15);
+}
+
+.debate-star-active {
+  color: rgba(255,200,50,0.9);
+}
+
+.debate-rating-display {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,200,50,0.8);
+  margin-left: 4px;
+}
+
+/* ---- Sidebar header actions ---- */
+.chat-sidebar-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chat-sidebar-community {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.4);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.chat-sidebar-community:hover {
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.7);
+}
+
+.chat-sidebar-community-active {
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.85);
+  border-color: rgba(255,255,255,0.2);
+}
+
+/* ---- Community panel (Feature 4) ---- */
+.community-panel {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  max-height: 50%;
+  overflow-y: auto;
+}
+
+.community-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0 6px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.55);
+}
+
+.community-panel-header strong {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.45);
+}
+
+.community-panel-header button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.35);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.community-panel-header button:hover {
+  color: rgba(255,255,255,0.7);
+  background: rgba(255,255,255,0.06);
+}
+
+.community-panel-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  margin-bottom: 6px;
+  color: rgba(255,255,255,0.35);
+}
+
+.community-panel-search input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: rgba(255,255,255,0.85);
+  font-size: 11px;
+}
+
+.community-panel-search input::placeholder {
+  color: rgba(255,255,255,0.3);
+}
+
+.community-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.community-tag {
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.community-tag:hover {
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.8);
+}
+
+.community-tag-active {
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.85);
+  border-color: rgba(255,255,255,0.2);
+}
+
+.community-panel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.community-config-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.community-config-card:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.community-config-card-header {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.community-config-card-header strong {
+  font-size: 12px;
+  color: rgba(255,255,255,0.85);
+}
+
+.community-config-author {
+  font-size: 10px;
+  color: rgba(255,255,255,0.35);
+}
+
+.community-config-desc {
+  font-size: 10px;
+  color: rgba(255,255,255,0.45);
+  line-height: 1.4;
+}
+
+.community-config-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 10px;
+  color: rgba(255,255,255,0.4);
+}
+
+.community-config-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.community-tag-pill {
+  padding: 1px 6px;
+  font-size: 9px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.06);
+  border-radius: 8px;
+}
