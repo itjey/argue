@@ -1,48 +1,27 @@
-type OpenRouterAuthMode = 'browser' | 'server'
+import { parseRuntimeConfig, type OpenRouterAuthMode } from './envContract'
 
-function normalizeBooleanFlag(value?: string) {
-  const normalized = value?.trim().toLowerCase()
-  return normalized === '1' || normalized === 'true' || normalized === 'yes'
-}
-
-function normalizeOpenRouterAuthMode(value?: string): OpenRouterAuthMode {
-  return value?.trim().toLowerCase() === 'server' ? 'server' : 'browser'
-}
-
-function normalizeApiBase(value?: string) {
-  return value?.trim().replace(/\/+$/, '') ?? ''
-}
-
-const openRouterAuthMode = normalizeOpenRouterAuthMode(
-  import.meta.env.VITE_OPENROUTER_AUTH_MODE,
-)
-
-const configuredOpenRouterApiBase = normalizeApiBase(
-  import.meta.env.VITE_OPENROUTER_API_BASE,
-)
+const runtimeConfig = parseRuntimeConfig({
+  VITE_ALLOW_GUEST_MODE: import.meta.env.VITE_ALLOW_GUEST_MODE,
+  VITE_BUSYTEX_BASE_PATH: import.meta.env.VITE_BUSYTEX_BASE_PATH,
+  VITE_OPENROUTER_API_BASE: import.meta.env.VITE_OPENROUTER_API_BASE,
+  VITE_OPENROUTER_AUTH_MODE: import.meta.env.VITE_OPENROUTER_AUTH_MODE,
+  VITE_PUBLIC_BASE: import.meta.env.VITE_PUBLIC_BASE,
+})
 
 function getConfiguredOpenRouterApiBase() {
-  if (configuredOpenRouterApiBase) {
-    return configuredOpenRouterApiBase
-  }
-
-  if (openRouterAuthMode === 'server') {
-    return '/api/v1'
-  }
-
-  return ''
+  return runtimeConfig.configuredOpenRouterApiBase
 }
 
 function isServerManagedOpenRouter() {
-  return openRouterAuthMode === 'server'
+  return runtimeConfig.openRouterAuthMode === 'server'
 }
 
 function isBrowserManagedOpenRouter() {
-  return openRouterAuthMode === 'browser'
+  return runtimeConfig.openRouterAuthMode === 'browser'
 }
 
 function isGuestModeEnabled() {
-  return normalizeBooleanFlag(import.meta.env.VITE_ALLOW_GUEST_MODE)
+  return runtimeConfig.guestModeEnabled
 }
 
 export {

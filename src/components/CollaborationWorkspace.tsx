@@ -1,16 +1,20 @@
 // CollaborationWorkspace — redesign in progress
 import { useEffect, useRef, useState, type KeyboardEvent, type ChangeEvent } from 'react'
 import type { User } from 'firebase/auth'
-import { ArrowUp, Square, Paperclip, Mic, ChevronDown, Search, X, Info, Copy, Pencil, Check, Plus } from 'lucide-react'
+import { ArrowUp, Square, Paperclip, Mic, ChevronDown, Search, X, Info, Copy, Pencil, Check, Plus, Star, Globe, Download, Trash2, Save, Upload, Users } from 'lucide-react'
 import {
   collection,
   doc,
+  deleteDoc,
+  getDoc,
+  increment,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   setDoc,
   Timestamp,
+  updateDoc,
 } from 'firebase/firestore'
 import {
   fetchOpenRouterModels,
@@ -34,7 +38,7 @@ import {
   type OpenRouterModelStatsEntry,
 } from '../lib/openrouterStats'
 import { ModelStatsPanel } from './ModelStatsPanel'
-import { db } from '../lib/firebase'
+import { db, getFirestoreRecoveryMessage } from '../lib/firebase'
 
 const SYSTEM_PROMPT = `You are a helpful assistant. Format your responses using Markdown.
 
@@ -157,6 +161,46 @@ type SavedChat = {
   createdAt: number
   updatedAt: number
   messages: ChatMessage[]
+  configId?: string | null
+  configName?: string | null
+  rating?: number | null
+}
+
+type SavedConfig = {
+  id: string
+  name: string
+  description: string
+  participants: GroupParticipantConfig[]
+  debateRounds: number
+  reasoningEffort: OpenRouterReasoningEffort
+  stats: {
+    totalRuns: number
+    totalRating: number
+    avgRating: number
+  }
+  createdAt: number
+  updatedAt: number
+  publicConfigId?: string | null
+}
+
+type PublicConfig = {
+  id: string
+  name: string
+  description: string
+  participants: GroupParticipantConfig[]
+  debateRounds: number
+  reasoningEffort: OpenRouterReasoningEffort
+  authorId: string
+  authorName: string
+  stats: {
+    uses: number
+    avgRating: number
+    totalRating: number
+    totalRatedUses: number
+  }
+  tags: string[]
+  createdAt: number
+  updatedAt: number
 }
 
 declare global {
@@ -575,6 +619,27 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
   const saveTimerRef = useRef<number | null>(null)
   const aiTitlesRef = useRef<Map<string, string>>(new Map())
 
+  // ---- Saved configs state (Feature 2) ----
+  const [savedConfigs, setSavedConfigs] = useState<SavedConfig[]>([])
+  const [configsReady, setConfigsReady] = useState(false)
+  const [configSyncError, setConfigSyncError] = useState('')
+  const [activeConfigId, setActiveConfigId] = useState<string | null>(null)
+  const [showSaveConfigDialog, setShowSaveConfigDialog] = useState(false)
+  const [showLoadConfigDialog, setShowLoadConfigDialog] = useState(false)
+  const [configName, setConfigName] = useState('')
+  const [configDescription, setConfigDescription] = useState('')
+
+  // ---- Rating state (Feature 3) ----
+  const [chatRatings, setChatRatings] = useState<Map<string, number>>(new Map())
+
+  // ---- Community configs state (Feature 4) ----
+  const [publicConfigs, setPublicConfigs] = useState<PublicConfig[]>([])
+  const [publicConfigsReady, setPublicConfigsReady] = useState(false)
+  const [publicConfigsError, setPublicConfigsError] = useState('')
+  const [showCommunityConfigs, setShowCommunityConfigs] = useState(false)
+  const [communitySearch, setCommunitySearch] = useState('')
+  const [communityTagFilter, setCommunityTagFilter] = useState('')
+
   useEffect(() => {
     let cancelled = false
 
@@ -607,6 +672,7 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
       setActiveChatId(null)
       setMessages([])
       setChatListReady(false)
+      setChatSyncError('')
       return
     }
 
@@ -627,6 +693,9 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
             createdAt?: Timestamp
             updatedAt?: Timestamp
             messages?: SavedChatMessage[]
+            configId?: string | null
+            configName?: string | null
+            rating?: number | null
           }
 
           return {
@@ -638,6 +707,9 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
             createdAt: timestampToMillis(data.createdAt),
             updatedAt: timestampToMillis(data.updatedAt),
             messages: deserializeMessages(data.messages),
+            configId: data.configId ?? null,
+            configName: data.configName ?? null,
+            rating: data.rating ?? null,
           }
         })
 
@@ -659,14 +731,125 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
           return nextChats[0].id
         })
       },
-      () => {
+      (error) => {
         setChatListReady(true)
-        setChatSyncError('Could not load chats.')
+        setChatSyncError(
+          getFirestoreRecoveryMessage(error, 'Could not load chats.'),
+        )
       },
     )
 
     return unsubscribe
   }, [currentUser])
+
+  // ---- Configs subscription (Feature 2) ----
+  useEffect(() => {
+    if (!currentUser) {
+      setSavedConfigs([])
+      setConfigsReady(false)
+      setConfigSyncError('')
+      return
+    }
+
+    const configsQuery = query(
+      collection(db, 'users', currentUser.uid, 'configs'),
+      orderBy('updatedAt', 'desc'),
+    )
+
+    const unsubConfigs = onSnapshot(
+      configsQuery,
+      (snapshot) => {
+        const nextConfigs = snapshot.docs.map((configDoc) => {
+          const data = configDoc.data()
+          return {
+            id: configDoc.id,
+            name: data.name ?? 'Untitled config',
+            description: data.description ?? '',
+            participants: data.participants ?? [],
+            debateRounds: data.debateRounds ?? 2,
+            reasoningEffort: data.reasoningEffort ?? 'high',
+            stats: {
+              totalRuns: data.stats?.totalRuns ?? 0,
+              totalRating: data.stats?.totalRating ?? 0,
+              avgRating: data.stats?.avgRating ?? 0,
+            },
+            createdAt: timestampToMillis(data.createdAt),
+            updatedAt: timestampToMillis(data.updatedAt),
+            publicConfigId: data.publicConfigId ?? null,
+          } as SavedConfig
+        })
+        setSavedConfigs(nextConfigs)
+        setConfigsReady(true)
+        setConfigSyncError('')
+      },
+      (error) => {
+        setConfigsReady(true)
+        setConfigSyncError(
+          getFirestoreRecoveryMessage(error, 'Could not load saved configs.'),
+        )
+      },
+    )
+
+    return unsubConfigs
+  }, [currentUser])
+
+  // ---- Public configs subscription (Feature 4) — lazy ----
+  useEffect(() => {
+    if (!currentUser) {
+      setPublicConfigs([])
+      setPublicConfigsReady(false)
+      setPublicConfigsError('')
+      return
+    }
+
+    if (!showCommunityConfigs) {
+      return
+    }
+
+    const publicQuery = query(
+      collection(db, 'public-configs'),
+      orderBy('updatedAt', 'desc'),
+    )
+
+    const unsubPublic = onSnapshot(
+      publicQuery,
+      (snapshot) => {
+        const configs = snapshot.docs.map((d) => {
+          const data = d.data()
+          return {
+            id: d.id,
+            name: data.name ?? 'Untitled',
+            description: data.description ?? '',
+            participants: data.participants ?? [],
+            debateRounds: data.debateRounds ?? 2,
+            reasoningEffort: data.reasoningEffort ?? 'high',
+            authorId: data.authorId ?? '',
+            authorName: data.authorName ?? 'Unknown',
+            stats: {
+              uses: data.stats?.uses ?? 0,
+              avgRating: data.stats?.avgRating ?? 0,
+              totalRating: data.stats?.totalRating ?? 0,
+              totalRatedUses: data.stats?.totalRatedUses ?? 0,
+            },
+            tags: data.tags ?? [],
+            createdAt: timestampToMillis(data.createdAt),
+            updatedAt: timestampToMillis(data.updatedAt),
+          } as PublicConfig
+        })
+        setPublicConfigs(configs)
+        setPublicConfigsReady(true)
+        setPublicConfigsError('')
+      },
+      (error) => {
+        setPublicConfigsReady(true)
+        setPublicConfigsError(
+          getFirestoreRecoveryMessage(error, 'Could not load community configs.'),
+        )
+      },
+    )
+
+    return unsubPublic
+  }, [currentUser, showCommunityConfigs])
 
   useEffect(() => {
     if (!activeChatId) {
@@ -724,6 +907,8 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
           preview: normalizeChatPreview(messages),
           modelId: selectedModel?.id ?? activeChat?.modelId ?? null,
           modelName: selectedModel?.name ?? activeChat?.modelName ?? null,
+          configId: activeConfigId ?? activeChat?.configId ?? null,
+          configName: activeConfigId ? savedConfigs.find((c) => c.id === activeConfigId)?.name ?? null : activeChat?.configName ?? null,
           createdAt: activeChat?.createdAt
             ? Timestamp.fromMillis(activeChat.createdAt)
             : serverTimestamp(),
@@ -731,8 +916,10 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
           messages: serializeMessages(messages),
         },
         { merge: true },
-      ).catch(() => {
-        setChatSyncError('Could not save chat.')
+      ).catch((error) => {
+        setChatSyncError(
+          getFirestoreRecoveryMessage(error, 'Could not save chat.'),
+        )
       })
 
       // Generate AI title after first completed assistant message
@@ -765,30 +952,37 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
         window.clearTimeout(saveTimerRef.current)
       }
     }
-  }, [activeChatId, chats, currentUser, messages, selectedModel])
+  }, [activeChatId, activeConfigId, chats, currentUser, messages, savedConfigs, selectedModel])
 
   async function createChat() {
     if (!currentUser || streaming) {
       return
     }
 
-    const chatRef = doc(collection(db, 'users', currentUser.uid, 'chats'))
-    await setDoc(chatRef, {
-      title: 'New chat',
-      preview: 'Empty',
-      modelId: selectedModel?.id ?? null,
-      modelName: selectedModel?.name ?? null,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      messages: [],
-    })
+    try {
+      const chatRef = doc(collection(db, 'users', currentUser.uid, 'chats'))
+      await setDoc(chatRef, {
+        title: 'New chat',
+        preview: 'Empty',
+        modelId: selectedModel?.id ?? null,
+        modelName: selectedModel?.name ?? null,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        messages: [],
+      })
 
-    hydratedChatIdRef.current = chatRef.id
-    setActiveChatId(chatRef.id)
-    setMessages([])
-    setPrompt('')
-    setAttachments([])
-    setEditingId(null)
+      hydratedChatIdRef.current = chatRef.id
+      setActiveChatId(chatRef.id)
+      setMessages([])
+      setPrompt('')
+      setAttachments([])
+      setEditingId(null)
+      setChatSyncError('')
+    } catch (error) {
+      setChatSyncError(
+        getFirestoreRecoveryMessage(error, 'Could not create a new chat.'),
+      )
+    }
   }
 
   function openChat(chatId: string) {
@@ -797,6 +991,187 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
     }
     hydratedChatIdRef.current = null
     setActiveChatId(chatId)
+  }
+
+  // ---- Config CRUD (Feature 2) ----
+  async function saveConfig() {
+    if (!currentUser || !configName.trim()) return
+    try {
+      const configRef = doc(collection(db, 'users', currentUser.uid, 'configs'))
+      await setDoc(configRef, {
+        name: configName.trim(),
+        description: configDescription.trim(),
+        participants: groupParticipants.map((p) => ({ ...p })),
+        debateRounds: groupDebateRounds,
+        reasoningEffort: groupReasoningEffort,
+        stats: { totalRuns: 0, totalRating: 0, avgRating: 0 },
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+      setActiveConfigId(configRef.id)
+      setShowSaveConfigDialog(false)
+      setConfigName('')
+      setConfigDescription('')
+      setConfigSyncError('')
+    } catch (error) {
+      setConfigSyncError(
+        getFirestoreRecoveryMessage(error, 'Could not save this config.'),
+      )
+    }
+  }
+
+  function loadConfig(config: SavedConfig) {
+    setGroupParticipants(normalizeGroupParticipants(config.participants.map((p) => ({ ...p }))))
+    setGroupDebateRounds(config.debateRounds)
+    setGroupReasoningEffort(config.reasoningEffort)
+    setActiveConfigId(config.id)
+    setShowLoadConfigDialog(false)
+  }
+
+  async function updateConfig() {
+    if (!currentUser || !activeConfigId) return
+    try {
+      const configRef = doc(db, 'users', currentUser.uid, 'configs', activeConfigId)
+      await setDoc(configRef, {
+        participants: groupParticipants.map((p) => ({ ...p })),
+        debateRounds: groupDebateRounds,
+        reasoningEffort: groupReasoningEffort,
+        updatedAt: serverTimestamp(),
+      }, { merge: true })
+      setConfigSyncError('')
+    } catch (error) {
+      setConfigSyncError(
+        getFirestoreRecoveryMessage(error, 'Could not update this config.'),
+      )
+    }
+  }
+
+  async function deleteConfig(configId: string) {
+    if (!currentUser) return
+    try {
+      await deleteDoc(doc(db, 'users', currentUser.uid, 'configs', configId))
+      if (activeConfigId === configId) {
+        setActiveConfigId(null)
+      }
+      setConfigSyncError('')
+    } catch (error) {
+      setConfigSyncError(
+        getFirestoreRecoveryMessage(error, 'Could not delete this config.'),
+      )
+    }
+  }
+
+  // ---- Rating (Feature 3) ----
+  async function rateChat(chatId: string, rating: number) {
+    if (!currentUser) return
+    try {
+      const chatRef = doc(db, 'users', currentUser.uid, 'chats', chatId)
+      await setDoc(chatRef, { rating }, { merge: true })
+      setChatRatings((prev) => new Map(prev).set(chatId, rating))
+
+      // Update linked config stats
+      const chat = chats.find((c) => c.id === chatId)
+      const linkedConfigId = chat?.configId ?? activeConfigId
+      if (linkedConfigId) {
+        const configRef = doc(db, 'users', currentUser.uid, 'configs', linkedConfigId)
+        const configSnap = await getDoc(configRef)
+        if (configSnap.exists()) {
+          const configData = configSnap.data()
+          const prevTotalRuns = configData.stats?.totalRuns ?? 0
+          const prevTotalRating = configData.stats?.totalRating ?? 0
+          const newTotalRuns = prevTotalRuns + 1
+          const newTotalRating = prevTotalRating + rating
+          await updateDoc(configRef, {
+            'stats.totalRuns': newTotalRuns,
+            'stats.totalRating': newTotalRating,
+            'stats.avgRating': Math.round((newTotalRating / newTotalRuns) * 10) / 10,
+          })
+        }
+      }
+      setChatSyncError('')
+    } catch (error) {
+      setChatSyncError(
+        getFirestoreRecoveryMessage(error, 'Could not save this rating.'),
+      )
+    }
+  }
+
+  // ---- Public config sharing (Feature 4) ----
+  async function publishConfig(configId: string, tags: string[]) {
+    if (!currentUser) return
+    const config = savedConfigs.find((c) => c.id === configId)
+    if (!config) return
+    try {
+      const publicRef = doc(collection(db, 'public-configs'))
+      await setDoc(publicRef, {
+        name: config.name,
+        description: config.description,
+        participants: config.participants.map((p) => ({ ...p })),
+        debateRounds: config.debateRounds,
+        reasoningEffort: config.reasoningEffort,
+        authorId: currentUser.uid,
+        authorName: currentUser.displayName ?? currentUser.email ?? 'Anonymous',
+        stats: { uses: 0, avgRating: 0, totalRating: 0, totalRatedUses: 0 },
+        tags,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+      await updateDoc(doc(db, 'users', currentUser.uid, 'configs', configId), {
+        publicConfigId: publicRef.id,
+      })
+      setPublicConfigsError('')
+    } catch (error) {
+      setPublicConfigsError(
+        getFirestoreRecoveryMessage(error, 'Could not publish this config.'),
+      )
+    }
+  }
+
+  async function unpublishConfig(configId: string) {
+    if (!currentUser) return
+    const config = savedConfigs.find((c) => c.id === configId)
+    if (!config?.publicConfigId) return
+    try {
+      await deleteDoc(doc(db, 'public-configs', config.publicConfigId))
+      await updateDoc(doc(db, 'users', currentUser.uid, 'configs', configId), {
+        publicConfigId: null,
+      })
+      setPublicConfigsError('')
+    } catch (error) {
+      setPublicConfigsError(
+        getFirestoreRecoveryMessage(error, 'Could not unpublish this config.'),
+      )
+    }
+  }
+
+  async function importPublicConfig(pub: PublicConfig) {
+    if (!currentUser) return
+    try {
+      const configRef = doc(collection(db, 'users', currentUser.uid, 'configs'))
+      await setDoc(configRef, {
+        name: pub.name,
+        description: pub.description,
+        participants: pub.participants.map((p) => ({ ...p })),
+        debateRounds: pub.debateRounds,
+        reasoningEffort: pub.reasoningEffort,
+        stats: { totalRuns: 0, totalRating: 0, avgRating: 0 },
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+      setGroupParticipants(normalizeGroupParticipants(pub.participants.map((p) => ({ ...p }))))
+      setGroupDebateRounds(pub.debateRounds)
+      setGroupReasoningEffort(pub.reasoningEffort)
+      setActiveConfigId(configRef.id)
+      setShowCommunityConfigs(false)
+      await updateDoc(doc(db, 'public-configs', pub.id), {
+        'stats.uses': increment(1),
+      }).catch(() => {})
+      setPublicConfigsError('')
+    } catch (error) {
+      setPublicConfigsError(
+        getFirestoreRecoveryMessage(error, 'Could not import this community config.'),
+      )
+    }
   }
 
   useEffect(() => {
@@ -1506,6 +1881,8 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
   let statsEntry: OpenRouterModelStatsEntry | null = null
   if (statsSnapshot && infoModel) statsEntry = resolveOpenRouterModelStats(statsSnapshot, infoModel)
   const activeChat = chats.find((chat) => chat.id === activeChatId) ?? null
+  const workspaceStorageNotice =
+    chatSyncError || configSyncError || publicConfigsError
 
   return (
     <>
@@ -1571,19 +1948,31 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
         <aside className="chat-sidebar">
           <div className="chat-sidebar-header">
             <strong>Chats</strong>
-            <button
-              className="chat-sidebar-new"
-              type="button"
-              onClick={() => {
-                void createChat()
-              }}
-              disabled={streaming}
-            >
-              <Plus size={15} />
-            </button>
+            <div className="chat-sidebar-header-actions">
+              <button
+                className={`chat-sidebar-community${showCommunityConfigs ? ' chat-sidebar-community-active' : ''}`}
+                type="button"
+                onClick={() => setShowCommunityConfigs((open) => !open)}
+                title="Community configs"
+              >
+                <Users size={15} />
+              </button>
+              <button
+                className="chat-sidebar-new"
+                type="button"
+                onClick={() => {
+                  void createChat()
+                }}
+                disabled={streaming}
+              >
+                <Plus size={15} />
+              </button>
+            </div>
           </div>
 
-          {chatSyncError ? <p className="chat-sidebar-note">{chatSyncError}</p> : null}
+          {workspaceStorageNotice ? (
+            <p className="chat-sidebar-note">{workspaceStorageNotice}</p>
+          ) : null}
 
           <div className="chat-sidebar-list">
             {!chatListReady ? (
@@ -1601,13 +1990,103 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
                 >
                   <span className="chat-sidebar-item-title">{chat.title}</span>
                   <span className="chat-sidebar-item-meta">
-                    {chat.modelName ?? 'No model'}
+                    {chat.configName ?? chat.modelName ?? 'No model'}
+                    {chat.rating ? ` · ${chat.rating}★` : ''}
                     {chat.updatedAt ? ` · ${formatChatTime(chat.updatedAt)}` : ''}
                   </span>
                 </button>
               ))
             )}
           </div>
+
+          {/* Community panel (Feature 4) */}
+          {showCommunityConfigs && (
+            <div className="community-panel">
+              <div className="community-panel-header">
+                <strong>Community Configs</strong>
+                <button type="button" onClick={() => setShowCommunityConfigs(false)} aria-label="Close"><X size={14} /></button>
+              </div>
+              <div className="community-panel-search">
+                <Search size={13} />
+                <input
+                  type="text"
+                  placeholder="Search configs…"
+                  value={communitySearch}
+                  onChange={(e) => setCommunitySearch(e.target.value)}
+                  spellCheck={false}
+                />
+              </div>
+              {(() => {
+                const allTags = Array.from(new Set(publicConfigs.flatMap((c) => c.tags)))
+                return allTags.length > 0 ? (
+                  <div className="community-tags">
+                    <button
+                      className={`community-tag${!communityTagFilter ? ' community-tag-active' : ''}`}
+                      type="button"
+                      onClick={() => setCommunityTagFilter('')}
+                    >All</button>
+                    {allTags.map((tag) => (
+                      <button
+                        key={tag}
+                        className={`community-tag${communityTagFilter === tag ? ' community-tag-active' : ''}`}
+                        type="button"
+                        onClick={() => setCommunityTagFilter(tag === communityTagFilter ? '' : tag)}
+                      >{tag}</button>
+                    ))}
+                  </div>
+                ) : null
+              })()}
+              {publicConfigsError ? (
+                <p className="group-config-note">{publicConfigsError}</p>
+              ) : null}
+              <div className="community-panel-list">
+                {!publicConfigsReady ? (
+                  <p className="group-config-note">Loading community configs…</p>
+                ) : (() => {
+                  const filtered = publicConfigs.filter((c) => {
+                    const matchSearch = !communitySearch.trim() ||
+                      c.name.toLowerCase().includes(communitySearch.toLowerCase()) ||
+                      c.description.toLowerCase().includes(communitySearch.toLowerCase()) ||
+                      c.authorName.toLowerCase().includes(communitySearch.toLowerCase())
+                    const matchTag = !communityTagFilter || c.tags.includes(communityTagFilter)
+                    return matchSearch && matchTag
+                  })
+                  return filtered.length === 0 ? (
+                    <p className="group-config-note">No community configs found.</p>
+                  ) : (
+                    filtered.map((pub) => (
+                      <div key={pub.id} className="community-config-card">
+                        <div className="community-config-card-header">
+                          <strong>{pub.name}</strong>
+                          <span className="community-config-author">by {pub.authorName}</span>
+                        </div>
+                        {pub.description && <p className="community-config-desc">{pub.description}</p>}
+                        <div className="community-config-meta">
+                          <span>{pub.participants.filter((p) => p.enabled).length} models</span>
+                          <span>{pub.debateRounds} {pub.debateRounds === 1 ? 'round' : 'rounds'}</span>
+                          <span>{pub.stats.uses} uses</span>
+                          {pub.stats.totalRatedUses > 0 && <span>{pub.stats.avgRating.toFixed(1)}★</span>}
+                        </div>
+                        {pub.tags.length > 0 && (
+                          <div className="community-config-tags">
+                            {pub.tags.map((tag) => <span key={tag} className="community-tag-pill">{tag}</span>)}
+                          </div>
+                        )}
+                        <button
+                          className="group-config-action-btn group-config-action-btn-primary"
+                          type="button"
+                          onClick={() => void importPublicConfig(pub)}
+                        >
+                          <Download size={13} />
+                          <span>Use this config</span>
+                        </button>
+                      </div>
+                    ))
+                  )
+                })()}
+              </div>
+            </div>
+          )}
         </aside>
 
         <div className="prompt-chat-shell">
@@ -1698,6 +2177,34 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
                                 {msg.groupData.synthesisStreaming && <span className="chat-thinking-pulse">{msg.groupData.synthesisModelName} synthesizing…</span>}
                               </div>
                               <MarkdownBlock>{msg.groupData.synthesis}</MarkdownBlock>
+                            </div>
+                          )}
+
+                          {/* Rating prompt (Feature 3) — shown after debate completes */}
+                          {msg.groupData.complete && activeChatId && (
+                            <div className="debate-rating-prompt">
+                              <span className="debate-rating-label">Rate this debate:</span>
+                              <div className="debate-rating-stars">
+                                {[1, 2, 3, 4, 5].map((star) => {
+                                  const currentRating = chatRatings.get(activeChatId) ?? chats.find((c) => c.id === activeChatId)?.rating ?? 0
+                                  return (
+                                    <button
+                                      key={star}
+                                      className={`debate-star${star <= currentRating ? ' debate-star-active' : ''}`}
+                                      type="button"
+                                      onClick={() => void rateChat(activeChatId, star)}
+                                      aria-label={`Rate ${star} stars`}
+                                    >
+                                      <Star size={16} fill={star <= currentRating ? 'currentColor' : 'none'} />
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                              {(chatRatings.get(activeChatId) ?? chats.find((c) => c.id === activeChatId)?.rating) ? (
+                                <span className="debate-rating-display">
+                                  {chatRatings.get(activeChatId) ?? chats.find((c) => c.id === activeChatId)?.rating}/5
+                                </span>
+                              ) : null}
                             </div>
                           )}
                         </>
@@ -2074,6 +2581,116 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
                         </select>
                       </label>
                     </div>
+
+                    {/* Config actions bar (Feature 2) */}
+                    <div className="group-config-actions">
+                      {activeConfigId && (
+                        <span className="group-config-active-name">
+                          {savedConfigs.find((c) => c.id === activeConfigId)?.name ?? 'Config'}
+                        </span>
+                      )}
+                      <button
+                        className="group-config-action-btn"
+                        type="button"
+                        onClick={() => { setConfigName(''); setConfigDescription(''); setShowSaveConfigDialog(true) }}
+                      >
+                        <Save size={13} />
+                        <span>Save config</span>
+                      </button>
+                      <button
+                        className="group-config-action-btn"
+                        type="button"
+                        onClick={() => setShowLoadConfigDialog(true)}
+                      >
+                        <Upload size={13} />
+                        <span>Load config</span>
+                      </button>
+                      {activeConfigId && (
+                        <button
+                          className="group-config-action-btn"
+                          type="button"
+                          onClick={() => void updateConfig()}
+                        >
+                          <Check size={13} />
+                          <span>Update</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Save config dialog */}
+                    {showSaveConfigDialog && (
+                      <div className="config-save-dialog">
+                        {configSyncError ? (
+                          <p className="group-config-note">{configSyncError}</p>
+                        ) : null}
+                        <label className="group-config-field">
+                          <span>Config name</span>
+                          <input
+                            className="group-config-input"
+                            type="text"
+                            value={configName}
+                            onChange={(e) => setConfigName(e.target.value)}
+                            placeholder="My best math config"
+                          />
+                        </label>
+                        <label className="group-config-field">
+                          <span>Description (optional)</span>
+                          <input
+                            className="group-config-input"
+                            type="text"
+                            value={configDescription}
+                            onChange={(e) => setConfigDescription(e.target.value)}
+                            placeholder="3 models, 2 rounds, high reasoning"
+                          />
+                        </label>
+                        <div className="config-save-dialog-actions">
+                          <button className="group-config-action-btn" type="button" onClick={() => setShowSaveConfigDialog(false)}>Cancel</button>
+                          <button className="group-config-action-btn group-config-action-btn-primary" type="button" onClick={() => void saveConfig()} disabled={!configName.trim()}>Save</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Load config dialog */}
+                    {showLoadConfigDialog && (
+                      <div className="config-load-dialog">
+                        <div className="config-load-dialog-header">
+                          <strong>Saved Configurations</strong>
+                          <button type="button" onClick={() => setShowLoadConfigDialog(false)} aria-label="Close"><X size={14} /></button>
+                        </div>
+                        {configSyncError ? (
+                          <p className="group-config-note">{configSyncError}</p>
+                        ) : null}
+                        {!configsReady ? (
+                          <p className="group-config-note">Loading configs…</p>
+                        ) : savedConfigs.length === 0 ? (
+                          <p className="group-config-note">No saved configs yet.</p>
+                        ) : (
+                          <div className="config-list">
+                            {savedConfigs.map((config) => (
+                              <div key={config.id} className={`config-list-item${config.id === activeConfigId ? ' config-list-item-active' : ''}`}>
+                                <div className="config-list-item-info">
+                                  <strong>{config.name}</strong>
+                                  <span className="config-list-item-meta">
+                                    {config.participants.filter((p) => p.enabled).length} models · {config.debateRounds} {config.debateRounds === 1 ? 'round' : 'rounds'}
+                                    {config.stats.totalRuns > 0 && ` · ${config.stats.avgRating.toFixed(1)}★ (${config.stats.totalRuns} runs)`}
+                                  </span>
+                                  {config.description && <span className="config-list-item-desc">{config.description}</span>}
+                                </div>
+                                <div className="config-list-item-actions">
+                                  <button type="button" onClick={() => loadConfig(config)} title="Use this config"><Download size={13} /></button>
+                                  {config.publicConfigId ? (
+                                    <button type="button" onClick={() => void unpublishConfig(config.id)} title="Unpublish"><Globe size={13} /></button>
+                                  ) : (
+                                    <button type="button" onClick={() => void publishConfig(config.id, [])} title="Share publicly"><Globe size={13} /></button>
+                                  )}
+                                  <button type="button" onClick={() => void deleteConfig(config.id)} title="Delete"><Trash2 size={13} /></button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <p className="group-config-note">
                       Choose the debating models, set response budgets, and assign specialized roles. The lead model writes the final synthesis.

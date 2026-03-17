@@ -31,7 +31,6 @@ import {
   KeyRound,
   Layers3,
   LoaderCircle,
-  LockKeyhole,
   LogIn,
   MailCheck,
   MessagesSquare,
@@ -137,19 +136,19 @@ function formatAuthError(error: FirebaseError) {
 
 const metrics: Metric[] = [
   {
-    value: '4-room',
-    label: 'collaboration suite',
-    detail: 'Reasoning, coding, math, and critique work in parallel.',
+    value: '3+',
+    label: 'AI models debating',
+    detail: 'GPT-5.4, Gemini 3.1 Pro, Claude Opus 4.6 challenge each other in real time.',
   },
   {
-    value: 'BYO',
-    label: 'provider keys',
-    detail: 'Connect your own model accounts and keep spend under control.',
+    value: '1-4',
+    label: 'configurable rounds',
+    detail: 'Set the number of debate rounds to match problem difficulty.',
   },
   {
-    value: '1 trace',
-    label: 'decision history',
-    detail: 'Every challenge, rebuttal, and synthesis stays visible.',
+    value: 'Full',
+    label: 'reasoning trace',
+    detail: 'Every argument, rebuttal, and synthesis stays visible for review.',
   },
 ]
 
@@ -157,113 +156,113 @@ const featureCards: FeatureCard[] = [
   {
     icon: Code2,
     eyebrow: 'Programming',
-    title: 'Assign implementation, review, and debugging as separate voices.',
+    title: 'Models write, review, and attack each other\'s code.',
     description:
-      'Set one model to architect, another to write, and a third to attack edge cases before anything ships.',
+      'One model architects, another implements, a third hunts edge cases. Ship code that survived adversarial review before you even look at it.',
   },
   {
     icon: Sigma,
-    eyebrow: 'Math',
-    title: 'Let proof-oriented models pressure test every intermediate step.',
+    eyebrow: 'Math & Stats',
+    title: 'Proof-checking across multiple rounds of debate.',
     description:
-      'Argue keeps symbolic thinking, numerical checks, and dissent together so the final answer survives scrutiny.',
+      'Symbolic reasoning, numerical verification, and dissent happen together so the final answer survives scrutiny from every angle.',
   },
   {
     icon: ScrollText,
-    eyebrow: 'Strategy',
-    title: 'Turn vague briefs into structured decisions with evidence trails.',
+    eyebrow: 'Research',
+    title: 'Competing reasoning strategies surface the strongest answer.',
     description:
-      'Research, synthesis, and executive framing happen in one calm room instead of scattered tabs and chats.',
+      'Different models bring different approaches. The debate structure forces them to defend their reasoning and expose weaknesses.',
   },
 ]
 
 const flowSteps: FlowStep[] = [
   {
     icon: KeyRound,
-    title: 'Bring your own keys',
+    title: 'Bring your API key',
     description:
-      'Paste provider credentials once, define guardrails, and keep model choice entirely in your hands.',
+      'Paste your OpenRouter key once. You control the models and the spend.',
   },
   {
     icon: Layers3,
-    title: 'Compose the room',
+    title: 'Configure the debate',
     description:
-      'Invite specialists for reasoning, generation, critique, and verification into the same focused workspace.',
+      'Choose models, assign roles like Builder or Adversary, set token budgets, and pick 1-4 rounds of debate.',
   },
   {
     icon: MessagesSquare,
-    title: 'Let them challenge each other',
+    title: 'Models debate in rounds',
     description:
-      'Arguments are explicit. Conflicts surface early. Better answers emerge because disagreement is designed in.',
+      'Each model responds in its role, reads the others\' arguments, and refines its position through structured rounds.',
   },
   {
     icon: FileOutput,
-    title: 'Export the final position',
+    title: 'Lead synthesizes the answer',
     description:
-      'Ship a clean synthesis with accepted steps, rejected branches, and a polished handoff for the human owner.',
+      'The lead model reads everything and writes a final synthesis — the strongest answer that survived the debate.',
   },
 ]
 
 const trustPoints: FlowStep[] = [
   {
-    icon: LockKeyhole,
-    title: 'User-controlled credentials',
+    icon: SlidersHorizontal,
+    title: 'Configurable reasoning depth',
     description:
-      'Provider access feels deliberate and premium, with the interface designed around calm control rather than clutter.',
+      'Run a quick 1-round check or a deep 4-round debate. Match the effort to the problem.',
   },
   {
     icon: ShieldCheck,
-    title: 'Clear operational boundaries',
+    title: 'Role-based specialization',
     description:
-      'Every model can be scoped by job, tone, and visibility, so collaborative power never turns into chaos.',
+      'Builder, Analyst, Adversary — each model has a job, a brief, and a token budget so the debate stays focused.',
   },
   {
-    icon: SlidersHorizontal,
-    title: 'Adjustable collaboration depth',
+    icon: ScrollText,
+    title: 'Full debate transcript',
     description:
-      'Run a fast consensus for small work or a longer structured debate for difficult tasks without leaving the page.',
+      'Every round, every argument, every rebuttal is saved. Expand any phase to see exactly how the answer was built.',
   },
 ]
 
 const models: Model[] = [
   {
     icon: BrainCircuit,
-    name: 'Reasoning Lead',
-    specialty: 'Frames the problem and questions assumptions.',
-    tone: 'Calm, skeptical, exact',
+    name: 'GPT-5.4 Builder',
+    specialty: 'Owns the implementation path and delivers the most complete solution.',
+    tone: 'Practical, structured, thorough',
   },
   {
     icon: Braces,
-    name: 'Code Partner',
-    specialty: 'Designs implementation paths and catches integration risk.',
-    tone: 'Practical, structured',
+    name: 'Gemini 3.1 Pro Analyst',
+    specialty: 'Breaks the problem down, surfaces edge cases, and stress-tests assumptions.',
+    tone: 'Precise, methodical',
   },
   {
     icon: Sigma,
-    name: 'Proof Engine',
-    specialty: 'Checks math, logic, and constraint satisfaction.',
-    tone: 'Formal, methodical',
+    name: 'Claude Opus 4.6 Adversary',
+    specialty: 'Challenges weak logic, finds missing pieces, and pushes for stronger answers.',
+    tone: 'Skeptical, rigorous',
   },
 ]
 
 const thread: Message[] = [
   {
     icon: BrainCircuit,
-    speaker: 'Reasoning Lead',
-    role: 'Sets the frame',
-    text: 'The shortest path is not automatically the safest path. We should compare latency, reliability, and maintainability before choosing an architecture.',
+    speaker: 'GPT-5.4 Builder',
+    role: 'Proposes the approach',
+    text: 'For the recurrence T(n) = 2T(n/2) + n, I\'ll apply the Master Theorem. We have a=2, b=2, so log₂2 = 1. Since f(n) = n = Θ(n¹), we\'re in Case 2. The solution is T(n) = Θ(n log n).',
   },
   {
     icon: Braces,
-    speaker: 'Code Partner',
-    role: 'Counters with implementation detail',
-    text: 'Agreed, but the current spec rewards simplicity. A thinner service layer lowers surface area while still leaving room for extensibility.',
+    speaker: 'Gemini 3.1 Pro Analyst',
+    role: 'Verifies the reasoning',
+    text: 'The Master Theorem application is correct, but we should verify with substitution. Assume T(n) = cn log n. Then 2·c(n/2)·log(n/2) + n = cn(log n - 1) + n = cn log n + n(1-c). For c=1 this holds. The bound is confirmed.',
   },
   {
     icon: Sigma,
-    speaker: 'Proof Engine',
-    role: 'Tests the logic',
-    text: 'The conclusion holds only if retry cost stays bounded. We should model failure bursts before accepting the simpler design outright.',
+    speaker: 'Claude Opus 4.6 Adversary',
+    role: 'Challenges an assumption',
+    text: 'Both analyses assume the base case is T(1) = O(1). If the problem intends T(1) = 1 specifically, the constant factor changes. Also: the Master Theorem requires f(n) to be asymptotically positive — true here, but worth stating explicitly for a formal proof.',
   },
 ]
 
@@ -892,9 +891,9 @@ function App() {
         <section className="hero section" id="concept">
           <div className="hero-copy">
             <div className="hero-overline-row">
-              <span className="hero-overline-pill">Private multi-model workspace</span>
+              <span className="hero-overline-pill">Multi-model debate platform</span>
               <span className="hero-overline-pill hero-overline-pill-muted">
-                Live reasoning, metrics, and role-based debate
+                Configurable roles, rounds, and token budgets
               </span>
             </div>
             <div className="hero-type-line">
@@ -902,15 +901,15 @@ function App() {
                 argue.
               </span>
             </div>
-            <h1>Make frontier models challenge each other until the answer holds.</h1>
+            <h1>Make frontier models debate hard problems until the best answer emerges.</h1>
             <p className="hero-text">
-              Argue is a stripped-back multi-model workspace for professionals who
-              want sharper thinking, not louder software. Choose the models,
-              assign the roles, paste your own API keys, and let specialists
-              challenge each other across programming, math, research, and planning.
+              Argue is a platform where different AI models debate and reason
+              through difficult problems. Choose models, assign specialized roles,
+              set token budgets and debate rounds, and watch them challenge each
+              other across programming, math, and research.
             </p>
             <p className="hero-subtext">
-              Built for people who want a command room, not a toy box.
+              Built for people who need verifiable answers, not guesses.
             </p>
 
             <div className="hero-actions">
@@ -943,8 +942,8 @@ function App() {
             <div className="workspace-shell workspace-shell-hero">
               <div className="workspace-header">
                 <div>
-                  <p className="workspace-label">Live session</p>
-                  <h2>Boardroom for frontier models</h2>
+                  <p className="workspace-label">Live debate</p>
+                  <h2>Solve T(n) = 2T(n/2) + n</h2>
                 </div>
                 <div className="status-pill">
                   <BadgeCheck size={16} />
@@ -955,17 +954,17 @@ function App() {
               <div className="workspace-grid">
                 <aside className="workspace-sidebar">
                   <div className="panel-card">
-                    <p className="panel-label">Prompt brief</p>
-                    <h3>Design a resilient architecture for a high-trust AI product.</h3>
+                    <p className="panel-label">Problem</p>
+                    <h3>Solve the recurrence T(n) = 2T(n/2) + n and prove the bound.</h3>
                     <div className="chip-row">
-                      <span>Code review</span>
-                      <span>Math check</span>
-                      <span>Tradeoff debate</span>
+                      <span>Math proof</span>
+                      <span>2 rounds</span>
+                      <span>High reasoning</span>
                     </div>
                   </div>
 
                   <div className="panel-card">
-                    <p className="panel-label">Room roster</p>
+                    <p className="panel-label">Debate roster</p>
                     <div className="roster-list">
                       {models.map((model) => {
                         const Icon = model.icon
@@ -1012,28 +1011,28 @@ function App() {
                   <div className="verdict-card">
                     <div className="verdict-header">
                       <div>
-                        <p className="panel-label">Accepted position</p>
-                        <h3>Ship the simple path, but prove the failure model first.</h3>
+                        <p className="panel-label">Final synthesis</p>
+                        <h3>T(n) = Θ(n log n), confirmed by Master Theorem and substitution.</h3>
                       </div>
                       <div className="verdict-score">
                         <Clock3 size={16} />
-                        12 min debate
+                        2 rounds
                       </div>
                     </div>
 
                     <div className="verdict-grid">
                       <div>
-                        <p className="mini-label">Chosen approach</p>
+                        <p className="mini-label">Accepted proof</p>
                         <p className="mini-text">
-                          Lean service layer with explicit retry controls and a
-                          verification pass before rollout.
+                          Master Theorem Case 2 applies with a=2, b=2. Verified via
+                          substitution method with T(1) = O(1) base case.
                         </p>
                       </div>
                       <div>
-                        <p className="mini-label">Rejected branch</p>
+                        <p className="mini-label">Adversary note</p>
                         <p className="mini-text">
-                          Fully abstracted orchestration added flexibility, but the
-                          maintenance cost was too high for the current scope.
+                          Base case assumption should be stated explicitly. Asymptotic
+                          positivity of f(n) = n holds trivially but needs mention in formal proof.
                         </p>
                       </div>
                     </div>
@@ -1048,11 +1047,11 @@ function App() {
           <div className="section-heading">
             <p className="section-kicker">Use cases</p>
             <h2 id="capabilities-title">
-              Built for professionals who need precision more than novelty.
+              Hard problems in math, stats, and programming — solved through debate.
             </h2>
             <p className="section-copy">
-              The design language is restrained on purpose. Argue should feel like
-              a private control room for difficult decisions, not a dashboard chasing attention.
+              Single-model answers are often confidently wrong. Argue makes models
+              defend their reasoning against each other, so errors get caught before you act on them.
             </p>
           </div>
 
@@ -1077,7 +1076,7 @@ function App() {
         <section className="section workflow-section" id="workflow">
           <div className="section-heading section-heading-compact">
             <p className="section-kicker">Workflow</p>
-            <h2>Structure disagreement, then make the final decision readable.</h2>
+            <h2>From API key to verified answer in four steps.</h2>
           </div>
 
           <div className="timeline-grid">
@@ -1104,10 +1103,10 @@ function App() {
           <div className="split-layout">
             <div className="split-copy">
               <p className="section-kicker">Interface</p>
-              <h2>A precise command surface for serious multi-model work.</h2>
+              <h2>Configure every dimension of the debate.</h2>
               <p className="section-copy">
-                Every panel is tuned for clarity. No wasted chrome. No soft decoration.
-                Just structure, contrast, and enough visual hierarchy to keep long sessions readable.
+                Rounds, reasoning depth, model count, token budgets, and specialized roles —
+                all adjustable before each debate. Save configurations that work and share them publicly.
               </p>
 
               <div className="trust-list">
@@ -1133,28 +1132,28 @@ function App() {
               <div className="control-card control-card-primary">
                 <div className="control-card-header">
                   <div>
-                    <p className="panel-label">Account layer</p>
-                    <h3>Unified sign-in across Google and email</h3>
+                    <p className="panel-label">Debate settings</p>
+                    <h3>Multi-model configuration</h3>
                   </div>
                   <ShieldCheck size={18} />
                 </div>
 
                 <div className="provider-list">
                   <div className="provider-row">
-                    <span>Google</span>
-                    <strong>Enabled</strong>
+                    <span>Debate rounds</span>
+                    <strong>1-4 rounds</strong>
                   </div>
                   <div className="provider-row">
-                    <span>Email + password</span>
-                    <strong>Enabled</strong>
+                    <span>Reasoning depth</span>
+                    <strong>Min → Max</strong>
                   </div>
                   <div className="provider-row">
-                    <span>Verification</span>
-                    <strong>Required</strong>
+                    <span>Models</span>
+                    <strong>2-5 per debate</strong>
                   </div>
                   <div className="provider-row">
-                    <span>Profile sync</span>
-                    <strong>Firestore</strong>
+                    <span>Token budgets</span>
+                    <strong>256-8192 each</strong>
                   </div>
                 </div>
               </div>
@@ -1162,38 +1161,38 @@ function App() {
               <div className="control-card">
                 <div className="control-card-header">
                   <div>
-                    <p className="panel-label">Room settings</p>
-                    <h3>Deliberate orchestration</h3>
+                    <p className="panel-label">Role assignment</p>
+                    <h3>Specialized model roles</h3>
                   </div>
                   <Workflow size={18} />
                 </div>
 
                 <div className="setting-row">
-                  <span>Debate depth</span>
-                  <span>Focused</span>
+                  <span>Builder</span>
+                  <span>Implementation lead</span>
                 </div>
                 <div className="setting-row">
-                  <span>Critique pass</span>
-                  <span>Required</span>
+                  <span>Analyst</span>
+                  <span>Edge case hunter</span>
                 </div>
                 <div className="setting-row">
-                  <span>Final summary</span>
-                  <span>Executive format</span>
+                  <span>Adversary</span>
+                  <span>Logic challenger</span>
                 </div>
               </div>
 
               <div className="control-card control-card-accent">
-                <p className="panel-label">Identity result</p>
-                <h3>One account per email, even when Google gets linked later.</h3>
+                <p className="panel-label">After the debate</p>
+                <h3>Save, rate, and share configurations that produce the best results.</h3>
                 <p className="control-copy">
-                  The auth layer writes account state to Firestore, keeps the email
-                  visible in the product, and prevents messy duplicate identities
-                  when the same person uses different sign-in methods.
+                  Save debate configurations, rate the quality of each debate,
+                  track which model combinations perform best, and publish your
+                  strongest configs for the community.
                 </p>
                 <div className="chip-row">
-                  <span>Email verified</span>
-                  <span>Google linked</span>
-                  <span>Firestore profile</span>
+                  <span>Save configs</span>
+                  <span>Rate debates</span>
+                  <span>Share publicly</span>
                 </div>
               </div>
             </div>
@@ -1203,27 +1202,27 @@ function App() {
         <section className="section trust-section" id="trust">
           <div className="cta-card">
             <div className="cta-copy">
-              <p className="section-kicker">Positioning</p>
-              <h2>A premium frontend for people who treat AI tooling like infrastructure.</h2>
+              <p className="section-kicker">Why debate</p>
+              <h2>Single-model answers are often wrong. Debate finds the errors before you act.</h2>
               <p>
-                This concept leans into a monochrome system, Lucide-only iconography,
-                a horizontal three-blade mark, typed hero branding, and a tighter,
-                more architectural layout across desktop, tablet, and mobile.
+                When models are forced to defend their reasoning against other models,
+                weak arguments collapse, edge cases surface, and the surviving answer
+                is the one that actually holds up under scrutiny.
               </p>
             </div>
 
             <div className="cta-points">
               <div className="cta-point">
                 <CheckCircle2 size={18} />
-                <span>Google and email login</span>
+                <span>Configurable debate depth (1-4 rounds)</span>
               </div>
               <div className="cta-point">
                 <CheckCircle2 size={18} />
-                <span>Verification flow</span>
+                <span>Role-based specialization per model</span>
               </div>
               <div className="cta-point">
                 <CheckCircle2 size={18} />
-                <span>Firestore profile sync</span>
+                <span>Full debate transcript with every argument</span>
               </div>
             </div>
           </div>
