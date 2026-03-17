@@ -25,6 +25,10 @@
   --line-strong: rgba(255, 255, 255, 0.12);
   --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.6);
   --warning: #ff8a3d;
+  --chat-bg: #000;
+  --chat-surface: #0a0a0a;
+  --accent: rgba(255, 255, 255, 0.82);
+  --accent-muted: rgba(255, 255, 255, 0.08);
 }
 
 *,

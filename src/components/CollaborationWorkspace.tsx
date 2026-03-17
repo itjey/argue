@@ -1,7 +1,7 @@
 // CollaborationWorkspace — redesign in progress
 import { useEffect, useRef, useState, type KeyboardEvent, type ChangeEvent } from 'react'
 import type { User } from 'firebase/auth'
-import { ArrowUp, Square, Paperclip, Mic, ChevronDown, Search, X, Info, Copy, Pencil, Check } from 'lucide-react'
+import { ArrowUp, Square, Paperclip, Mic, ChevronDown, Search, X, Info, Copy, Pencil, Check, Plus } from 'lucide-react'
 import {
   collection,
   doc,
@@ -1579,7 +1579,7 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
               }}
               disabled={streaming}
             >
-              New
+              <Plus size={15} />
             </button>
           </div>
 
@@ -1617,6 +1617,7 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
           {/* Chat history */}
           {hasMessages && (
             <div className="chat-container" ref={chatContainerRef}>
+              <div className="chat-fade-top" aria-hidden="true" />
               {messages.map((msg) => {
                 const hasReasoningTrace = Boolean(msg.reasoning?.trim())
                 const isThinkingExpanded = hasReasoningTrace && activeThinkingMessageId === msg.id
