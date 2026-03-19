@@ -299,6 +299,20 @@ function App() {
   const [passwordResetError, setPasswordResetError] = useState('')
   const [topbarHidden, setTopbarHidden] = useState(false)
   const [hasSavedApiKey, setHasSavedApiKey] = useState(serverManagedOpenRouter)
+  const [isLight, setIsLight] = useState(() => {
+    const stored = window.localStorage.getItem('argue-theme') === 'light'
+    document.documentElement.setAttribute('data-theme', stored ? 'light' : 'dark')
+    return stored
+  })
+
+  function toggleTheme() {
+    setIsLight((prev) => {
+      const next = !prev
+      document.documentElement.setAttribute('data-theme', next ? 'light' : 'dark')
+      window.localStorage.setItem('argue-theme', next ? 'light' : 'dark')
+      return next
+    })
+  }
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
@@ -1280,6 +1294,8 @@ function App() {
         onRefreshVerification={handleRefreshVerification}
         onResendVerification={handleResendVerification}
         onSignOut={handleSignOut}
+        isLight={isLight}
+        onThemeToggle={toggleTheme}
       />
 
       {pricingOpen ? (

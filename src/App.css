@@ -7628,3 +7628,252 @@
   color: rgba(255, 255, 255, 0.25);
   line-height: 1.5;
 }
+
+/* ── Appearance toggle (in AuthDialog) ──────────────────── */
+
+.auth-appearance-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 0 0;
+  margin-top: 0.2rem;
+  border-top: 1px solid var(--line);
+}
+
+.auth-appearance-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.28rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.4rem;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.auth-appearance-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--ink-strong);
+}
+
+/* ── Light mode overrides ───────────────────────────────── */
+
+html[data-theme="light"] .app-shell {
+  background: #f5f4f2;
+}
+
+html[data-theme="light"] .topbar {
+  background: #ffffff;
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+html[data-theme="light"] .brand,
+html[data-theme="light"] .brand-wordmark {
+  color: #1a1918;
+}
+
+html[data-theme="light"] .brand-blade {
+  color: rgba(0, 0, 0, 0.75);
+}
+
+html[data-theme="light"] .nav a,
+html[data-theme="light"] .nav-link-button,
+html[data-theme="light"] .topbar-account-button {
+  color: var(--ink-muted);
+}
+
+html[data-theme="light"] .nav a:hover,
+html[data-theme="light"] .nav-link-button:hover {
+  color: var(--ink-strong);
+}
+
+html[data-theme="light"] .topbar-account-button {
+  border-color: rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+html[data-theme="light"] .topbar-account-button:hover {
+  background: rgba(0, 0, 0, 0.055);
+  border-color: rgba(0, 0, 0, 0.15);
+}
+
+/* Auth dialog */
+html[data-theme="light"] .auth-dialog {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.09);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.12);
+}
+
+html[data-theme="light"] .auth-dialog-header {
+  border-bottom-color: rgba(0, 0, 0, 0.07);
+}
+
+html[data-theme="light"] .auth-close:hover,
+html[data-theme="light"] .auth-close:focus-visible {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+html[data-theme="light"] .auth-tabs {
+  border-bottom-color: rgba(0, 0, 0, 0.07);
+}
+
+html[data-theme="light"] .auth-tabs .auth-tab:hover {
+  color: var(--ink-strong);
+}
+
+html[data-theme="light"] .auth-feedback,
+html[data-theme="light"] .auth-note {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.07);
+}
+
+html[data-theme="light"] .auth-feedback-success {
+  background: rgba(30, 130, 70, 0.06);
+  border-color: rgba(30, 130, 70, 0.2);
+}
+
+html[data-theme="light"] .auth-feedback-error {
+  background: rgba(200, 40, 40, 0.06);
+  border-color: rgba(200, 40, 40, 0.2);
+}
+
+html[data-theme="light"] .auth-provider-button {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.11);
+}
+
+html[data-theme="light"] .auth-provider-button:hover,
+html[data-theme="light"] .auth-provider-button:focus-visible {
+  background: rgba(0, 0, 0, 0.055);
+  border-color: rgba(0, 0, 0, 0.17);
+}
+
+html[data-theme="light"] .auth-divider::before {
+  border-top-color: rgba(0, 0, 0, 0.08);
+}
+
+html[data-theme="light"] .auth-divider span {
+  background: #ffffff;
+}
+
+html[data-theme="light"] .auth-input {
+  background: rgba(0, 0, 0, 0.025);
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+html[data-theme="light"] .auth-input:focus {
+  border-color: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.035);
+}
+
+html[data-theme="light"] .auth-primary-button {
+  background: rgba(0, 0, 0, 0.07);
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+html[data-theme="light"] .auth-primary-button:hover,
+html[data-theme="light"] .auth-primary-button:focus-visible {
+  background: rgba(0, 0, 0, 0.11);
+  border-color: rgba(0, 0, 0, 0.18);
+}
+
+html[data-theme="light"] .auth-secondary-button {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.09);
+}
+
+html[data-theme="light"] .auth-secondary-button:hover,
+html[data-theme="light"] .auth-secondary-button:focus-visible {
+  background: rgba(0, 0, 0, 0.07);
+  border-color: rgba(0, 0, 0, 0.14);
+}
+
+html[data-theme="light"] .auth-card {
+  background: rgba(0, 0, 0, 0.025);
+  border-color: rgba(0, 0, 0, 0.07);
+}
+
+html[data-theme="light"] .auth-card-header {
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+html[data-theme="light"] .auth-provider-tag {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+html[data-theme="light"] .auth-settings-card {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.07);
+}
+
+html[data-theme="light"] .auth-settings-status-ok {
+  color: #1a7a3a;
+}
+
+html[data-theme="light"] .auth-settings-status-missing {
+  color: #b04500;
+}
+
+html[data-theme="light"] .auth-appearance-btn {
+  background: rgba(0, 0, 0, 0.035);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+html[data-theme="light"] .auth-appearance-btn:hover {
+  background: rgba(0, 0, 0, 0.07);
+  border-color: rgba(0, 0, 0, 0.16);
+}
+
+/* Pricing panel in light mode */
+html[data-theme="light"] .pricing-billing-toggle {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+html[data-theme="light"] .pricing-billing-btn-active {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+html[data-theme="light"] .pricing-slider {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+html[data-theme="light"] .pricing-slider-fill {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+html[data-theme="light"] .pricing-slider::-webkit-slider-thumb {
+  background: #1a1918;
+  border-color: #f5f4f2;
+}
+
+html[data-theme="light"] .pricing-slider::-moz-range-thumb {
+  background: #1a1918;
+  border-color: #f5f4f2;
+}
+
+html[data-theme="light"] .pricing-summary {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+html[data-theme="light"] .pricing-usage-row {
+  background: rgba(0, 0, 0, 0.025);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+html[data-theme="light"] .pricing-cta-btn {
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.35);
+}
+
+html[data-theme="light"] .pricing-cta-note {
+  color: rgba(0, 0, 0, 0.3);
+}

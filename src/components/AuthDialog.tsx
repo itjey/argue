@@ -4,11 +4,13 @@ import {
   KeyRound,
   Link2,
   LoaderCircle,
+  Moon,
   Settings,
   LogIn,
   LogOut,
   MailCheck,
   ShieldCheck,
+  Sun,
   User as UserIcon,
   X,
 } from 'lucide-react'
@@ -25,6 +27,7 @@ type AuthDialogProps = {
   email: string
   errorMessage: string
   isVerified: boolean
+  isLight: boolean
   linkPassword: string
   linkPasswordConfirm: string
   mode: AuthMode
@@ -45,6 +48,7 @@ type AuthDialogProps = {
   onRefreshVerification: () => void
   onResendVerification: () => void
   onSignOut: () => void
+  onThemeToggle: () => void
   password: string
 }
 
@@ -55,6 +59,7 @@ function AuthDialog({
   currentUser,
   email,
   errorMessage,
+  isLight,
   isVerified,
   linkPassword,
   linkPasswordConfirm,
@@ -77,6 +82,7 @@ function AuthDialog({
   onRefreshVerification,
   onResendVerification,
   onSignOut,
+  onThemeToggle,
 }: AuthDialogProps) {
   const browserManagedOpenRouter = isBrowserManagedOpenRouter()
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -446,6 +452,19 @@ function AuthDialog({
             </p>
           </>
         )}
+
+        <div className="auth-appearance-row">
+          <span className="auth-label">Appearance</span>
+          <button
+            aria-label={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
+            className="auth-appearance-btn"
+            onClick={onThemeToggle}
+            type="button"
+          >
+            {isLight ? <Moon size={14} /> : <Sun size={14} />}
+            {isLight ? 'Dark mode' : 'Light mode'}
+          </button>
+        </div>
       </section>
     </div>
   )
