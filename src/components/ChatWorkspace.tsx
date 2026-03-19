@@ -427,7 +427,7 @@ export function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
         </div>
       )}
 
-      <div className={`prompt-page${hasMessages ? ' prompt-page-chat' : ''}`}>
+      <div className={`prompt-page${hasMessages ? ' prompt-page-chat prompt-page-chat-solo' : ''}`}>
         <div className="prompt-chat-shell">
           {hasMessages && (
             <div className="chat-container" ref={chatContainerRef}>

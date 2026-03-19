@@ -239,7 +239,7 @@ function LatexWorkspacePanel({
   const pdfFileName = `${sanitizeFilename(label || 'latex-document')}.pdf`
 
   const panel = (
-    <section className="latex-workspace-panel">
+    <section className={`latex-workspace-panel${inline ? ' latex-workspace-panel-inline' : ''}`}>
       <header className="latex-workspace-header">
         <div className="latex-workspace-heading">
           <span className="latex-workspace-kicker">{label || 'LaTeX'} workspace</span>
