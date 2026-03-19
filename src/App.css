@@ -7332,3 +7332,299 @@
 .debate-config-radio input[type="radio"] {
   accent-color: rgba(255, 255, 255, 0.75);
 }
+
+/* ── Pricing panel ───────────────────────────────────────── */
+
+.pricing-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  padding-top: 0.2rem;
+}
+
+/* Billing toggle */
+.pricing-billing-toggle {
+  display: flex;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.55rem;
+  padding: 3px;
+  width: fit-content;
+}
+
+.pricing-billing-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.85rem;
+  border: none;
+  border-radius: 0.38rem;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.45);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 130ms ease, color 130ms ease;
+}
+
+.pricing-billing-btn:hover {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.pricing-billing-btn-active {
+  background: rgba(255, 255, 255, 0.09);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.pricing-billing-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.3rem;
+  background: rgba(120, 220, 140, 0.12);
+  color: #7ddc8c;
+}
+
+/* Slider */
+.pricing-slider-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.pricing-slider-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.pricing-slider-track-wrap {
+  position: relative;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.pricing-slider-fill {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 3px;
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 2px;
+  pointer-events: none;
+  transition: width 60ms ease;
+}
+
+.pricing-slider {
+  position: relative;
+  width: 100%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.09);
+  border-radius: 2px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.pricing-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background: #e8e8e8;
+  border: 2px solid #111;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
+  cursor: grab;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.pricing-slider::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  transform: scale(1.15);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12);
+}
+
+.pricing-slider::-moz-range-thumb {
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background: #e8e8e8;
+  border: 2px solid #111;
+  cursor: grab;
+}
+
+/* Summary card */
+.pricing-summary {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.65rem;
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.pricing-summary-price {
+  display: flex;
+  align-items: baseline;
+  gap: 0.2rem;
+}
+
+.pricing-summary-amount {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--ink-strong);
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.pricing-summary-period {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.pricing-summary-credits {
+  font-size: 0.875rem;
+  margin-top: 0.1rem;
+}
+
+.pricing-credits-count {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.pricing-credits-label {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.pricing-summary-annual-note {
+  margin-top: 0.25rem;
+  font-size: 0.78rem;
+  color: #7ddc8c;
+}
+
+/* Usage table */
+.pricing-usage-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pricing-usage-heading {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.pricing-usage-table {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pricing-usage-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.45rem;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.pricing-usage-row-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.pricing-usage-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.1rem 0.38rem;
+  border-radius: 0.25rem;
+}
+
+.pricing-usage-tag-fast {
+  background: rgba(100, 200, 255, 0.1);
+  color: #6dc8ff;
+}
+
+.pricing-usage-tag-standard {
+  background: rgba(180, 130, 255, 0.1);
+  color: #b882ff;
+}
+
+.pricing-usage-tag-premium {
+  background: rgba(255, 170, 80, 0.1);
+  color: #ffaa50;
+}
+
+.pricing-usage-model {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.75);
+  font-weight: 500;
+}
+
+.pricing-usage-row-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+}
+
+.pricing-usage-count {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.pricing-usage-reasoning {
+  font-size: 0.73rem;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.pricing-usage-footnote {
+  margin: 0;
+  font-size: 0.73rem;
+  color: rgba(255, 255, 255, 0.28);
+  line-height: 1.5;
+}
+
+/* CTA */
+.pricing-cta-btn {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  border: none;
+  border-radius: 0.55rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.35);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: not-allowed;
+  transition: background 150ms ease;
+}
+
+.pricing-cta-note {
+  margin: 0;
+  text-align: center;
+  font-size: 0.73rem;
+  color: rgba(255, 255, 255, 0.25);
+  line-height: 1.5;
+}

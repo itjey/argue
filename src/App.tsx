@@ -18,6 +18,7 @@ import {
   verifyPasswordResetCode,
 } from 'firebase/auth'
 import type { LucideIcon } from 'lucide-react'
+import { PricingPanel } from './components/PricingPanel'
 import {
   ArrowRight,
   BadgeCheck,
@@ -1301,7 +1302,7 @@ function App() {
                 <X size={18} />
               </button>
             </div>
-            <p className="auth-copy">Pricing details coming soon.</p>
+            <PricingPanel />
           </section>
         </div>
       ) : null}
