@@ -278,11 +278,11 @@
 }
 
 .topbar-account-warning {
-  color: #c8a520;
+  color: #f97316;
   font-size: 0.66rem;
   letter-spacing: 0.02em;
   text-transform: none;
-  opacity: 0.82;
+  opacity: 0.9;
 }
 
 .topbar-api-key-warning {
