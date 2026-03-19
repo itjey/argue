@@ -28,7 +28,7 @@ Write your content here.
 \\end{document}`
 
 function WorkspaceShell({ currentUser }: WorkspaceShellProps) {
-  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceId>(currentUser ? 'debate' : 'chat')
+  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceId>('chat')
 
   return (
     <div className="workspace-shell-layout">

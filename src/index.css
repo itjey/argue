@@ -97,7 +97,6 @@ svg {
   gap: 2px;
   padding: 4px 6px;
   background: #111;
-  border-bottom: 1px solid var(--line);
   flex-shrink: 0;
 }
 
