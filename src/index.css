@@ -41,6 +41,7 @@ html {
   scroll-behavior: smooth;
   scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
   background: #000;
+  overscroll-behavior: none;
 }
 
 body {
@@ -49,6 +50,7 @@ body {
   height: 100vh;
   overflow: hidden;
   background: #000;
+  overscroll-behavior: none;
 }
 
 ::selection {

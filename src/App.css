@@ -24,7 +24,7 @@
   gap: 1rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 0;
-  background: rgba(0, 0, 0, 0.88);
+  background: #000;
   backdrop-filter: blur(16px);
   will-change: transform, opacity;
   transition:
