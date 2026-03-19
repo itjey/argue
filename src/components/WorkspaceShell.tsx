@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import type { User } from 'firebase/auth'
 import { DebateWorkspace } from './DebateWorkspace'
 import { ChatWorkspace } from './ChatWorkspace'
@@ -46,7 +47,7 @@ function WorkspaceShell({ currentUser }: WorkspaceShellProps) {
             aria-pressed={sidebarCollapsed}
             title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            {sidebarCollapsed ? 'Show' : 'Hide'}
+            {sidebarCollapsed ? <PanelLeftOpen size={15} strokeWidth={1.6} /> : <PanelLeftClose size={15} strokeWidth={1.6} />}
           </button>
         </div>
 
