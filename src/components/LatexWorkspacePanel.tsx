@@ -241,11 +241,6 @@ function LatexWorkspacePanel({
   const panel = (
     <section className={`latex-workspace-panel${inline ? ' latex-workspace-panel-inline' : ''}`}>
       <header className="latex-workspace-header">
-        <div className="latex-workspace-heading">
-          <span className="latex-workspace-kicker">{label || 'LaTeX'} workspace</span>
-          <strong className="latex-workspace-title">Live PDF preview</strong>
-        </div>
-
         <div className="latex-workspace-actions">
           <button
             className={`latex-workspace-toggle${autoCompile ? ' latex-workspace-toggle-on' : ''}`}
@@ -287,24 +282,11 @@ function LatexWorkspacePanel({
         </div>
       </header>
 
-      <div className="latex-workspace-statusbar">
-        <span>{statusText}</span>
-        {lastCompiledAt ? (
-          <span className="latex-workspace-status-meta">
-            Last success {new Date(lastCompiledAt).toLocaleTimeString()}
-          </span>
-        ) : null}
-      </div>
-
       <div className="latex-workspace-body" ref={containerRef}>
         <div
           className="latex-workspace-pane latex-workspace-editor-pane"
           style={{ width: `${editorWidth}%` }}
         >
-          <div className="latex-workspace-pane-header">
-            <span>Source</span>
-          </div>
-
           <textarea
             aria-label="LaTeX source"
             autoCapitalize="off"
@@ -336,10 +318,6 @@ function LatexWorkspacePanel({
         </div>
 
         <div className="latex-workspace-pane latex-workspace-preview-pane">
-          <div className="latex-workspace-pane-header">
-            <span>PDF preview</span>
-          </div>
-
           <div className="latex-workspace-preview-shell">
             {compileError ? (
               <div className="latex-workspace-banner">
