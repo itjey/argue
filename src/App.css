@@ -4294,7 +4294,9 @@
   align-items: center;
   justify-content: center;
   min-height: calc(100vh - 56px);
-  padding: 2rem 1rem;
+  /* right compensates for the 160px workspace sidebar so flex-centered
+     content lands on the viewport's horizontal midpoint (same as topbar nav) */
+  padding: 2rem calc(160px + 1rem) 2rem 1rem;
 }
 
 .prompt-chat-shell {
@@ -4322,6 +4324,17 @@
 
 .prompt-page-chat-solo {
   grid-template-columns: minmax(0, 1fr);
+  /* mirror the workspace sidebar so grid-centered content is at viewport center */
+  padding-right: 160px;
+}
+
+/* Collapsed sidebar (84px) ─ restore correct visual centering */
+.workspace-sidebar-rail-collapsed ~ .workspace-content-area .prompt-page {
+  padding-right: calc(84px + 1rem);
+}
+
+.workspace-sidebar-rail-collapsed ~ .workspace-content-area .prompt-page-chat-solo {
+  padding-right: 84px;
 }
 
 .prompt-page-chat-solo .prompt-chat-shell {

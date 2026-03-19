@@ -206,6 +206,15 @@ svg {
   .workspace-sidebar-toggle {
     justify-content: center;
   }
+
+  /* Sidebar auto-shrinks to 84px at this breakpoint — adjust centering compensation */
+  .prompt-page {
+    padding-right: calc(84px + 1rem);
+  }
+
+  .prompt-page-chat-solo {
+    padding-right: 84px;
+  }
 }
 
 /* ── Debate Config Panel ── */
