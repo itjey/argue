@@ -5737,14 +5737,10 @@
 }
 
 .latex-workspace-panel-inline {
-  position: relative;
-  inset: auto;
-  top: auto;
-  right: auto;
-  bottom: auto;
-  left: auto;
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
   min-width: 0;
   min-height: 0;
   border-radius: 0;
@@ -5984,9 +5980,9 @@
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  gap: 0.75rem;
-  padding: 1rem;
-  background: linear-gradient(180deg, #090909 0%, #040404 100%);
+  gap: 0;
+  padding: 0;
+  background: #0c0c0c;
 }
 
 .latex-workspace-banner {
@@ -6014,11 +6010,8 @@
   min-height: 0;
   width: 100%;
   border: none;
-  border-radius: 0.9rem;
+  border-radius: 0;
   background: #141414;
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
-    0 20px 40px rgba(0, 0, 0, 0.3);
 }
 
 .latex-workspace-placeholder {
