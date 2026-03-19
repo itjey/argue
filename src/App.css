@@ -7333,19 +7333,74 @@
   accent-color: rgba(255, 255, 255, 0.75);
 }
 
-/* ── Pricing panel ───────────────────────────────────────── */
+/* ── Pricing page ────────────────────────────────────────── */
 
-.pricing-panel {
+.page-pricing {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.pricing-page {
+  min-height: 100%;
+  padding: 2rem 1.5rem 4rem;
+}
+
+.pricing-page-inner {
+  max-width: 860px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 1.2rem;
-  padding-top: 0.2rem;
+  gap: 2rem;
+}
+
+.pricing-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.38);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: color 130ms ease;
+}
+
+.pricing-back-btn:hover {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.pricing-page-top {
+  padding-top: 0.5rem;
+}
+
+.pricing-page-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.pricing-page-heading h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  font-weight: 600;
+  color: var(--ink-strong);
+  letter-spacing: -0.02em;
+}
+
+.pricing-page-heading p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.42);
 }
 
 /* Billing toggle */
 .pricing-billing-toggle {
   display: flex;
-  gap: 4px;
+  gap: 3px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 0.55rem;
@@ -7361,7 +7416,7 @@
   border: none;
   border-radius: 0.38rem;
   background: transparent;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.42);
   font: inherit;
   font-size: 0.82rem;
   font-weight: 500;
@@ -7370,12 +7425,12 @@
 }
 
 .pricing-billing-btn:hover {
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .pricing-billing-btn-active {
   background: rgba(255, 255, 255, 0.09);
-  color: rgba(255, 255, 255, 0.92);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .pricing-billing-badge {
@@ -7387,7 +7442,117 @@
   color: #7ddc8c;
 }
 
-/* Slider */
+/* Three-plan grid */
+.pricing-plans-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 640px) {
+  .pricing-plans-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pricing-plan-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1.25rem 1.15rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.75rem;
+  transition: border-color 150ms ease;
+}
+
+.pricing-plan-card:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.pricing-plan-price {
+  display: flex;
+  align-items: baseline;
+  gap: 0.18rem;
+}
+
+.pricing-plan-amount {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: var(--ink-strong);
+  letter-spacing: -0.02em;
+}
+
+.pricing-plan-period {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.pricing-plan-annual-note {
+  margin: -0.4rem 0 0;
+  font-size: 0.73rem;
+  color: #7ddc8c;
+}
+
+.pricing-plan-credits {
+  margin: 0;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Usage list (shared) */
+.pricing-usage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  flex: 1;
+}
+
+.pricing-usage-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.pricing-usage-item-model {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.pricing-usage-item-counts {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.pricing-usage-item-reason {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+/* Plan CTA button */
+.pricing-plan-cta {
+  margin-top: auto;
+  width: 100%;
+  padding: 0.58rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.45rem;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.3);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: not-allowed;
+  transition: background 150ms ease;
+}
+
+/* Custom slider section */
+.pricing-custom-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 480px;
+}
+
 .pricing-slider-section {
   display: flex;
   flex-direction: column;
@@ -7460,173 +7625,76 @@
   cursor: grab;
 }
 
-/* Summary card */
-.pricing-summary {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 0.65rem;
-  padding: 1rem 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.pricing-summary-price {
+.pricing-custom-summary {
   display: flex;
   align-items: baseline;
-  gap: 0.2rem;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
-.pricing-summary-amount {
+.pricing-custom-amount {
   font-family: var(--font-display);
-  font-size: 2rem;
-  font-weight: 700;
+  font-size: 1.5rem;
+  font-weight: 500;
   color: var(--ink-strong);
-  line-height: 1;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
 }
 
-.pricing-summary-period {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.4);
+.pricing-custom-period {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.35);
 }
 
-.pricing-summary-credits {
-  font-size: 0.875rem;
-  margin-top: 0.1rem;
+.pricing-custom-credits {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.5);
 }
 
-.pricing-credits-count {
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.pricing-credits-label {
-  color: rgba(255, 255, 255, 0.45);
-}
-
-.pricing-summary-annual-note {
-  margin-top: 0.25rem;
+.pricing-custom-annual {
   font-size: 0.78rem;
   color: #7ddc8c;
+  width: 100%;
 }
 
-/* Usage table */
-.pricing-usage-section {
+.pricing-custom-cta {
+  width: auto;
+  align-self: flex-start;
+  padding: 0.58rem 1.4rem;
+}
+
+/* Footer / link */
+.pricing-page-footer {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.pricing-usage-heading {
+.pricing-custom-link {
+  display: inline;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.42);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color 130ms ease;
+  text-align: left;
+}
+
+.pricing-custom-link:hover {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.pricing-page-footnote {
   margin: 0;
   font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: rgba(255, 255, 255, 0.3);
-}
-
-.pricing-usage-table {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.pricing-usage-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-  padding: 0.6rem 0.8rem;
-  border-radius: 0.45rem;
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.pricing-usage-row-left {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-shrink: 0;
-}
-
-.pricing-usage-tag {
-  font-size: 0.65rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.1rem 0.38rem;
-  border-radius: 0.25rem;
-}
-
-.pricing-usage-tag-fast {
-  background: rgba(100, 200, 255, 0.1);
-  color: #6dc8ff;
-}
-
-.pricing-usage-tag-standard {
-  background: rgba(180, 130, 255, 0.1);
-  color: #b882ff;
-}
-
-.pricing-usage-tag-premium {
-  background: rgba(255, 170, 80, 0.1);
-  color: #ffaa50;
-}
-
-.pricing-usage-model {
-  font-size: 0.82rem;
-  color: rgba(255, 255, 255, 0.75);
-  font-weight: 500;
-}
-
-.pricing-usage-row-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.1rem;
-}
-
-.pricing-usage-count {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.pricing-usage-reasoning {
-  font-size: 0.73rem;
-  color: rgba(255, 255, 255, 0.35);
-}
-
-.pricing-usage-footnote {
-  margin: 0;
-  font-size: 0.73rem;
-  color: rgba(255, 255, 255, 0.28);
-  line-height: 1.5;
-}
-
-/* CTA */
-.pricing-cta-btn {
-  width: 100%;
-  padding: 0.7rem 1rem;
-  border: none;
-  border-radius: 0.55rem;
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.35);
-  font: inherit;
-  font-size: 0.88rem;
-  font-weight: 600;
-  cursor: not-allowed;
-  transition: background 150ms ease;
-}
-
-.pricing-cta-note {
-  margin: 0;
-  text-align: center;
-  font-size: 0.73rem;
   color: rgba(255, 255, 255, 0.25);
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 /* ── Appearance toggle (in AuthDialog) ──────────────────── */
@@ -7831,14 +7899,74 @@ html[data-theme="light"] .auth-appearance-btn:hover {
   border-color: rgba(0, 0, 0, 0.16);
 }
 
-/* Pricing panel in light mode */
+/* Pricing page in light mode */
+html[data-theme="light"] .pricing-page {
+  background: #f5f4f2;
+}
+
+html[data-theme="light"] .pricing-page-heading p {
+  color: rgba(0, 0, 0, 0.42);
+}
+
+html[data-theme="light"] .pricing-back-btn {
+  color: rgba(0, 0, 0, 0.35);
+}
+
+html[data-theme="light"] .pricing-back-btn:hover {
+  color: rgba(0, 0, 0, 0.65);
+}
+
 html[data-theme="light"] .pricing-billing-toggle {
   background: rgba(0, 0, 0, 0.04);
   border-color: rgba(0, 0, 0, 0.08);
 }
 
+html[data-theme="light"] .pricing-billing-btn {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+html[data-theme="light"] .pricing-billing-btn:hover {
+  color: rgba(0, 0, 0, 0.72);
+}
+
 html[data-theme="light"] .pricing-billing-btn-active {
   background: rgba(0, 0, 0, 0.08);
+  color: rgba(0, 0, 0, 0.88);
+}
+
+html[data-theme="light"] .pricing-plan-card {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.07);
+}
+
+html[data-theme="light"] .pricing-plan-card:hover {
+  border-color: rgba(0, 0, 0, 0.14);
+}
+
+html[data-theme="light"] .pricing-plan-period {
+  color: rgba(0, 0, 0, 0.35);
+}
+
+html[data-theme="light"] .pricing-plan-credits {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+html[data-theme="light"] .pricing-usage-item-model {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+html[data-theme="light"] .pricing-usage-item-counts {
+  color: rgba(0, 0, 0, 0.72);
+}
+
+html[data-theme="light"] .pricing-usage-item-reason {
+  color: rgba(0, 0, 0, 0.33);
+}
+
+html[data-theme="light"] .pricing-plan-cta {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.07);
+  color: rgba(0, 0, 0, 0.3);
 }
 
 html[data-theme="light"] .pricing-slider {
@@ -7859,21 +7987,30 @@ html[data-theme="light"] .pricing-slider::-moz-range-thumb {
   border-color: #f5f4f2;
 }
 
-html[data-theme="light"] .pricing-summary {
-  background: rgba(0, 0, 0, 0.03);
-  border-color: rgba(0, 0, 0, 0.08);
+html[data-theme="light"] .pricing-slider-labels {
+  color: rgba(0, 0, 0, 0.3);
 }
 
-html[data-theme="light"] .pricing-usage-row {
-  background: rgba(0, 0, 0, 0.025);
-  border-color: rgba(0, 0, 0, 0.06);
-}
-
-html[data-theme="light"] .pricing-cta-btn {
-  background: rgba(0, 0, 0, 0.06);
+html[data-theme="light"] .pricing-custom-period {
   color: rgba(0, 0, 0, 0.35);
 }
 
-html[data-theme="light"] .pricing-cta-note {
-  color: rgba(0, 0, 0, 0.3);
+html[data-theme="light"] .pricing-custom-credits {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+html[data-theme="light"] .pricing-page-footer {
+  border-top-color: rgba(0, 0, 0, 0.07);
+}
+
+html[data-theme="light"] .pricing-custom-link {
+  color: rgba(0, 0, 0, 0.42);
+}
+
+html[data-theme="light"] .pricing-custom-link:hover {
+  color: rgba(0, 0, 0, 0.72);
+}
+
+html[data-theme="light"] .pricing-page-footnote {
+  color: rgba(0, 0, 0, 0.28);
 }

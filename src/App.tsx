@@ -18,7 +18,7 @@ import {
   verifyPasswordResetCode,
 } from 'firebase/auth'
 import type { LucideIcon } from 'lucide-react'
-import { PricingPanel } from './components/PricingPanel'
+import { PricingPage } from './components/PricingPanel'
 import {
   ArrowRight,
   BadgeCheck,
@@ -917,8 +917,10 @@ function App() {
         </button>
       </header>
 
-        <main className={`page${workspaceVisible ? ' page-workspace' : ''}`} id="top">
-        {workspaceVisible ? (
+        <main className={`page${workspaceVisible && !pricingOpen ? ' page-workspace' : ''}${pricingOpen ? ' page-pricing' : ''}`} id="top">
+        {pricingOpen ? (
+          <PricingPage onClose={() => setPricingOpen(false)} />
+        ) : workspaceVisible ? (
           <WorkspaceShell currentUser={currentUser} />
         ) : (
           <>
@@ -1298,31 +1300,8 @@ function App() {
         onThemeToggle={toggleTheme}
       />
 
-      {pricingOpen ? (
-        <div className="auth-backdrop" onClick={() => setPricingOpen(false)}>
-          <section
-            aria-modal="true"
-            aria-labelledby="pricing-dialog-title"
-            className="auth-dialog"
-            role="dialog"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="auth-dialog-header">
-              <h2 id="pricing-dialog-title">Pricing</h2>
-              <button
-                aria-label="Close pricing panel"
-                className="auth-close"
-                onClick={() => setPricingOpen(false)}
-                type="button"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <PricingPanel />
-          </section>
-        </div>
-      ) : null}
-
+      {pricingOpen ? null : (
+        <>
       {passwordResetOpen ? (
         <div className="auth-backdrop" onClick={handlePasswordResetClose}>
           <section
@@ -1420,6 +1399,8 @@ function App() {
           </section>
         </div>
       ) : null}
+      </>
+      )}
     </div>
   )
 }
