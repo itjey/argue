@@ -217,9 +217,9 @@ function parseRoundOutput(text: string, expectedTags: string[]) {
   return parsed
 }
 
-function participantSystemPrompt(participant: CollaborationParticipantConfig) {
+function participantSystemPrompt(participant: CollaborationParticipantConfig, participantCount = 3) {
   return [
-    'You are one participant in a three-model collaboration focused on maximum correctness.',
+    `You are one participant in a ${participantCount}-model collaboration focused on maximum correctness.`,
     `Your role is: ${participant.role}.`,
     'Be willing to change your mind when the evidence is against you.',
     'Return the requested tags exactly, with no spaces inside tag names, and keep claims explicit.',
@@ -561,6 +561,7 @@ export {
   buildSynthesisPrompt,
   buildVotePrompt,
   determineVoteWinner,
+  extractTag,
   parseRoundOutput,
   participantSystemPrompt,
   resolveDefaultRoom,

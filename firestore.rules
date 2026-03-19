@@ -14,6 +14,10 @@ service cloud.firestore {
         allow read, create, update: if isOwner(userId);
         allow delete: if isOwner(userId);
       }
+
+      match /debateTemplates/{templateId} {
+        allow read, create, update, delete: if isOwner(userId);
+      }
     }
   }
 }

@@ -43,7 +43,7 @@ import {
   X,
 } from 'lucide-react'
 import { AuthDialog, type AuthMode } from './components/AuthDialog'
-import { CollaborationWorkspace } from './components/CollaborationWorkspace'
+import { WorkspaceShell } from './components/WorkspaceShell'
 import {
   auth,
   getProviderLabels,
@@ -886,7 +886,7 @@ function App() {
 
         <main className={`page${workspaceVisible ? ' page-workspace' : ''}`} id="top">
         {workspaceVisible ? (
-          <CollaborationWorkspace currentUser={currentUser} />
+          <WorkspaceShell currentUser={currentUser!} />
         ) : (
           <>
         <section className="hero section" id="concept">

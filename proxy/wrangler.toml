@@ -1,0 +1,6 @@
+name = "argue-proxy"
+main = "worker.ts"
+compatibility_date = "2024-01-01"
+
+[vars]
+UPSTREAM = "https://openrouter.ai/api/v1/chat/completions"

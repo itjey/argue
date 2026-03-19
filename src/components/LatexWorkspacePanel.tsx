@@ -6,6 +6,7 @@ import { compileLatexToPdf } from '../lib/swiftlatex'
 type LatexWorkspacePanelProps = {
   hidden?: boolean
   initialSource: string
+  inline?: boolean
   label: string
   onHide: () => void
   open: boolean
@@ -77,6 +78,7 @@ function getStatusText(
 function LatexWorkspacePanel({
   hidden = false,
   initialSource,
+  inline = false,
   label,
   onHide,
   open,
@@ -236,7 +238,7 @@ function LatexWorkspacePanel({
   const statusText = getStatusText(compiling, compileError, pdfUrl, hidden)
   const pdfFileName = `${sanitizeFilename(label || 'latex-document')}.pdf`
 
-  return createPortal(
+  const panel = (
     <section className="latex-workspace-panel">
       <header className="latex-workspace-header">
         <div className="latex-workspace-heading">
@@ -365,9 +367,10 @@ function LatexWorkspacePanel({
           </div>
         </div>
       </div>
-    </section>,
-    document.body,
+    </section>
   )
+
+  return inline ? panel : createPortal(panel, document.body)
 }
 
 export { LatexWorkspacePanel }

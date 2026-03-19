@@ -240,38 +240,8 @@ type CreateOpenRouterChatCompletionStreamOptions =
     onProgress?: (reply: OpenRouterAssistantReply) => void
   }
 
-const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models'
-const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions'
-const PROXY_MODELS_URL = 'https://holy-union-290f.jeynarayan2010.workers.dev/api/v1/models'
-const PROXY_CHAT_URL = 'https://holy-union-290f.jeynarayan2010.workers.dev/api/v1/chat/completions'
-
-let workingApiBase: 'direct' | 'proxy' | null = null;
-let baseTestPromise: Promise<'direct' | 'proxy'> | null = null;
-
-async function getWorkingApiBase(): Promise<'direct' | 'proxy'> {
-  if (workingApiBase) return workingApiBase;
-  if (!baseTestPromise) {
-    const testUrl = async (url: string, type: 'direct' | 'proxy') => {
-      const controller = new AbortController();
-      const id = setTimeout(() => controller.abort(), 1500);
-      try {
-        const res = await fetch(url, { signal: controller.signal, headers: { 'HTTP-Referer': getAppOrigin() } });
-        clearTimeout(id);
-        if (res.ok) return type;
-        throw new Error('Not ok');
-      } catch (err) {
-        clearTimeout(id);
-        throw err;
-      }
-    };
-    baseTestPromise = Promise.any([
-      testUrl(OPENROUTER_MODELS_URL, 'direct'),
-      testUrl(PROXY_MODELS_URL, 'proxy')
-    ]).catch(() => 'direct' as const); // fallback to direct if both timeout
-  }
-  workingApiBase = await baseTestPromise;
-  return workingApiBase;
-}
+const OPENROUTER_CHAT_URL =
+  import.meta.env?.VITE_PROXY_URL || 'https://openrouter.ai/api/v1/chat/completions'
 const APP_TITLE = 'Argue'
 
 function getAppOrigin() {
@@ -635,10 +605,6 @@ function extractSsePayload(rawEvent: string) {
 }
 
 async function fetchOpenRouterModels() {
-  // Fire off the API reachability test in the background so chat doesn't lag later
-  getWorkingApiBase().catch(() => {})
-
-  // Return bundled models INSTANTLY to remove the 3.5s loading delay for the user
   return getBundledOpenRouterModels()
 }
 
@@ -654,10 +620,7 @@ async function createOpenRouterChatCompletion({
   plugins,
   webSearchOptions,
 }: CreateOpenRouterChatCompletionOptions) {
-  const apiBase = await getWorkingApiBase()
-  const chatUrl = apiBase === 'proxy' ? PROXY_CHAT_URL : OPENROUTER_CHAT_URL
-
-  let response = await fetch(chatUrl, {
+  const response = await fetch(OPENROUTER_CHAT_URL, {
     method: 'POST',
     headers: requestHeaders(apiKey),
     body: JSON.stringify({
@@ -684,65 +647,10 @@ async function createOpenRouterChatCompletion({
   return extractAssistantReply(payload)
 }
 
-async function createOpenRouterChatCompletionStream({
-  apiKey,
-  includeReasoning,
-  maxTokens,
-  messages,
-  model,
-  modalities,
-  onProgress,
-  reasoning,
-  imageConfig,
-  plugins,
-  webSearchOptions,
-}: CreateOpenRouterChatCompletionStreamOptions) {
-  const apiBase = await getWorkingApiBase()
-  const chatUrl = apiBase === 'proxy' ? PROXY_CHAT_URL : OPENROUTER_CHAT_URL
-
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 30000)
-
-  let response: Response
-  try {
-    response = await fetch(chatUrl, {
-      signal: controller.signal,
-      method: 'POST',
-      headers: requestHeaders(apiKey),
-      body: JSON.stringify({
-        model,
-        stream: true,
-        messages,
-        include_reasoning: includeReasoning,
-        max_tokens: maxTokens,
-        modalities,
-        reasoning,
-        image_config: imageConfig,
-        plugins,
-        web_search_options: webSearchOptions,
-      }),
-    })
-  } catch (err) {
-    clearTimeout(timeoutId)
-    if (err instanceof DOMException && err.name === 'AbortError') {
-      throw new Error('The request timed out. Please try again.')
-    }
-    throw err
-  }
-  clearTimeout(timeoutId)
-
-  if (!response.ok) {
-    const payload = (await response.json().catch(async () => ({
-      error: {
-        message: await response.text(),
-      },
-    }))) as OpenRouterChatResponse
-
-    throw new Error(
-      payload.error?.message ?? 'OpenRouter rejected the streaming chat request.',
-    )
-  }
-
+async function processStreamResponse(
+  response: Response,
+  onProgress?: (reply: OpenRouterAssistantReply) => void,
+): Promise<OpenRouterAssistantReply> {
   if (!response.body) {
     throw new Error('The browser could not read the streaming chat response.')
   }
@@ -755,16 +663,10 @@ async function createOpenRouterChatCompletionStream({
 
   function processEvent(rawEvent: string) {
     const normalizedEvent = rawEvent.replace(/\r\n/g, '\n').trim()
-
-    if (!normalizedEvent) {
-      return
-    }
+    if (!normalizedEvent) return
 
     const payload = extractSsePayload(normalizedEvent)
-
-    if (!payload) {
-      return
-    }
+    if (!payload) return
 
     if (payload === '[DONE]') {
       streamFinished = true
@@ -772,19 +674,12 @@ async function createOpenRouterChatCompletionStream({
     }
 
     const chunk = JSON.parse(payload) as OpenRouterChatStreamChunk
-
-    if (chunk.error?.message) {
-      throw new Error(chunk.error.message)
-    }
+    if (chunk.error?.message) throw new Error(chunk.error.message)
 
     const delta = chunk.choices?.[0]?.delta
-
     if (!delta) {
       if (chunk.usage) {
-        aggregatedReply = {
-          ...aggregatedReply,
-          usage: chunk.usage,
-        }
+        aggregatedReply = { ...aggregatedReply, usage: chunk.usage }
       }
       return
     }
@@ -795,16 +690,12 @@ async function createOpenRouterChatCompletionStream({
 
   while (!streamFinished) {
     const { done, value } = await reader.read()
-
     if (done) {
       buffer += decoder.decode()
       break
     }
-
     buffer += decoder.decode(value, { stream: true })
-
     let separatorIndex = buffer.indexOf('\n\n')
-
     while (separatorIndex >= 0) {
       const rawEvent = buffer.slice(0, separatorIndex)
       buffer = buffer.slice(separatorIndex + 2)
@@ -813,9 +704,7 @@ async function createOpenRouterChatCompletionStream({
     }
   }
 
-  if (buffer.trim()) {
-    processEvent(buffer)
-  }
+  if (buffer.trim()) processEvent(buffer)
 
   if (
     !aggregatedReply.text &&
@@ -830,6 +719,49 @@ async function createOpenRouterChatCompletionStream({
   }
 
   return aggregatedReply
+}
+
+async function createOpenRouterChatCompletionStream({
+  apiKey,
+  includeReasoning,
+  maxTokens,
+  messages,
+  model,
+  modalities,
+  onProgress,
+  reasoning,
+  imageConfig,
+  plugins,
+  webSearchOptions,
+}: CreateOpenRouterChatCompletionStreamOptions) {
+  const response = await fetch(OPENROUTER_CHAT_URL, {
+    method: 'POST',
+    headers: requestHeaders(apiKey),
+    body: JSON.stringify({
+      model,
+      stream: true,
+      messages,
+      include_reasoning: includeReasoning,
+      max_tokens: maxTokens,
+      modalities,
+      reasoning,
+      image_config: imageConfig,
+      plugins,
+      web_search_options: webSearchOptions,
+    }),
+  })
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(async () => ({
+      error: { message: await response.text() },
+    }))) as OpenRouterChatResponse
+
+    throw new Error(
+      payload.error?.message ?? 'OpenRouter rejected the streaming chat request.',
+    )
+  }
+
+  return await processStreamResponse(response, onProgress)
 }
 
 function getRecentOpenRouterModels(models: OpenRouterModel[], limit = 12) {

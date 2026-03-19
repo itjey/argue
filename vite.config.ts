@@ -19,6 +19,14 @@ export default defineConfig(({ mode }) => ({
   base:
     normalizeBase(process.env.VITE_PUBLIC_BASE) ??
     (mode === 'production' ? '/argue/' : '/'),
+  server: {
+    proxy: {
+      '/api/v1/chat/completions': {
+        target: 'https://openrouter.ai',
+        changeOrigin: true,
+      },
+    },
+  },
   build: {
     rollupOptions: {
       output: {
