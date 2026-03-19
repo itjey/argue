@@ -128,21 +128,21 @@
 .topbar:focus-within .brand-blade-left,
 .brand:hover .brand-blade-left,
 .brand:focus-visible .brand-blade-left {
-  transform: translateY(-50%) rotate(0deg) translateX(0.02rem);
+  transform: translateY(-50%) rotate(0deg);
 }
 
 .topbar:hover .brand-blade-center,
 .topbar:focus-within .brand-blade-center,
 .brand:hover .brand-blade-center,
 .brand:focus-visible .brand-blade-center {
-  transform: translateY(-50%) rotate(0deg) translateX(0.14rem);
+  transform: translateY(-50%) rotate(0deg);
 }
 
 .topbar:hover .brand-blade-right,
 .topbar:focus-within .brand-blade-right,
 .brand:hover .brand-blade-right,
 .brand:focus-visible .brand-blade-right {
-  transform: translateY(-50%) rotate(0deg) translateX(0.26rem);
+  transform: translateY(-50%) rotate(0deg);
 }
 
 .topbar:hover .brand-blade,
