@@ -4353,15 +4353,6 @@
   padding-right: 108px;
 }
 
-/* Collapsed sidebar (0px) — remove centering compensation */
-.workspace-sidebar-rail-collapsed ~ .workspace-content-area .prompt-page {
-  padding-right: 1rem;
-}
-
-.workspace-sidebar-rail-collapsed ~ .workspace-content-area .prompt-page-chat-solo {
-  padding-right: 0;
-}
-
 .prompt-page-chat-solo .prompt-chat-shell {
   grid-column: 1;
   width: min(100%, 1120px);

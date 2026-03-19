@@ -85,148 +85,57 @@ svg {
 /* ── Workspace Shell ── */
 .workspace-shell-layout {
   display: flex;
+  flex-direction: column;
   height: 100%;
   overflow: hidden;
 }
 
-.workspace-sidebar-rail {
-  width: fit-content;
-  min-width: 0;
-  flex-shrink: 0;
+.workspace-tab-bar {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 4px;
-  padding: 10px 6px;
-  background: #111;
-  border-right: 1px solid var(--line);
-  overflow: hidden;
-  transition: width 0.22s ease, min-width 0.22s ease, padding 0.22s ease, border-color 0.22s ease;
-}
-
-.workspace-sidebar-rail-collapsed {
-  width: 0;
-  min-width: 0;
-  padding: 0;
-  border-right: none;
-}
-
-.workspace-sidebar-header {
-  display: flex;
+  flex-direction: row;
   align-items: center;
-  justify-content: flex-end;
-  padding-bottom: 6px;
+  gap: 2px;
+  padding: 4px 6px;
+  background: #111;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
 }
 
-.workspace-sidebar-toggle {
+.workspace-tab-btn {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
+  padding: 0.22rem 0.55rem;
   border: none;
-  border-radius: 5px;
-  padding: 0;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.18);
-  cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease;
-  flex-shrink: 0;
-}
-
-.workspace-sidebar-toggle:hover,
-.workspace-sidebar-toggle:focus-visible {
-  color: rgba(255, 255, 255, 0.6);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.workspace-sidebar-nav {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 2px;
-}
-
-.workspace-rail-btn {
-  width: 100%;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  justify-content: center;
-  padding: 0.35rem 0.55rem;
-  border: none;
-  border-radius: 0.45rem;
+  border-radius: 0.35rem;
   background: transparent;
   color: rgba(255, 255, 255, 0.32);
   font: inherit;
+  font-size: 0.8rem;
+  font-weight: 450;
   cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease;
   white-space: nowrap;
-  overflow: hidden;
+  transition: color 0.15s ease, background 0.15s ease;
 }
 
-.workspace-rail-btn:hover {
+.workspace-tab-btn:hover {
   color: rgba(255, 255, 255, 0.82);
   background: rgba(255, 255, 255, 0.05);
 }
 
-.workspace-rail-btn-active {
+.workspace-tab-btn-active {
   color: rgba(255, 255, 255, 0.92);
   background: rgba(255, 255, 255, 0.08);
 }
 
-.workspace-rail-btn-active:hover {
+.workspace-tab-btn-active:hover {
   color: rgba(255, 255, 255, 0.98);
   background: rgba(255, 255, 255, 0.11);
-}
-
-.workspace-rail-label {
-  display: block;
-  font-size: 0.82rem;
-  font-weight: 450;
-  letter-spacing: 0.01em;
-  color: inherit;
-}
-
-/* Pull tab — shown when sidebar is fully collapsed */
-.workspace-sidebar-pull-tab {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 52px;
-  border: none;
-  border-radius: 0 8px 8px 0;
-  padding: 0;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.28);
-  cursor: pointer;
-  transition: width 140ms ease, background 140ms ease, color 140ms ease;
-}
-
-.workspace-sidebar-pull-tab:hover {
-  width: 20px;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.72);
 }
 
 .workspace-content-area {
   flex: 1;
   overflow: hidden;
   position: relative;
-}
-
-@media (max-width: 860px) {
-  .workspace-sidebar-rail {
-    width: fit-content;
-    min-width: 0;
-  }
 }
 
 /* ── Debate Config Panel ── */
