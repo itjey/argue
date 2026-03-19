@@ -274,6 +274,7 @@ function App() {
   const topbarHiddenRef = useRef(false)
   const scrollFrameRef = useRef<number | null>(null)
   const [authDialogOpen, setAuthDialogOpen] = useState(false)
+  const [pricingOpen, setPricingOpen] = useState(false)
   const [authMode, setAuthMode] = useState<AuthMode>('sign-in')
   const [authEmail, setAuthEmail] = useState('')
   const [authPassword, setAuthPassword] = useState('')
@@ -852,6 +853,9 @@ function App() {
             <>
               <a href="#chat">Chat</a>
               <a href="#models">Models</a>
+              <button className="nav-link-button" onClick={() => setPricingOpen(true)} type="button">
+                Pricing
+              </button>
               <button className="nav-link-button" onClick={() => openAuthDialog('sign-in')} type="button">
                 Account
               </button>
@@ -862,6 +866,9 @@ function App() {
               <a href="#workflow">Workflow</a>
               <a href="#interface">Interface</a>
               <a href="#trust">Trust</a>
+              <button className="nav-link-button" onClick={() => setPricingOpen(true)} type="button">
+                Pricing
+              </button>
             </>
           )}
         </nav>
@@ -1273,6 +1280,31 @@ function App() {
         onResendVerification={handleResendVerification}
         onSignOut={handleSignOut}
       />
+
+      {pricingOpen ? (
+        <div className="auth-backdrop" onClick={() => setPricingOpen(false)}>
+          <section
+            aria-modal="true"
+            aria-labelledby="pricing-dialog-title"
+            className="auth-dialog"
+            role="dialog"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="auth-dialog-header">
+              <h2 id="pricing-dialog-title">Pricing</h2>
+              <button
+                aria-label="Close pricing panel"
+                className="auth-close"
+                onClick={() => setPricingOpen(false)}
+                type="button"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <p className="auth-copy">Pricing details coming soon.</p>
+          </section>
+        </div>
+      ) : null}
 
       {passwordResetOpen ? (
         <div className="auth-backdrop" onClick={handlePasswordResetClose}>
