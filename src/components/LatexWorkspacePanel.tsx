@@ -46,35 +46,6 @@ function extractLatexError(log: string, status: number) {
   return `Compilation failed with status ${status}.`
 }
 
-function getStatusText(
-  compiling: boolean,
-  compileError: string | null,
-  pdfUrl: string | null,
-  hidden: boolean,
-) {
-  if (hidden) {
-    return 'Workspace hidden. Restore it from the right edge.'
-  }
-
-  if (compiling) {
-    return 'Compiling in the browser and fetching packages on demand…'
-  }
-
-  if (compileError && pdfUrl) {
-    return 'Last compile failed. Showing the most recent successful PDF.'
-  }
-
-  if (compileError) {
-    return 'Compilation failed. Check the log for details.'
-  }
-
-  if (pdfUrl) {
-    return 'PDF preview is up to date.'
-  }
-
-  return 'Ready to compile.'
-}
-
 function LatexWorkspacePanel({
   hidden = false,
   initialSource,
@@ -91,8 +62,6 @@ function LatexWorkspacePanel({
   const [compiling, setCompiling] = useState(false)
   const [autoCompile, setAutoCompile] = useState(true)
   const [showLog, setShowLog] = useState(false)
-  const [lastCompiledAt, setLastCompiledAt] = useState<number | null>(null)
-
   const containerRef = useRef<HTMLDivElement>(null)
   const dragWidthRef = useRef(editorWidth)
   const lastCompiledSourceRef = useRef<string | null>(null)
@@ -150,7 +119,6 @@ function LatexWorkspacePanel({
 
           return nextPdfUrl
         })
-        setLastCompiledAt(Date.now())
         setCompileError(null)
       } else {
         setCompileError(extractLatexError(result.log, result.status))
@@ -235,7 +203,6 @@ function LatexWorkspacePanel({
     return null
   }
 
-  const statusText = getStatusText(compiling, compileError, pdfUrl, hidden)
   const pdfFileName = `${sanitizeFilename(label || 'latex-document')}.pdf`
 
   const panel = (
