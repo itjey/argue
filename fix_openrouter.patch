@@ -1,0 +1,293 @@
+--- src/lib/openrouter.ts
++++ src/lib/openrouter.ts
+@@ -244,8 +244,11 @@
+     onProgress?: (reply: OpenRouterAssistantReply) => void
+   }
+ 
+-const OPENROUTER_MODELS_URL = 'https://holy-union-290f.jeynarayan2010.workers.dev/api/v1/models'
+-const OPENROUTER_CHAT_URL = 'https://holy-union-290f.jeynarayan2010.workers.dev/api/v1/chat/completions'
++const OPENROUTER_ENDPOINTS = [
++  'https://holy-union-290f.jeynarayan2010.workers.dev/api/v1',
++  'https://openrouter.ai/api/v1',
++]
++
+ const APP_TITLE = 'Argue'
+ 
+ function getAppOrigin() {
+@@ -610,13 +613,11 @@
+ 
+ async function fetchOpenRouterModels() {
+-  try {
+-    const response = await fetch(OPENROUTER_MODELS_URL, {
+-      headers: requestHeaders(),
+-    })
+-
+-    if (!response.ok) {
+-      throw new Error('OpenRouter model catalog could not be loaded right now.')
+-    }
+-
+-    const payload = (await response.json()) as OpenRouterModelsResponse
+-    const models = (payload.data ?? [])
+-      .filter((model): model is OpenRouterModel => Boolean(model?.id))
+-      .map((model) => normalizeOpenRouterModel(model))
+-
+-    if (models.length > 0) {
+-      return models.sort((left, right) => left.name.localeCompare(right.name))
+-    }
+-  } catch (error) {
+-    console.warn('[OpenRouter] Falling back to bundled model catalog.', error)
++  for (const endpoint of OPENROUTER_ENDPOINTS) {
++    try {
++      const response = await fetch(`${endpoint}/models`, {
++        headers: requestHeaders(),
++      })
++      if (response.ok) {
++        const payload = (await response.json()) as OpenRouterModelsResponse
++        const models = (payload.data ?? [])
++          .filter((model): model is OpenRouterModel => Boolean(model?.id))
++          .map((model) => normalizeOpenRouterModel(model))
++        if (models.length > 0) {
++          return models.sort((left, right) => left.name.localeCompare(right.name))
++        }
++      }
++    } catch (err) {
++      console.warn(`[OpenRouter] fetch from ${endpoint} failed.`, err)
++    }
+   }
++  console.warn('[OpenRouter] Falling back to bundled model catalog.')
+   return getBundledOpenRouterModels()
+ }
+ 
+@@ -638,64 +639,78 @@
+   plugins,
+   webSearchOptions,
+ }: CreateOpenRouterChatCompletionOptions) {
+-  const response = await fetch(OPENROUTER_CHAT_URL, {
+-    method: 'POST',
+-    headers: requestHeaders(apiKey),
+-    body: JSON.stringify({
+-      model,
+-      messages: messages.map((m) => ({
+-        ...m,
+-        content:
+-          typeof m.content === 'string' &&
+-          (m.content.length > 50000 || m.role === 'system')
+-            ? m.content
+-            : serializeChatContent(m.content, modalities),
+-      })),
+-      include_reasoning: includeReasoning,
+-      reasoning,
+-      max_tokens: maxTokens,
+-      plugins,
+-      provider: {
+-        require_parameters: true,
+-        ...imageConfig,
+-      },
+-      ...webSearchOptions,
+-    }),
+-  })
++  let lastError: Error | null = null
++  for (const endpoint of OPENROUTER_ENDPOINTS) {
++    try {
++      const response = await fetch(`${endpoint}/chat/completions`, {
++        method: 'POST',
++        headers: requestHeaders(apiKey),
++        body: JSON.stringify({
++          model,
++          messages: messages.map((m) => ({
++            ...m,
++            content:
++              typeof m.content === 'string' &&
++              (m.content.length > 50000 || m.role === 'system')
++                ? m.content
++                : serializeChatContent(m.content, modalities),
++          })),
++          include_reasoning: includeReasoning,
++          reasoning,
++          max_tokens: maxTokens,
++          plugins,
++          provider: {
++            require_parameters: true,
++            ...imageConfig,
++          },
++          ...webSearchOptions,
++        }),
++      })
+ 
+-  if (!response.ok) {
+-    const type = response.headers.get('content-type') || ''
+-    if (type.includes('application/json')) {
+-      const payload = (await response.json()) as { error?: { message?: string } }
+-      throw new Error(
+-        payload.error?.message ||
+-          'An unknown error occurred while submitting the request.',
+-      )
+-    }
+-    throw new Error(`The API returned an error ${response.status}.`)
++      if (!response.ok) {
++        const type = response.headers.get('content-type') || ''
++        if (type.includes('application/json')) {
++          const payload = (await response.json()) as { error?: { message?: string } }
++          throw new Error(
++            payload.error?.message ||
++              'An unknown error occurred while submitting the request.',
++          )
++        }
++        throw new Error(`The API returned an error ${response.status}.`)
++      }
++
++      const payload = (await response.json()) as OpenRouterChatCompletionResponse
++      return extractChatReply(payload)
++    } catch (err: unknown) {
++      lastError = err instanceof Error ? err : new Error(String(err))
++      console.warn(`[OpenRouter] request to ${endpoint} failed:`, err)
++      continue
++    }
+   }
+ 
+-  const payload = (await response.json()) as OpenRouterChatCompletionResponse
+-  return extractChatReply(payload)
++  throw lastError || new Error('All OpenRouter endpoints failed.')
+ }
+ 
+ async function createOpenRouterChatCompletionStream({
+@@ -710,67 +725,82 @@
+   webSearchOptions,
+   onProgress,
+ }: CreateOpenRouterChatCompletionStreamOptions) {
+-  const response = await fetch(OPENROUTER_CHAT_URL, {
+-    method: 'POST',
+-    headers: requestHeaders(apiKey),
+-    body: JSON.stringify({
+-      model,
+-      messages: messages.map((m) => ({
+-        ...m,
+-        content:
+-          typeof m.content === 'string' &&
+-          (m.content.length > 50000 || m.role === 'system')
+-            ? m.content
+-            : serializeChatContent(m.content, modalities),
+-      })),
+-      stream: true,
+-      include_reasoning: includeReasoning,
+-      reasoning,
+-      max_tokens: maxTokens,
+-      plugins,
+-      provider: {
+-        require_parameters: true,
+-        ...imageConfig,
+-      },
+-      ...webSearchOptions,
+-    }),
+-  })
+-
+-  if (!response.ok) {
+-    const type = response.headers.get('content-type') || ''
+-    if (type.includes('application/json')) {
+-      const payload = (await response.json()) as { error?: { message?: string } }
+-      throw new Error(
+-        payload.error?.message ||
+-          'An unknown error occurred while submitting the request.',
+-      )
+-    }
+-    throw new Error(`The API returned an error ${response.status}.`)
+-  }
+-
+-  if (!response.body) {
+-    throw new Error('The API returned an empty stream.')
+-  }
+-
+-  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
+-  let currentReply: OpenRouterAssistantReply = { text: '', refusal: '' }
+-
+-  while (true) {
+-    const { done, value } = await reader.read()
+-    if (done) break
+-
+-    const chunk = extractSsePayload(value)
+-    if (!chunk) continue
+-    if (chunk === '[DONE]') break
+-
+-    try {
+-      const payload = JSON.parse(chunk) as OpenRouterChatCompletionChunk
+-      currentReply = updateChatReply(currentReply, payload)
+-      onProgress?.(currentReply)
+-    } catch {
+-      // Ignore parse errors from incomplete chunks
++  let lastError: Error | null = null
++  for (const endpoint of OPENROUTER_ENDPOINTS) {
++    try {
++      const response = await fetch(`${endpoint}/chat/completions`, {
++        method: 'POST',
++        headers: requestHeaders(apiKey),
++        body: JSON.stringify({
++          model,
++          messages: messages.map((m) => ({
++            ...m,
++            content:
++              typeof m.content === 'string' &&
++              (m.content.length > 50000 || m.role === 'system')
++                ? m.content
++                : serializeChatContent(m.content, modalities),
++          })),
++          stream: true,
++          include_reasoning: includeReasoning,
++          reasoning,
++          max_tokens: maxTokens,
++          plugins,
++          provider: {
++            require_parameters: true,
++            ...imageConfig,
++          },
++          ...webSearchOptions,
++        }),
++      })
++
++      if (!response.ok) {
++        const type = response.headers.get('content-type') || ''
++        if (type.includes('application/json')) {
++          const payload = (await response.json()) as { error?: { message?: string } }
++          throw new Error(
++            payload.error?.message ||
++              'An unknown error occurred while submitting the request.',
++          )
++        }
++        throw new Error(`The API returned an error ${response.status}.`)
++      }
++
++      if (!response.body) {
++        throw new Error('The API returned an empty stream.')
++      }
++
++      const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
++      let currentReply: OpenRouterAssistantReply = { text: '', refusal: '' }
++
++      while (true) {
++        const { done, value } = await reader.read()
++        if (done) break
++
++        const chunk = extractSsePayload(value)
++        if (!chunk) continue
++        if (chunk === '[DONE]') break
++
++        try {
++          const payload = JSON.parse(chunk) as OpenRouterChatCompletionChunk
++          currentReply = updateChatReply(currentReply, payload)
++          onProgress?.(currentReply)
++        } catch {
++          // Ignore parse errors from incomplete chunks
++        }
++      }
++
++      return currentReply
++    } catch (err: unknown) {
++      lastError = err instanceof Error ? err : new Error(String(err))
++      console.warn(`[OpenRouter] stream to ${endpoint} failed:`, err)
++      continue
+     }
+   }
+ 
+-  return currentReply
++  throw lastError || new Error('All OpenRouter endpoints failed.')
+ }
+ 

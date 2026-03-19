@@ -1,31 +1,15 @@
 // CollaborationWorkspace — redesign in progress
 import { useEffect, useRef, useState, type KeyboardEvent, type ChangeEvent } from 'react'
 import type { User } from 'firebase/auth'
-import { ArrowUp, Square, Paperclip, Mic, ChevronDown, Search, X, Info, Copy, Pencil, Check, Plus } from 'lucide-react'
-import {
-  collection,
-  doc,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  setDoc,
-  Timestamp,
-} from 'firebase/firestore'
+import { ArrowUp, Square, Paperclip, Mic, ChevronDown, Search, X, Info, Copy, Pencil, Check } from 'lucide-react'
 import {
   fetchOpenRouterModels,
-  getInitialOpenRouterModels,
   createOpenRouterChatCompletionStream,
-  createOpenRouterChatCompletion,
   type OpenRouterModel,
   type OpenRouterChatMessage,
   type OpenRouterReasoningEffort,
   type OpenRouterUrlCitation,
 } from '../lib/openrouter'
-import { OPENROUTER_KEY_STORAGE } from '../lib/openrouterStorage'
-import {
-  isBrowserManagedOpenRouter,
-} from '../lib/runtimeConfig'
 import { MarkdownBlock } from './RichMessageContent'
 import {
   fetchOpenRouterStatsSnapshot,
@@ -34,7 +18,8 @@ import {
   type OpenRouterModelStatsEntry,
 } from '../lib/openrouterStats'
 import { ModelStatsPanel } from './ModelStatsPanel'
-import { db } from '../lib/firebase'
+
+const OPENROUTER_KEY_STORAGE = 'argue-openrouter-api-key'
 
 const SYSTEM_PROMPT = `You are a helpful assistant. Format your responses using Markdown.
 
@@ -48,7 +33,7 @@ Formatting rules:
 Keep responses clear and well-structured.`
 
 interface CollaborationWorkspaceProps {
-  currentUser?: User | null
+  currentUser: User
 }
 
 interface AttachedFile {
@@ -58,16 +43,8 @@ interface AttachedFile {
   mimeType: string
 }
 
-type SavedAttachment = {
-  id: string
-  name: string
-  dataUrl: string
-  mimeType: string
-}
-
 // ---- Group collaboration types ----
 interface GroupModelRun {
-  participantId: string
   modelId: string
   modelName: string
   roleLabel: string
@@ -84,27 +61,11 @@ interface GroupPhase {
 
 interface GroupData {
   phases: GroupPhase[]
-  currentPhaseIndex: number
+  currentPhaseIndex: number   // 0=Build, 1=Critique, 2=Synthesis
   currentRunLabel: string     // e.g. "GPT-5.4 is thinking…"
   synthesis: string
   synthesisStreaming: boolean
-  synthesisModelName: string
   complete: boolean
-}
-
-interface GroupParticipantConfig {
-  id: string
-  enabled: boolean
-  lead: boolean
-  modelId: string
-  roleLabel: string
-  roleBrief: string
-  maxTokens: number
-  useReasoning: boolean
-}
-
-type ActiveGroupParticipant = GroupParticipantConfig & {
-  model: OpenRouterModel
 }
 
 interface ChatMessage {
@@ -126,37 +87,6 @@ interface ChatMessage {
     searching: boolean
   }
   groupData?: GroupData
-}
-
-type SavedChatMessage = {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  attachments?: SavedAttachment[]
-  streaming?: boolean
-  error?: boolean
-  reasoning?: string
-  isReasoningModel?: boolean
-  thinkingDuration?: number
-  stoppedThinking?: boolean
-  webSearch?: {
-    enabled: boolean
-    approximateQuery: string
-    citations: OpenRouterUrlCitation[]
-    searching: boolean
-  }
-  groupData?: GroupData
-}
-
-type SavedChat = {
-  id: string
-  title: string
-  preview: string
-  modelId: string | null
-  modelName: string | null
-  createdAt: number
-  updatedAt: number
-  messages: ChatMessage[]
 }
 
 declare global {
@@ -199,80 +129,25 @@ const GROUP_ONE_ID = '__group_1__'
 const GROUP_ONE: OpenRouterModel = {
   id: GROUP_ONE_ID,
   name: 'Group 1',
-  description: 'Configurable multi-model debate room with editable roles, budgets, and rounds.',
+  description: 'GPT-5.4 · Claude Opus 4.6 · Gemini 3.1 Pro — Adversarial collaboration at max reasoning',
   pricing: { prompt: '0', completion: '0', web_search: '0' },
   supported_parameters: ['reasoning'],
   architecture: { input_modalities: ['text'], output_modalities: ['text'] },
 }
 
-const MIN_GROUP_PARTICIPANTS = 2
-const MIN_GROUP_DEBATE_ROUNDS = 1
-const MAX_GROUP_DEBATE_ROUNDS = 4
-const MIN_GROUP_MAX_TOKENS = 256
-const MAX_GROUP_MAX_TOKENS = 8192
-
-const DEFAULT_GROUP_PARTICIPANTS: GroupParticipantConfig[] = [
-  {
-    id: 'lead',
-    enabled: true,
-    lead: true,
-    modelId: 'openai/gpt-5.4',
-    roleLabel: 'Builder',
-    roleBrief: 'Own the implementation path and deliver the most complete solution.',
-    maxTokens: 2200,
-    useReasoning: true,
-  },
-  {
-    id: 'analyst',
-    enabled: true,
-    lead: false,
-    modelId: 'google/gemini-3.1-pro-preview',
-    roleLabel: 'Analyst',
-    roleBrief: 'Break the problem down, surface edge cases, and stress-test assumptions.',
-    maxTokens: 1800,
-    useReasoning: false,
-  },
-  {
-    id: 'adversary',
-    enabled: true,
-    lead: false,
-    modelId: 'anthropic/claude-opus-4.6',
-    roleLabel: 'Adversary',
-    roleBrief: 'Challenge weak logic, find missing pieces, and push for a stronger final answer.',
-    maxTokens: 2200,
-    useReasoning: true,
-  },
+const GROUP_MODELS_CONFIG = [
+  { id: 'openai/gpt-5.4',                name: 'GPT-5.4',         role: 'Builder',   useReasoning: true  },
+  { id: 'google/gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro',  role: 'Analyst',   useReasoning: false },
+  { id: 'anthropic/claude-opus-4.6',     name: 'Claude Opus 4.6', role: 'Adversary', useReasoning: true  },
 ]
 
 const GROUP_SYSTEM_PROMPT = `You are participating in a multi-model collaborative problem-solving session.
-Format responses using Markdown. Use $...$ for inline math and $$...$$ for block equations.
+Format responses using Markdown. Use $...\$ for inline math and $$...$$ for block equations.
 Use fenced code blocks with language hints (e.g. \`\`\`python). Be thorough and precise.`
 
 /** Ensure **Title** section headers in reasoning text appear on their own paragraph. */
 function normalizeReasoningText(text: string): string {
   return text.replace(/([^\n])(\*\*[A-Z][^*\n]{0,80}\*\*)/g, '$1\n\n$2')
-}
-
-type ThinkingIndicatorTone = 'default' | 'pulse' | 'stopped'
-
-function getThinkingIndicator(message: ChatMessage): { label: string; tone: ThinkingIndicatorTone } {
-  if (message.streaming && !message.content && !message.reasoning) {
-    return { label: 'Thinking…', tone: 'pulse' }
-  }
-
-  if (message.stoppedThinking) {
-    return { label: 'Stopped thinking', tone: 'stopped' }
-  }
-
-  if (message.thinkingDuration != null) {
-    return { label: `Thought for ${Math.round(message.thinkingDuration / 1000)}s`, tone: 'default' }
-  }
-
-  if (message.streaming) {
-    return { label: 'Thinking…', tone: 'pulse' }
-  }
-
-  return { label: 'Thoughts', tone: 'default' }
 }
 
 function buildApiMessages(messages: ChatMessage[]): OpenRouterChatMessage[] {
@@ -343,213 +218,24 @@ function getWebSearchModelProfile(model: OpenRouterModel | null) {
   }
 }
 
-function clampWholeNumber(value: number, min: number, max: number) {
-  if (!Number.isFinite(value)) {
-    return min
-  }
-
-  return Math.min(max, Math.max(min, Math.round(value)))
-}
-
-function findOpenRouterModelById(models: OpenRouterModel[], id: string) {
-  return (
-    models.find((model) => model.id === id) ??
-    getInitialOpenRouterModels().find((model) => model.id === id) ??
-    null
-  )
-}
-
-function normalizeGroupParticipants(participants: GroupParticipantConfig[]) {
-  const enabledParticipants = participants.filter((participant) => participant.enabled)
-  const leadId =
-    enabledParticipants.find((participant) => participant.lead)?.id ??
-    enabledParticipants[0]?.id ??
-    null
-
-  return participants.map((participant) => ({
-    ...participant,
-    lead: Boolean(leadId && participant.enabled && participant.id === leadId),
-    maxTokens: clampWholeNumber(
-      participant.maxTokens,
-      MIN_GROUP_MAX_TOKENS,
-      MAX_GROUP_MAX_TOKENS,
-    ),
-  }))
-}
-
-function getActiveGroupParticipants(
-  participants: GroupParticipantConfig[],
-  models: OpenRouterModel[],
-): ActiveGroupParticipant[] {
-  return participants
-    .filter((participant) => participant.enabled)
-    .map((participant) => {
-      const model = findOpenRouterModelById(models, participant.modelId)
-
-      if (!model) {
-        return null
-      }
-
-      return {
-        ...participant,
-        model,
-      } satisfies ActiveGroupParticipant
-    })
-    .filter((participant): participant is ActiveGroupParticipant => participant !== null)
-}
-
-function getLeadGroupParticipant(participants: ActiveGroupParticipant[]) {
-  return participants.find((participant) => participant.lead) ?? participants[0] ?? null
-}
-
-function getReasoningEffortLabel(value: OpenRouterReasoningEffort) {
-  return EFFORT_LEVELS.find((level) => level.value === value)?.label ?? 'High'
-}
-
-function getGroupModelSummary(
-  participants: GroupParticipantConfig[],
-  models: OpenRouterModel[],
-) {
-  const names = getActiveGroupParticipants(participants, models)
-    .map((participant) => participant.model.name)
-
-  return names.length > 0 ? names.join(' · ') : 'Choose at least two models'
-}
-
-function normalizeChatTitle(messages: ChatMessage[]) {
-  const firstUserMessage = messages.find((message) => message.role === 'user')
-  const text = firstUserMessage?.content.trim() ?? ''
-  if (!text) {
-    return 'New chat'
-  }
-  return text.length > 48 ? `${text.slice(0, 48).trimEnd()}…` : text
-}
-
-async function generateChatTitle(userMessage: string, assistantReply: string, apiKey: string): Promise<string | null> {
-  try {
-    const result = await createOpenRouterChatCompletion({
-      apiKey,
-      model: 'openai/gpt-4o-mini',
-      maxTokens: 20,
-      messages: [
-        {
-          role: 'system',
-          content: 'Generate a 2-5 word title for this conversation. No quotes, no punctuation at the end. Just the short title.',
-        },
-        { role: 'user', content: userMessage },
-        { role: 'assistant', content: assistantReply.slice(0, 200) },
-        { role: 'user', content: 'Title:' },
-      ],
-    })
-    const title = result.text?.trim().replace(/^["']|["']$/g, '').replace(/\.+$/, '')
-    return title && title.length > 0 && title.length <= 50 ? title : null
-  } catch {
-    return null
-  }
-}
-
-function normalizeChatPreview(messages: ChatMessage[]) {
-  const latestMessage = [...messages]
-    .reverse()
-    .find((message) => message.content.trim() || (message.attachments?.length ?? 0) > 0)
-  if (!latestMessage) {
-    return 'Empty'
-  }
-  const base =
-    latestMessage.content.trim() ||
-    latestMessage.attachments?.map((file) => file.name).join(', ') ||
-    'Attachment'
-  return base.length > 80 ? `${base.slice(0, 80).trimEnd()}…` : base
-}
-
-function timestampToMillis(value: Timestamp | null | undefined) {
-  return value instanceof Timestamp ? value.toMillis() : 0
-}
-
-function serializeMessages(messages: ChatMessage[]): SavedChatMessage[] {
-  return messages.map((message) => ({
-    id: message.id,
-    role: message.role,
-    content: message.content,
-    ...(message.attachments ? {
-      attachments: message.attachments.map((attachment) => ({
-        id: attachment.id,
-        name: attachment.name,
-        dataUrl: attachment.dataUrl,
-        mimeType: attachment.mimeType,
-      })),
-    } : {}),
-    ...(message.streaming !== undefined && { streaming: message.streaming }),
-    ...(message.error !== undefined && { error: message.error }),
-    ...(message.reasoning !== undefined && { reasoning: message.reasoning }),
-    ...(message.isReasoningModel !== undefined && { isReasoningModel: message.isReasoningModel }),
-    ...(message.thinkingDuration !== undefined && { thinkingDuration: message.thinkingDuration }),
-    ...(message.stoppedThinking !== undefined && { stoppedThinking: message.stoppedThinking }),
-    ...(message.webSearch ? { webSearch: message.webSearch } : {}),
-    ...(message.groupData ? { groupData: message.groupData } : {}),
-  }))
-}
-
-function deserializeMessages(messages: SavedChatMessage[] | undefined): ChatMessage[] {
-  return (messages ?? []).map((message) => ({
-    ...message,
-    attachments: message.attachments?.map((attachment) => ({ ...attachment })),
-    webSearch: message.webSearch
-      ? {
-          ...message.webSearch,
-          citations: [...message.webSearch.citations],
-        }
-      : undefined,
-    groupData: message.groupData
-      ? {
-          ...message.groupData,
-          phases: message.groupData.phases.map((phase) => ({
-            ...phase,
-            runs: phase.runs.map((run) => ({ ...run })),
-          })),
-        }
-      : undefined,
-  }))
-}
-
-function formatChatTime(value: number) {
-  if (!value) {
-    return ''
-  }
-  return new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
 
 
-
-export function CollaborationWorkspace({ currentUser }: CollaborationWorkspaceProps) {
+export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [chats, setChats] = useState<SavedChat[]>([])
-  const [activeChatId, setActiveChatId] = useState<string | null>(null)
-  const [chatListReady, setChatListReady] = useState(false)
-  const [chatSyncError, setChatSyncError] = useState('')
   const [prompt, setPrompt] = useState('')
   const [listening, setListening] = useState(false)
   const [attachments, setAttachments] = useState<AttachedFile[]>([])
   const [streaming, setStreaming] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [activeThinkingMessageId, setActiveThinkingMessageId] = useState<string | null>(null)
+  const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set())
   const [reasoningEffort, setReasoningEffort] = useState<OpenRouterReasoningEffort>('high')
   const [webSearchEnabled, setWebSearchEnabled] = useState(true)
-  const [groupDebateRounds, setGroupDebateRounds] = useState(2)
-  const [groupReasoningEffort, setGroupReasoningEffort] = useState<OpenRouterReasoningEffort>('high')
-  const [groupCustomizationOpen, setGroupCustomizationOpen] = useState(true)
-  const [groupParticipants, setGroupParticipants] = useState<GroupParticipantConfig[]>(
-    () => normalizeGroupParticipants(DEFAULT_GROUP_PARTICIPANTS.map((participant) => ({ ...participant }))),
-  )
   const [effortOpen, setEffortOpen] = useState(false)
   const effortDropRef = useRef<HTMLDivElement>(null)
 
   // model selector
-  const [models, setModels] = useState<OpenRouterModel[]>(() =>
-    getInitialOpenRouterModels(),
-  )
-  const [modelCatalogNotice, setModelCatalogNotice] = useState('')
+  const [models, setModels] = useState<OpenRouterModel[]>([])
   const [selectedModel, setSelectedModel] = useState<OpenRouterModel | null>(null)
   const [modelSearch, setModelSearch] = useState('')
   const [modelOpen, setModelOpen] = useState(false)
@@ -570,267 +256,10 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null)
   const abortedRef = useRef(false)
-  const userKeyRequired = isBrowserManagedOpenRouter()
-  const hydratedChatIdRef = useRef<string | null>(null)
-  const saveTimerRef = useRef<number | null>(null)
-  const aiTitlesRef = useRef<Map<string, string>>(new Map())
 
   useEffect(() => {
-    let cancelled = false
-
-    fetchOpenRouterModels()
-      .then((result) => {
-        if (cancelled) return
-
-        setModels(result.models)
-        setModelCatalogNotice(result.warning ?? '')
-      })
-      .catch((error) => {
-        console.error('Failed to load the OpenRouter model catalog.', error)
-
-        if (cancelled) return
-
-        setModels(getInitialOpenRouterModels())
-        setModelCatalogNotice(
-          'Showing the built-in starter catalog because the model list could not be loaded on this network.',
-        )
-      })
-
-    return () => {
-      cancelled = true
-    }
+    fetchOpenRouterModels().then((list) => setModels(list)).catch(() => {})
   }, [])
-
-  useEffect(() => {
-    if (!currentUser) {
-      setChats([])
-      setActiveChatId(null)
-      setMessages([])
-      setChatListReady(false)
-      return
-    }
-
-    const chatsQuery = query(
-      collection(db, 'users', currentUser.uid, 'chats'),
-      orderBy('updatedAt', 'desc'),
-    )
-
-    const unsubscribe = onSnapshot(
-      chatsQuery,
-      (snapshot) => {
-        const nextChats = snapshot.docs.map((chatDoc) => {
-          const data = chatDoc.data() as {
-            title?: string
-            preview?: string
-            modelId?: string | null
-            modelName?: string | null
-            createdAt?: Timestamp
-            updatedAt?: Timestamp
-            messages?: SavedChatMessage[]
-          }
-
-          return {
-            id: chatDoc.id,
-            title: data.title ?? 'New chat',
-            preview: data.preview ?? 'Empty',
-            modelId: data.modelId ?? null,
-            modelName: data.modelName ?? null,
-            createdAt: timestampToMillis(data.createdAt),
-            updatedAt: timestampToMillis(data.updatedAt),
-            messages: deserializeMessages(data.messages),
-          }
-        })
-
-        setChats(nextChats)
-        setChatListReady(true)
-        setChatSyncError('')
-
-        if (nextChats.length === 0) {
-          hydratedChatIdRef.current = null
-          setActiveChatId(null)
-          setMessages([])
-          return
-        }
-
-        setActiveChatId((currentChatId) => {
-          if (currentChatId && nextChats.some((chat) => chat.id === currentChatId)) {
-            return currentChatId
-          }
-          return nextChats[0].id
-        })
-      },
-      () => {
-        setChatListReady(true)
-        setChatSyncError('Could not load chats.')
-      },
-    )
-
-    return unsubscribe
-  }, [currentUser])
-
-  useEffect(() => {
-    if (!activeChatId) {
-      if (!chatListReady) {
-        return
-      }
-      hydratedChatIdRef.current = null
-      setMessages([])
-      return
-    }
-
-    if (hydratedChatIdRef.current === activeChatId) {
-      return
-    }
-
-    const activeChat = chats.find((chat) => chat.id === activeChatId)
-    if (!activeChat) {
-      return
-    }
-
-    hydratedChatIdRef.current = activeChatId
-    setMessages(deserializeMessages(activeChat.messages))
-    setPrompt('')
-    setAttachments([])
-    setEditingId(null)
-
-    if (activeChat.modelId) {
-      const nextModel =
-        activeChat.modelId === GROUP_ONE_ID
-          ? GROUP_ONE
-          : findOpenRouterModelById(models, activeChat.modelId)
-      if (nextModel) {
-        setSelectedModel(nextModel)
-      }
-    }
-  }, [activeChatId, chatListReady, chats, models])
-
-  useEffect(() => {
-    if (!currentUser || !activeChatId || hydratedChatIdRef.current !== activeChatId) {
-      return
-    }
-
-    if (saveTimerRef.current != null) {
-      window.clearTimeout(saveTimerRef.current)
-    }
-
-    saveTimerRef.current = window.setTimeout(() => {
-      const activeChat = chats.find((chat) => chat.id === activeChatId)
-      const chatTitle = aiTitlesRef.current.get(activeChatId) ?? normalizeChatTitle(messages)
-
-      void setDoc(
-        doc(db, 'users', currentUser.uid, 'chats', activeChatId),
-        {
-          title: chatTitle,
-          preview: normalizeChatPreview(messages),
-          modelId: selectedModel?.id ?? activeChat?.modelId ?? null,
-          modelName: selectedModel?.name ?? activeChat?.modelName ?? null,
-          createdAt: activeChat?.createdAt
-            ? Timestamp.fromMillis(activeChat.createdAt)
-            : serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          messages: serializeMessages(messages),
-        },
-        { merge: true },
-      ).catch(() => {
-        setChatSyncError('Could not save chat.')
-      })
-
-      // Generate AI title after first completed assistant message
-      const firstUser = messages.find((m) => m.role === 'user')
-      const firstAssistant = messages.find((m) => m.role === 'assistant' && !m.streaming && !m.error && m.content.trim())
-      if (
-        firstUser &&
-        firstAssistant &&
-        !aiTitlesRef.current.has(activeChatId)
-      ) {
-        aiTitlesRef.current.set(activeChatId, '') // mark as pending
-        const apiKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
-        if (apiKey) {
-          void generateChatTitle(firstUser.content, firstAssistant.content, apiKey).then((aiTitle) => {
-            if (aiTitle) {
-              aiTitlesRef.current.set(activeChatId, aiTitle)
-              void setDoc(
-                doc(db, 'users', currentUser.uid, 'chats', activeChatId),
-                { title: aiTitle },
-                { merge: true },
-              )
-            }
-          })
-        }
-      }
-    }, 300)
-
-    return () => {
-      if (saveTimerRef.current != null) {
-        window.clearTimeout(saveTimerRef.current)
-      }
-    }
-  }, [activeChatId, chats, currentUser, messages, selectedModel])
-
-  async function createChat() {
-    if (!currentUser || streaming) {
-      return
-    }
-
-    const chatRef = doc(collection(db, 'users', currentUser.uid, 'chats'))
-    await setDoc(chatRef, {
-      title: 'New chat',
-      preview: 'Empty',
-      modelId: selectedModel?.id ?? null,
-      modelName: selectedModel?.name ?? null,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      messages: [],
-    })
-
-    hydratedChatIdRef.current = chatRef.id
-    setActiveChatId(chatRef.id)
-    setMessages([])
-    setPrompt('')
-    setAttachments([])
-    setEditingId(null)
-  }
-
-  function openChat(chatId: string) {
-    if (streaming || chatId === activeChatId) {
-      return
-    }
-    hydratedChatIdRef.current = null
-    setActiveChatId(chatId)
-  }
-
-  useEffect(() => {
-    if (!activeThinkingMessageId) {
-      return
-    }
-
-    const hasSelectedThinkingTrace = messages.some(
-      (message) =>
-        message.id === activeThinkingMessageId &&
-        message.role === 'assistant' &&
-        message.isReasoningModel &&
-        Boolean(message.reasoning?.trim()),
-    )
-
-    if (!hasSelectedThinkingTrace) {
-      setActiveThinkingMessageId(null)
-    }
-  }, [messages, activeThinkingMessageId])
-
-  useEffect(() => {
-    if (!activeThinkingMessageId) {
-      return
-    }
-
-    function handleWindowKeyDown(event: globalThis.KeyboardEvent) {
-      if (event.key === 'Escape') {
-        setActiveThinkingMessageId(null)
-      }
-    }
-
-    window.addEventListener('keydown', handleWindowKeyDown)
-    return () => window.removeEventListener('keydown', handleWindowKeyDown)
-  }, [activeThinkingMessageId])
 
   useEffect(() => {
     function onPointerDown(e: PointerEvent) {
@@ -936,34 +365,6 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
     setAttachments((prev) => prev.filter((a) => a.id !== id))
   }
 
-  function getStoredOpenRouterKey() {
-    if (!userKeyRequired) {
-      return ''
-    }
-
-    return window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
-  }
-
-  function pushAssistantError(message: string) {
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: message,
-        error: true,
-      },
-    ])
-  }
-
-  function getMissingCredentialMessage() {
-    if (userKeyRequired) {
-      return 'Add your OpenRouter API key in Account -> Settings to start a run.'
-    }
-
-    return 'This deployment is missing its server-side OpenRouter key. Set OPENROUTER_API_KEY on the backend and redeploy.'
-  }
-
   function openInfoPanel(e: React.MouseEvent, model: OpenRouterModel) {
     e.stopPropagation()
     setInfoModel(model)
@@ -975,33 +376,23 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
     }
   }
 
-  function updateGroupParticipant(
-    participantId: string,
-    updater: (participant: GroupParticipantConfig) => GroupParticipantConfig,
-  ) {
-    setGroupParticipants((prev) =>
-      normalizeGroupParticipants(
-        prev.map((participant) =>
-          participant.id === participantId ? updater(participant) : participant,
-        ),
-      ),
-    )
-  }
-
-  function setGroupLead(participantId: string) {
-    setGroupParticipants((prev) =>
-      normalizeGroupParticipants(
-        prev.map((participant) => ({
-          ...participant,
-          lead: participant.id === participantId && participant.enabled,
-        })),
-      ),
-    )
-  }
-
   async function runStream(historyBefore: ChatMessage[], userMsg: ChatMessage) {
-    const apiKey = getStoredOpenRouterKey()
-    if ((userKeyRequired && !apiKey.trim()) || !selectedModel) return
+    const apiKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
+    if (!apiKey.trim() || !selectedModel) {
+      const errorId = crypto.randomUUID()
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: errorId,
+          role: 'assistant',
+          content: !apiKey.trim()
+            ? 'Please add your OpenRouter API key in Settings before chatting.'
+            : 'Please select a model first.',
+          error: true,
+        },
+      ])
+      return
+    }
 
     const style = getReasoningStyle(selectedModel)
     const includeReasoning = style !== 'none'
@@ -1125,14 +516,18 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
   }
 
   async function runGroupStream(_historyBefore: ChatMessage[], userMsg: ChatMessage) {
-    const apiKey = getStoredOpenRouterKey()
-    if (userKeyRequired && !apiKey.trim()) return
-
-    const activeParticipants = getActiveGroupParticipants(groupParticipants, models)
-    const leadParticipant = getLeadGroupParticipant(activeParticipants)
-
-    if (activeParticipants.length < MIN_GROUP_PARTICIPANTS || !leadParticipant) {
-      pushAssistantError('Enable at least two valid models in Group 1 before starting a debate.')
+    const apiKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
+    if (!apiKey.trim()) {
+      const errorId = crypto.randomUUID()
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: errorId,
+          role: 'assistant',
+          content: 'Please add your OpenRouter API key in Settings before chatting.',
+          error: true,
+        },
+      ])
       return
     }
 
@@ -1140,22 +535,26 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
 
     // Initialize local mutable state (used for logic; synced to React state via syncGroup)
     const group: GroupData = {
-      phases: Array.from({ length: groupDebateRounds }, (_, roundIndex) => ({
-        label: `Round ${roundIndex + 1}`,
-        runs: activeParticipants.map((participant) => ({
-          participantId: participant.id,
-          modelId: participant.model.id,
-          modelName: participant.model.name,
-          roleLabel: participant.roleLabel,
-          content: '',
-          status: 'pending' as const,
-        })),
-      })),
+      phases: [
+        {
+          label: 'Build',
+          runs: GROUP_MODELS_CONFIG.map((m) => ({
+            modelId: m.id, modelName: m.name, roleLabel: m.role,
+            content: '', status: 'pending' as const,
+          })),
+        },
+        {
+          label: 'Critique',
+          runs: GROUP_MODELS_CONFIG.map((m) => ({
+            modelId: m.id, modelName: m.name, roleLabel: m.role,
+            content: '', status: 'pending' as const,
+          })),
+        },
+      ],
       currentPhaseIndex: 0,
       currentRunLabel: '',
       synthesis: '',
       synthesisStreaming: false,
-      synthesisModelName: leadParticipant.model.name,
       complete: false,
     }
 
@@ -1185,106 +584,115 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
 
     const userText = userMsg.content.trim()
 
-    function buildPhaseMessages(systemPrompt: string, promptText: string): OpenRouterChatMessage[] {
+    function phase1SystemFor(roleLabel: string): string {
+      if (roleLabel === 'Builder') return `${GROUP_SYSTEM_PROMPT}\n\nYour role in this collaboration is: BUILDER\nYour job: Provide a thorough, complete solution to the user's request. Think deeply, show your reasoning, and produce your best possible answer.`
+      if (roleLabel === 'Analyst') return `${GROUP_SYSTEM_PROMPT}\n\nYour role in this collaboration is: ANALYST\nYour job: Deeply analyze the problem. Break it down into key components, identify edge cases, underlying patterns, and important considerations others might miss. Then provide your complete take.`
+      return `${GROUP_SYSTEM_PROMPT}\n\nYour role in this collaboration is: ADVERSARY\nYour job: Provide a complete, independent answer. In the next round you will aggressively challenge the other models' responses — but for now, give your best answer first.`
+    }
+
+    function phase2SystemFor(roleLabel: string, buildRuns: GroupModelRun[]): string {
+      const summaries = buildRuns.map((r) => `## ${r.modelName} (${r.roleLabel})\n${r.content}`).join('\n\n---\n\n')
+      const base = `${GROUP_SYSTEM_PROMPT}\n\nYou are in Round 2 of a collaborative session. All three models completed Round 1. Here are all Round 1 responses:\n\n${summaries}\n\n---\n\nUSER'S ORIGINAL REQUEST: ${userText}`
+      if (roleLabel === 'Adversary') {
+        return `${base}\n\nYour task: Be ruthlessly specific. Find everything wrong or missing across ALL responses (including your own). Identify incorrect logic, unhandled edge cases, missing parts of the user's request. Then produce an improved answer that fixes all these issues. Explain what you changed and why.`
+      }
+      return `${base}\n\nYour task: Review all responses critically. What is incorrect or incomplete? What did you miss that others caught? Now produce an improved, corrected version of your answer incorporating the best insights from all three. Be specific about what you changed and why.`
+    }
+
+    function buildPhaseMessages(systemPrompt: string, userText: string): OpenRouterChatMessage[] {
       return [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: promptText },
+        { role: 'user', content: userText },
       ]
     }
 
-    function buildRoundSystemPrompt(
-      participant: ActiveGroupParticipant,
-      roundIndex: number,
-      previousRuns: GroupModelRun[],
-    ) {
-      const roleHeader = `${GROUP_SYSTEM_PROMPT}\n\nYour role in this collaboration is: ${participant.roleLabel.toUpperCase()}\nYour approach: ${participant.roleBrief}\n\nUSER'S ORIGINAL REQUEST: ${userText}`
-
-      if (roundIndex === 0) {
-        return `${roleHeader}\n\nRound 1 instructions: Produce your best full answer from this perspective. Be concrete, rigorous, and complete.`
-      }
-
-      const priorRoundSummary = previousRuns
-        .map((run) => `## ${run.modelName} (${run.roleLabel})\n${run.content}`)
-        .join('\n\n---\n\n')
-
-      return `${roleHeader}\n\nYou are now in round ${roundIndex + 1}. Here are the responses from round ${roundIndex}:\n\n${priorRoundSummary}\n\nYour task: Critique the gaps, contradictions, and weak assumptions in the room, then produce an improved answer from your assigned perspective. Explain what changed and why when it matters.`
-    }
-
     try {
-      for (const [phaseIndex, phase] of group.phases.entries()) {
-        group.currentPhaseIndex = phaseIndex
+      // ── Phase 1: Build ──────────────────────────────────────────
+      group.currentPhaseIndex = 0
+      for (const run of group.phases[0].runs) {
+        if (abortedRef.current) break
+        group.currentRunLabel = `${run.modelName} is thinking…`
+        run.status = 'thinking'
+        syncGroup()
 
-        for (const run of phase.runs) {
-          if (abortedRef.current) break
-          group.currentRunLabel = `${run.modelName} is thinking…`
-          run.status = 'thinking'
-          syncGroup()
+        const cfg = GROUP_MODELS_CONFIG.find((c) => c.id === run.modelId)!
+        const sysPrompt = phase1SystemFor(run.roleLabel)
+        const msgs = buildPhaseMessages(sysPrompt, userText)
+        const startMs = Date.now()
 
-          const participant = activeParticipants.find(
-            (entry) => entry.id === run.participantId,
-          )
-
-          if (!participant) {
-            run.content = 'Error: This configured model is no longer available.'
-            run.status = 'done'
-            syncGroup()
-            continue
-          }
-
-          const previousRuns = phaseIndex > 0 ? group.phases[phaseIndex - 1].runs : []
-          const sysPrompt = buildRoundSystemPrompt(participant, phaseIndex, previousRuns)
-          const msgs = buildPhaseMessages(sysPrompt, userText)
-          const startMs = Date.now()
-
-          try {
-            await createOpenRouterChatCompletionStream({
-              apiKey,
-              model: participant.model.id,
-              messages: msgs,
-              includeReasoning: participant.useReasoning,
-              maxTokens: participant.maxTokens,
-              reasoning: participant.useReasoning
-                ? { effort: groupReasoningEffort }
-                : undefined,
-              plugins: webSearchEnabled ? [{ id: 'web' }] : undefined,
-              webSearchOptions: webSearchEnabled ? { search_context_size: 'high' } : undefined,
-              onProgress: (reply) => {
-                if (abortedRef.current) return
-                run.content = reply.text
-                run.reasoning = reply.reasoning || run.reasoning
-                syncGroup()
-              },
-            })
-          } catch (e) {
-            run.content = `Error: ${e instanceof Error ? e.message : 'Failed'}`
-          }
-          run.status = 'done'
-          run.thinkingMs = Date.now() - startMs
-          syncGroup()
+        try {
+          await createOpenRouterChatCompletionStream({
+            apiKey,
+            model: run.modelId,
+            messages: msgs,
+            includeReasoning: cfg.useReasoning,
+            reasoning: cfg.useReasoning ? { effort: 'high' } : undefined,
+            plugins: webSearchEnabled ? [{ id: 'web' }] : undefined,
+            webSearchOptions: webSearchEnabled ? { search_context_size: 'high' } : undefined,
+            onProgress: (reply) => {
+              if (abortedRef.current) return
+              run.content = reply.text
+              run.reasoning = reply.reasoning || run.reasoning
+              syncGroup()
+            },
+          })
+        } catch (e) {
+          run.content = `Error: ${e instanceof Error ? e.message : 'Failed'}`
         }
-
-        if (abortedRef.current) {
-          break
-        }
+        run.status = 'done'
+        run.thinkingMs = Date.now() - startMs
+        syncGroup()
       }
 
-      // ── Final synthesis (lead model) ────────────────────────────
+      // ── Phase 2: Critique ───────────────────────────────────────
+      group.currentPhaseIndex = 1
+      for (const run of group.phases[1].runs) {
+        if (abortedRef.current) break
+        group.currentRunLabel = `${run.modelName} is thinking…`
+        run.status = 'thinking'
+        syncGroup()
+
+        const cfg = GROUP_MODELS_CONFIG.find((c) => c.id === run.modelId)!
+        const sysPrompt = phase2SystemFor(run.roleLabel, group.phases[0].runs)
+        const msgs = buildPhaseMessages(sysPrompt, userText)
+        const startMs = Date.now()
+
+        try {
+          await createOpenRouterChatCompletionStream({
+            apiKey,
+            model: run.modelId,
+            messages: msgs,
+            includeReasoning: cfg.useReasoning,
+            reasoning: cfg.useReasoning ? { effort: 'high' } : undefined,
+            plugins: webSearchEnabled ? [{ id: 'web' }] : undefined,
+            webSearchOptions: webSearchEnabled ? { search_context_size: 'high' } : undefined,
+            onProgress: (reply) => {
+              if (abortedRef.current) return
+              run.content = reply.text
+              run.reasoning = reply.reasoning || run.reasoning
+              syncGroup()
+            },
+          })
+        } catch (e) {
+          run.content = `Error: ${e instanceof Error ? e.message : 'Failed'}`
+        }
+        run.status = 'done'
+        run.thinkingMs = Date.now() - startMs
+        syncGroup()
+      }
+
+      // ── Phase 3: Synthesis (GPT-5.4 only) ──────────────────────
       if (!abortedRef.current) {
-        group.currentPhaseIndex = group.phases.length
-        group.currentRunLabel = `${leadParticipant.model.name} is synthesizing…`
+        group.currentPhaseIndex = 2
+        group.currentRunLabel = 'GPT-5.4 is synthesizing…'
         group.synthesisStreaming = true
         syncGroup()
 
-        const phaseSummaries = group.phases
-          .map(
-            (phase) =>
-              `# ${phase.label}\n\n${phase.runs
-                .map((run) => `## ${run.modelName} (${run.roleLabel})\n${run.content}`)
-                .join('\n\n---\n\n')}`,
-          )
+        const phase2Summaries = group.phases[1].runs
+          .map((r) => `## ${r.modelName} (${r.roleLabel}) — Round 2\n${r.content}`)
           .join('\n\n---\n\n')
 
-        const synthesisSystem = `${GROUP_SYSTEM_PROMPT}\n\nYou are the lead synthesizer for a collaborative ${groupDebateRounds}-round problem-solving session.\nYour role in the room is: ${leadParticipant.roleLabel}\nYour approach is: ${leadParticipant.roleBrief}\n\nUSER'S ORIGINAL REQUEST: ${userText}\n\n${phaseSummaries}\n\n---\n\nYour task: Synthesize the best final answer. Take the strongest elements from the room, resolve contradictions, and produce a single comprehensive response to the user's original request. Make clear decisions where the room disagreed.`
+        const synthesisSystem = `${GROUP_SYSTEM_PROMPT}\n\nYou are synthesizing the results of a 2-round collaborative problem-solving session.\n\nUSER'S ORIGINAL REQUEST: ${userText}\n\n${phase2Summaries}\n\n---\n\nYour task: Synthesize the best final answer. Take the strongest elements from each model, resolve any contradictions, and produce a single comprehensive, correct, complete response to the user's original request. This is the answer the user will see — make it excellent.`
 
         const msgs: OpenRouterChatMessage[] = [
           { role: 'system', content: synthesisSystem },
@@ -1294,13 +702,10 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
         try {
           await createOpenRouterChatCompletionStream({
             apiKey,
-            model: leadParticipant.model.id,
+            model: 'openai/gpt-5.4',
             messages: msgs,
-            includeReasoning: leadParticipant.useReasoning,
-            maxTokens: leadParticipant.maxTokens,
-            reasoning: leadParticipant.useReasoning
-              ? { effort: groupReasoningEffort }
-              : undefined,
+            includeReasoning: true,
+            reasoning: { effort: 'high' },
             onProgress: (reply) => {
               if (abortedRef.current) return
               group.synthesis = reply.text
@@ -1352,15 +757,6 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
     if (!selectedModel) return
     if (streaming) return
 
-    if (!activeChatId) {
-      await createChat()
-    }
-
-    if (userKeyRequired && !getStoredOpenRouterKey().trim()) {
-      pushAssistantError(getMissingCredentialMessage())
-      return
-    }
-
     shouldAutoScrollRef.current = true
 
     const userMsg: ChatMessage = {
@@ -1381,21 +777,6 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
 
     if (selectedModel?.id === GROUP_ONE_ID) {
-      if (activeGroupParticipants.length < MIN_GROUP_PARTICIPANTS) {
-        pushAssistantError('Enable at least two models in Group 1 before starting a debate.')
-        return
-      }
-
-      if (missingGroupModels.length > 0) {
-        pushAssistantError('One or more Group 1 participants use a model that is not available in the current catalog.')
-        return
-      }
-
-      if (new Set(activeGroupParticipants.map((participant) => participant.model.id)).size !== activeGroupParticipants.length) {
-        pushAssistantError('Choose a different model for each active Group 1 participant.')
-        return
-      }
-
       await runGroupStream(historyBefore, userMsg)
     } else {
       await runStream(historyBefore, userMsg)
@@ -1441,7 +822,12 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
   }
 
   function toggleThinking(id: string) {
-    setActiveThinkingMessageId((current) => (current === id ? null : id))
+    setExpandedThinking((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   const supportsFiles = selectedModel ? (selectedModel.id !== GROUP_ONE_ID && isMultimodal(selectedModel)) : false
@@ -1449,29 +835,6 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
   const reasoningStyle = selectedModel ? getReasoningStyle(selectedModel) : 'none'
   const selectedWebSearchProfile = getWebSearchModelProfile(selectedModel)
   const supportsWebSearch = selectedWebSearchProfile.supported
-  const activeGroupParticipants = getActiveGroupParticipants(groupParticipants, models)
-  const groupLeadParticipant = getLeadGroupParticipant(activeGroupParticipants)
-  const groupSummary = getGroupModelSummary(groupParticipants, models)
-  const groupReasoningLabel = getReasoningEffortLabel(groupReasoningEffort)
-  const missingGroupModels = groupParticipants.filter(
-    (participant) =>
-      participant.enabled && !findOpenRouterModelById(models, participant.modelId),
-  )
-  const activeThinkingMessage =
-    activeThinkingMessageId == null
-      ? null
-      : messages.find(
-          (message) =>
-            message.id === activeThinkingMessageId &&
-            message.role === 'assistant' &&
-            message.isReasoningModel,
-        ) ?? null
-  const activeThinkingIndicator = activeThinkingMessage
-    ? getThinkingIndicator(activeThinkingMessage)
-    : null
-  const activeThinkingTrace = activeThinkingMessage
-    ? normalizeReasoningText(activeThinkingMessage.reasoning ?? '')
-    : ''
 
   const filteredModels = modelSearch.trim()
     ? models.filter((m) =>
@@ -1505,7 +868,6 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
 
   let statsEntry: OpenRouterModelStatsEntry | null = null
   if (statsSnapshot && infoModel) statsEntry = resolveOpenRouterModelStats(statsSnapshot, infoModel)
-  const activeChat = chats.find((chat) => chat.id === activeChatId) ?? null
 
   return (
     <>
@@ -1567,69 +929,15 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
         </div>
       )}
 
-      <div className={`prompt-page prompt-page-chat${activeThinkingMessage ? ' prompt-page-chat-thinking-open' : ''}`}>
-        <aside className="chat-sidebar">
-          <div className="chat-sidebar-header">
-            <strong>Chats</strong>
-            <button
-              className="chat-sidebar-new"
-              type="button"
-              onClick={() => {
-                void createChat()
-              }}
-              disabled={streaming}
-            >
-              <Plus size={15} />
-            </button>
-          </div>
+      <div className={`prompt-page${hasMessages ? ' prompt-page-chat' : ''}`}>
+        {/* Chat history */}
+        {hasMessages && (
+          <div className="chat-container" ref={chatContainerRef}>
+            {messages.map((msg) => {
+              const hasReasoningTrace = Boolean(msg.reasoning?.trim())
+              const isThinkingExpanded = hasReasoningTrace && expandedThinking.has(msg.id)
 
-          {chatSyncError ? <p className="chat-sidebar-note">{chatSyncError}</p> : null}
-
-          <div className="chat-sidebar-list">
-            {!chatListReady ? (
-              <p className="chat-sidebar-note">Loading chats…</p>
-            ) : chats.length === 0 ? (
-              <p className="chat-sidebar-note">No saved chats yet.</p>
-            ) : (
-              chats.map((chat) => (
-                <button
-                  key={chat.id}
-                  className={`chat-sidebar-item${chat.id === activeChatId ? ' chat-sidebar-item-active' : ''}`}
-                  type="button"
-                  onClick={() => openChat(chat.id)}
-                  disabled={streaming}
-                >
-                  <span className="chat-sidebar-item-title">{chat.title}</span>
-                  <span className="chat-sidebar-item-meta">
-                    {chat.modelName ?? 'No model'}
-                    {chat.updatedAt ? ` · ${formatChatTime(chat.updatedAt)}` : ''}
-                  </span>
-                </button>
-              ))
-            )}
-          </div>
-        </aside>
-
-        <div className="prompt-chat-shell">
-          <div className="chat-main-header">
-            <strong>{activeChat?.title ?? 'New chat'}</strong>
-          </div>
-          {/* Chat history */}
-          {hasMessages && (
-            <div className="chat-container" ref={chatContainerRef}>
-              <div className="chat-fade-top" aria-hidden="true" />
-              {messages.map((msg) => {
-                const hasReasoningTrace = Boolean(msg.reasoning?.trim())
-                const isThinkingExpanded = hasReasoningTrace && activeThinkingMessageId === msg.id
-                const thinkingIndicator = getThinkingIndicator(msg)
-                const thinkingIndicatorClassName =
-                  thinkingIndicator.tone === 'pulse'
-                    ? 'chat-thinking-pulse'
-                    : thinkingIndicator.tone === 'stopped'
-                      ? 'chat-thinking-stopped'
-                      : undefined
-
-                return (
+              return (
               <div key={msg.id} className={`chat-row chat-row-${msg.role}`}>
                 <div className={`chat-bubble chat-bubble-${msg.role}${msg.error ? ' chat-bubble-error' : ''}`}>
                   {msg.role === 'user' && msg.attachments && msg.attachments.length > 0 && (
@@ -1655,11 +963,9 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
                           {msg.streaming && msg.groupData.currentRunLabel && (
                             <div className="chat-thinking-row">
                               <span className="chat-thinking-pulse">{msg.groupData.currentRunLabel}</span>
-                              <span className="group-phase-indicator">
-                                {msg.groupData.currentPhaseIndex < msg.groupData.phases.length
-                                  ? `Round ${msg.groupData.currentPhaseIndex + 1}/${msg.groupData.phases.length}`
-                                  : 'Synthesis'}
-                              </span>
+                              {msg.groupData.currentPhaseIndex < 2 && (
+                                <span className="group-phase-indicator">Phase {msg.groupData.currentPhaseIndex + 1}/2</span>
+                              )}
                             </div>
                           )}
 
@@ -1670,7 +976,7 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
                             return (
                               <details key={pi} className="group-phase-details">
                                 <summary className="group-phase-summary">
-                                  <span className="group-phase-label">{phase.label}</span>
+                                  <span className="group-phase-label">Phase {pi + 1}: {phase.label}</span>
                                   <span className="group-phase-meta">{activeRuns.filter(r => r.status === 'done').length}/{phase.runs.length} models</span>
                                 </summary>
                                 <div className="group-phase-runs">
@@ -1695,7 +1001,7 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
                             <div className="group-synthesis">
                               <div className="group-synthesis-header">
                                 <span>✦ Final Answer</span>
-                                {msg.groupData.synthesisStreaming && <span className="chat-thinking-pulse">{msg.groupData.synthesisModelName} synthesizing…</span>}
+                                {msg.groupData.synthesisStreaming && <span className="chat-thinking-pulse">GPT-5.4 synthesizing…</span>}
                               </div>
                               <MarkdownBlock>{msg.groupData.synthesis}</MarkdownBlock>
                             </div>
@@ -1708,15 +1014,29 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
                           {msg.isReasoningModel && (
                             <div className="chat-thinking-row">
                               <button
-                                className={`chat-thinking-toggle${hasReasoningTrace ? '' : ' chat-thinking-toggle-disabled'}${isThinkingExpanded ? ' chat-thinking-toggle-active' : ''}`}
+                                className={`chat-thinking-toggle${hasReasoningTrace ? '' : ' chat-thinking-toggle-disabled'}`}
                                 type="button"
                                 disabled={!hasReasoningTrace}
                                 aria-expanded={isThinkingExpanded}
-                                aria-controls={hasReasoningTrace ? 'chat-thinking-panel' : undefined}
                                 onClick={() => toggleThinking(msg.id)}
                               >
-                                <span className={thinkingIndicatorClassName}>{thinkingIndicator.label}</span>
+                                {msg.streaming && !msg.content && !msg.reasoning ? (
+                                  <span className="chat-thinking-pulse">Thinking…</span>
+                                ) : msg.stoppedThinking ? (
+                                  <span className="chat-thinking-stopped">Stopped thinking</span>
+                                ) : msg.thinkingDuration != null ? (
+                                  <span>Thought for {Math.round(msg.thinkingDuration / 1000)}s</span>
+                                ) : msg.streaming ? (
+                                  <span className="chat-thinking-pulse">Thinking…</span>
+                                ) : (
+                                  <span>Thoughts</span>
+                                )}
                               </button>
+                              {isThinkingExpanded && (
+                                <div className="chat-thinking-content">
+                                  <MarkdownBlock>{normalizeReasoningText(msg.reasoning ?? '')}</MarkdownBlock>
+                                </div>
+                              )}
                             </div>
                           )}
                           <MarkdownBlock>{msg.content}</MarkdownBlock>
@@ -1751,10 +1071,10 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
                   )}
                 </div>
               </div>
-                )
-              })}
-            </div>
-          )}
+              )
+            })}
+          </div>
+        )}
 
         {/* Input area */}
         <div className={`prompt-center${hasMessages ? ' prompt-center-sticky' : ''}`}>
@@ -1851,26 +1171,17 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
                                 }}
                               >
                                 <span className="model-list-name">Group 1</span>
-                                <span className="model-list-id">{groupSummary}</span>
+                                <span className="model-list-id">GPT-5.4 · Claude Opus 4.6 · Gemini 3.1 Pro</span>
                                 <div className="model-list-badges">
                                   <span className="model-list-badge model-list-badge-free">Free web search</span>
-                                  <span className="model-list-badge model-list-badge-group">
-                                    {activeGroupParticipants.length} models
-                                  </span>
+                                  <span className="model-list-badge model-list-badge-group">3 models</span>
                                 </div>
                               </button>
                             </div>
                           </div>
                         )}
-                        {modelCatalogNotice && !modelSearch.trim() && (
-                          <p className="model-list-status">{modelCatalogNotice}</p>
-                        )}
                         {filteredModels.length === 0 && (
-                          <p className="model-list-empty">
-                            {modelSearch.trim()
-                              ? 'No models match your search'
-                              : 'No models found'}
-                          </p>
+                          <p className="model-list-empty">No models found</p>
                         )}
                         {groupedModels.map((group) => (
                           <div key={group.key} className="model-list-group">
@@ -1985,11 +1296,8 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
                 )}
                 {selectedModel?.id === GROUP_ONE_ID && (
                   <div className="group-disclaimer">
-                    <span>{groupSummary}</span>
-                    <span className="group-disclaimer-separator">•</span>
-                    <span>{groupDebateRounds} {groupDebateRounds === 1 ? 'round' : 'rounds'}</span>
-                    <span className="group-disclaimer-separator">•</span>
-                    <span>{groupReasoningLabel} reasoning</span>
+                    <span className="group-disclaimer-icon">⚡</span>
+                    <span>GPT-5.4 · Claude Opus 4.6 · Gemini 3.1 Pro · Max reasoning</span>
                   </div>
                 )}
               </div>
@@ -2014,225 +1322,6 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
                 </button>
               </div>
             </div>
-
-            {selectedModel?.id === GROUP_ONE_ID && (
-              <div className="group-config-panel">
-                <button
-                  className="group-config-summary"
-                  type="button"
-                  onClick={() => setGroupCustomizationOpen((open) => !open)}
-                  aria-expanded={groupCustomizationOpen}
-                >
-                  <span className="group-config-summary-copy">
-                    <span className="group-config-summary-title">Customize Group 1</span>
-                    <span className="group-config-summary-meta">
-                      {activeGroupParticipants.length} models · {groupDebateRounds} {groupDebateRounds === 1 ? 'round' : 'rounds'} · {groupReasoningLabel} reasoning
-                    </span>
-                  </span>
-                  <ChevronDown size={14} className={`model-selector-chevron${groupCustomizationOpen ? ' model-selector-chevron-open' : ''}`} />
-                </button>
-
-                {groupCustomizationOpen && (
-                  <div className="group-config-content">
-                    <div className="group-config-grid">
-                      <label className="group-config-field">
-                        <span>Debate rounds</span>
-                        <input
-                          className="group-config-input"
-                          type="number"
-                          min={MIN_GROUP_DEBATE_ROUNDS}
-                          max={MAX_GROUP_DEBATE_ROUNDS}
-                          value={groupDebateRounds}
-                          onChange={(e) =>
-                            setGroupDebateRounds(
-                              clampWholeNumber(
-                                Number(e.target.value),
-                                MIN_GROUP_DEBATE_ROUNDS,
-                                MAX_GROUP_DEBATE_ROUNDS,
-                              ),
-                            )
-                          }
-                        />
-                      </label>
-
-                      <label className="group-config-field">
-                        <span>Reasoning depth</span>
-                        <select
-                          className="group-config-input"
-                          value={groupReasoningEffort}
-                          onChange={(e) =>
-                            setGroupReasoningEffort(
-                              e.target.value as OpenRouterReasoningEffort,
-                            )
-                          }
-                        >
-                          {EFFORT_LEVELS.map((level) => (
-                            <option key={level.value} value={level.value}>
-                              {level.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-
-                    <p className="group-config-note">
-                      Choose the debating models, set response budgets, and assign specialized roles. The lead model writes the final synthesis.
-                    </p>
-
-                    {missingGroupModels.length > 0 && (
-                      <p className="group-config-warning">
-                        One or more configured models are not in the current catalog snapshot. Pick another model before running.
-                      </p>
-                    )}
-
-                    <div className="group-config-participants">
-                      {groupParticipants.map((participant, index) => {
-                        const currentModel = findOpenRouterModelById(
-                          models,
-                          participant.modelId,
-                        )
-
-                        return (
-                          <article
-                            key={participant.id}
-                            className={`group-config-card${participant.enabled ? ' group-config-card-active' : ''}`}
-                          >
-                            <div className="group-config-card-header">
-                              <div>
-                                <p className="group-config-card-label">
-                                  Participant {index + 1}
-                                </p>
-                                <h4>{currentModel?.name ?? participant.modelId}</h4>
-                              </div>
-                              <div className="group-config-card-controls">
-                                <label className="group-config-check">
-                                  <input
-                                    type="checkbox"
-                                    checked={participant.enabled}
-                                    onChange={(e) =>
-                                      updateGroupParticipant(participant.id, (current) => ({
-                                        ...current,
-                                        enabled: e.target.checked,
-                                      }))
-                                    }
-                                  />
-                                  <span>Enabled</span>
-                                </label>
-                                <label className="group-config-check">
-                                  <input
-                                    type="radio"
-                                    name="group-lead"
-                                    checked={participant.enabled && participant.lead}
-                                    disabled={!participant.enabled}
-                                    onChange={() => setGroupLead(participant.id)}
-                                  />
-                                  <span>Lead synth</span>
-                                </label>
-                              </div>
-                            </div>
-
-                            <div className="group-config-card-grid">
-                              <label className="group-config-field group-config-field-full">
-                                <span>Model</span>
-                                <select
-                                  className="group-config-input"
-                                  value={participant.modelId}
-                                  onChange={(e) =>
-                                    updateGroupParticipant(participant.id, (current) => ({
-                                      ...current,
-                                      modelId: e.target.value,
-                                    }))
-                                  }
-                                >
-                                  {models.map((model) => (
-                                    <option key={model.id} value={model.id}>
-                                      {model.name} ({model.id})
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
-
-                              <label className="group-config-field">
-                                <span>Role</span>
-                                <input
-                                  className="group-config-input"
-                                  type="text"
-                                  value={participant.roleLabel}
-                                  onChange={(e) =>
-                                    updateGroupParticipant(participant.id, (current) => ({
-                                      ...current,
-                                      roleLabel: e.target.value,
-                                    }))
-                                  }
-                                  placeholder="Builder"
-                                />
-                              </label>
-
-                              <label className="group-config-field">
-                                <span>Token budget</span>
-                                <input
-                                  className="group-config-input"
-                                  type="number"
-                                  min={MIN_GROUP_MAX_TOKENS}
-                                  max={MAX_GROUP_MAX_TOKENS}
-                                  value={participant.maxTokens}
-                                  onChange={(e) =>
-                                    updateGroupParticipant(participant.id, (current) => ({
-                                      ...current,
-                                      maxTokens: clampWholeNumber(
-                                        Number(e.target.value),
-                                        MIN_GROUP_MAX_TOKENS,
-                                        MAX_GROUP_MAX_TOKENS,
-                                      ),
-                                    }))
-                                  }
-                                />
-                              </label>
-
-                              <label className="group-config-field group-config-field-full">
-                                <span>Approach</span>
-                                <textarea
-                                  className="group-config-input group-config-textarea"
-                                  rows={3}
-                                  value={participant.roleBrief}
-                                  onChange={(e) =>
-                                    updateGroupParticipant(participant.id, (current) => ({
-                                      ...current,
-                                      roleBrief: e.target.value,
-                                    }))
-                                  }
-                                  placeholder="Focus this model on a specific style of thinking."
-                                />
-                              </label>
-                            </div>
-
-                            <label className="group-config-check group-config-check-inline">
-                              <input
-                                type="checkbox"
-                                checked={participant.useReasoning}
-                                onChange={(e) =>
-                                  updateGroupParticipant(participant.id, (current) => ({
-                                    ...current,
-                                    useReasoning: e.target.checked,
-                                  }))
-                                }
-                              />
-                              <span>Use provider reasoning for this participant</span>
-                            </label>
-                          </article>
-                        )
-                      })}
-                    </div>
-
-                    {groupLeadParticipant && (
-                      <p className="group-config-footnote">
-                        Final synthesis lead: {groupLeadParticipant.model.name} as {groupLeadParticipant.roleLabel}.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           {editingId && (
@@ -2248,55 +1337,6 @@ export function CollaborationWorkspace({ currentUser }: CollaborationWorkspacePr
             </p>
           )}
         </div>
-        </div>
-
-        {activeThinkingMessage && activeThinkingIndicator && (
-          <>
-            <button
-              className="chat-thinking-backdrop"
-              type="button"
-              aria-label="Close thinking panel"
-              onClick={() => setActiveThinkingMessageId(null)}
-            />
-            <aside
-              id="chat-thinking-panel"
-              className="chat-thinking-panel"
-              aria-labelledby="chat-thinking-panel-title"
-            >
-              <div className="chat-thinking-panel-inner">
-                <div className="chat-thinking-panel-header">
-                  <h2 id="chat-thinking-panel-title" className="chat-thinking-panel-title">
-                    {activeThinkingIndicator.label}
-                  </h2>
-                  <button
-                    className="chat-thinking-panel-close"
-                    type="button"
-                    aria-label="Close thinking panel"
-                    onClick={() => setActiveThinkingMessageId(null)}
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-
-                {activeThinkingMessage.content.trim() && (
-                  <div className="chat-thinking-panel-preview">
-                    <p>{activeThinkingMessage.content.trim()}</p>
-                  </div>
-                )}
-
-                <div className="chat-thinking-panel-body">
-                  {activeThinkingTrace ? (
-                    <div className="chat-thinking-panel-content">
-                      <MarkdownBlock>{activeThinkingTrace}</MarkdownBlock>
-                    </div>
-                  ) : (
-                    <p className="chat-thinking-empty">This response did not return a visible reasoning trace.</p>
-                  )}
-                </div>
-              </div>
-            </aside>
-          </>
-        )}
       </div>
     </>
   )
