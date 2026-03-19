@@ -717,27 +717,8 @@ export function DebateWorkspace({ currentUser }: DebateWorkspaceProps) {
         </div>
       )}
 
+      <div className={`debate-workspace-layout${useDebateMode ? ' debate-workspace-layout-configured' : ''}`}>
       <div className={`prompt-page${hasMessages ? ' prompt-page-chat' : ''}`}>
-        {/* Debate config panel */}
-        {useDebateMode && (
-          <div className="debate-config-wrapper">
-            <DebateConfigPanel
-              config={debateConfig}
-              models={models}
-              onChange={setDebateConfig}
-              collapsed={configCollapsed}
-              onToggleCollapse={() => setConfigCollapsed((c) => !c)}
-            />
-            {!configCollapsed && currentUser && (
-              <TemplateManager
-                userId={currentUser.uid}
-                currentConfig={debateConfig}
-                onLoadTemplate={(config) => setDebateConfig(config)}
-              />
-            )}
-          </div>
-        )}
-
         {/* Chat history */}
         {hasMessages && (
           <div className="chat-container" ref={chatContainerRef}>
@@ -1101,6 +1082,25 @@ export function DebateWorkspace({ currentUser }: DebateWorkspaceProps) {
             </p>
           )}
         </div>
+      </div>
+      {useDebateMode && (
+        <aside className="debate-config-rail">
+          <DebateConfigPanel
+            config={debateConfig}
+            models={models}
+            onChange={setDebateConfig}
+            collapsed={configCollapsed}
+            onToggleCollapse={() => setConfigCollapsed((c) => !c)}
+          />
+          {!configCollapsed && currentUser && (
+            <TemplateManager
+              userId={currentUser.uid}
+              currentConfig={debateConfig}
+              onLoadTemplate={(config) => setDebateConfig(config)}
+            />
+          )}
+        </aside>
+      )}
       </div>
     </>
   )

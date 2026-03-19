@@ -6890,3 +6890,404 @@
   margin-bottom: 8px;
   gap: 8px;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Debate workspace split layout
+   ═══════════════════════════════════════════════════════════════ */
+
+.debate-workspace-layout {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* prompt-page must flex-grow to fill the chat column */
+.debate-workspace-layout > .prompt-page {
+  flex: 1;
+  min-width: 0;
+}
+
+/* In chat mode, let the parent flex height drive instead of 100vh calc */
+.debate-workspace-layout > .prompt-page-chat {
+  height: 100%;
+}
+
+/* When the config rail is present, remove the workspace-sidebar
+   centering compensation — the rail naturally balances the layout */
+.debate-workspace-layout-configured > .prompt-page {
+  padding: 2rem 1rem;
+}
+
+.debate-workspace-layout-configured > .prompt-page-chat {
+  padding: 0;
+}
+
+/* ── Debate config right rail ─────────────────────────────────── */
+.debate-config-rail {
+  width: 300px;
+  min-width: 300px;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #060606;
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 1.5rem 1.25rem 2.5rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.07) transparent;
+}
+
+.debate-config-rail::-webkit-scrollbar { width: 4px; }
+.debate-config-rail::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 4px;
+}
+
+/* ── Debate config panel (inside rail) ───────────────────────── */
+
+/* Override the cramped index.css defaults */
+.debate-config-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  margin-bottom: 0;
+  overflow: visible;
+}
+
+.debate-config-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 1rem;
+  margin-bottom: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: default;
+  user-select: none;
+}
+
+.debate-config-title {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.28);
+}
+
+.debate-config-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 120ms, background 120ms;
+}
+
+.debate-config-collapse-btn:hover {
+  color: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Collapsed state */
+.debate-config-collapsed {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0;
+}
+
+.debate-config-expand-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.35);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 0;
+  transition: color 120ms;
+}
+
+.debate-config-expand-btn:hover {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* Error banner */
+.debate-config-errors {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.4rem;
+  background: rgba(255, 70, 70, 0.1);
+  border: 1px solid rgba(255, 70, 70, 0.2);
+  margin: 0.75rem 0 0;
+}
+
+.debate-config-error {
+  margin: 0;
+  font-size: 0.74rem;
+  color: #ff8080;
+}
+
+/* Sections */
+.debate-config-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.debate-config-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.debate-config-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.debate-config-section-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.28);
+}
+
+/* Participant list */
+.debate-config-participants {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.debate-config-participant {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.75rem 0.85rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0.6rem;
+}
+
+.debate-config-participant-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.debate-config-alias-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
+  padding: 0.15rem 0;
+  color: var(--ink-strong);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 500;
+  outline: none;
+  transition: border-color 120ms;
+}
+
+.debate-config-alias-input:focus {
+  border-bottom-color: rgba(255, 255, 255, 0.3);
+}
+
+.debate-config-alias-input::placeholder {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+/* Model selector inside config rail — opens downward, full width */
+.debate-config-model-selector {
+  position: relative;
+}
+
+.debate-config-model-selector .model-selector-trigger {
+  width: 100%;
+  max-width: none;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  padding: 0.38rem 0.65rem;
+  border-radius: 0.45rem;
+}
+
+.debate-config-model-selector .model-dropdown {
+  bottom: auto;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
+  width: auto;
+}
+
+/* Role select */
+.debate-config-role-select {
+  width: 100%;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 0.45rem;
+  padding: 0.38rem 0.65rem;
+  color: rgba(255, 255, 255, 0.65);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color 120ms;
+}
+
+.debate-config-role-select:focus {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+/* Token budget row */
+.debate-config-budget-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.debate-config-budget-label {
+  font-size: 0.74rem;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.debate-config-budget-input,
+.debate-config-number-input {
+  width: 80px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 0.35rem;
+  padding: 0.3rem 0.5rem;
+  color: var(--ink-strong);
+  font: inherit;
+  font-size: 0.78rem;
+  text-align: right;
+  outline: none;
+  transition: border-color 120ms;
+}
+
+.debate-config-budget-input:focus,
+.debate-config-number-input:focus {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* Label–control row */
+.debate-config-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.debate-config-label {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* On/Off toggle button */
+.debate-config-toggle {
+  padding: 0.22rem 0.7rem;
+  font: inherit;
+  font-size: 0.74rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 99px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 120ms, color 120ms, border-color 120ms;
+}
+
+.debate-config-toggle:hover {
+  color: rgba(255, 255, 255, 0.65);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.debate-config-toggle-on {
+  background: rgba(255, 255, 255, 0.09);
+  color: rgba(255, 255, 255, 0.88);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+/* Inline add button */
+.debate-config-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.3);
+  font: inherit;
+  font-size: 0.74rem;
+  cursor: pointer;
+  padding: 0;
+  transition: color 120ms;
+}
+
+.debate-config-add-btn:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Remove participant button */
+.debate-config-remove-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 120ms, background 120ms;
+}
+
+.debate-config-remove-btn:hover {
+  color: #ff6060;
+  background: rgba(255, 70, 70, 0.1);
+}
+
+/* Synthesis radio group */
+.debate-config-radio-group {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.debate-config-radio {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+}
+
+.debate-config-radio input[type="radio"] {
+  accent-color: rgba(255, 255, 255, 0.75);
+}
