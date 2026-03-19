@@ -90,8 +90,8 @@ svg {
 }
 
 .workspace-sidebar-rail {
-  width: 72px;
-  min-width: 72px;
+  width: fit-content;
+  min-width: 0;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -154,7 +154,7 @@ svg {
   align-items: center;
   gap: 0.45rem;
   justify-content: center;
-  padding: 0.35rem 0.4rem;
+  padding: 0.35rem 0.55rem;
   border: none;
   border-radius: 0.45rem;
   background: transparent;
@@ -224,8 +224,8 @@ svg {
 
 @media (max-width: 860px) {
   .workspace-sidebar-rail {
-    width: 72px;
-    min-width: 72px;
+    width: fit-content;
+    min-width: 0;
   }
 }
 
