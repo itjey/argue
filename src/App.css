@@ -6897,7 +6897,7 @@
 
 .debate-workspace-layout {
   display: flex;
-  height: 100%;
+  height: calc(100vh - 56px);
   overflow: hidden;
 }
 
@@ -6905,15 +6905,32 @@
 .debate-workspace-layout > .prompt-page {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
-/* In chat mode, let the parent flex height drive instead of 100vh calc */
+/* In chat mode, override the grid with a flex column so chat-container
+   can flex: 1 and scroll, and prompt-center sticks to the bottom */
 .debate-workspace-layout > .prompt-page-chat {
+  display: flex;
+  flex-direction: column;
   height: 100%;
+  overflow: hidden;
+  padding: 0;
 }
 
-/* When the config rail is present, remove the workspace-sidebar
-   centering compensation — the rail naturally balances the layout */
+/* Chat messages fill remaining space and scroll */
+.debate-workspace-layout .chat-container {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Input bar stays pinned at bottom */
+.debate-workspace-layout .prompt-center-sticky {
+  flex-shrink: 0;
+}
+
+/* When config rail is present, remove centering compensation */
 .debate-workspace-layout-configured > .prompt-page {
   padding: 2rem 1rem;
 }
@@ -6926,7 +6943,7 @@
 .debate-config-rail {
   width: 300px;
   min-width: 300px;
-  height: 100%;
+  height: calc(100vh - 56px);
   overflow-y: auto;
   overflow-x: hidden;
   background: #060606;
