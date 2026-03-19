@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import type { ComponentType } from 'react'
-import { ChevronLeft, ChevronRight, Swords, MessageSquare, FileText } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { User } from 'firebase/auth'
 import { DebateWorkspace } from './DebateWorkspace'
 import { ChatWorkspace } from './ChatWorkspace'
@@ -12,10 +11,10 @@ interface WorkspaceShellProps {
   currentUser: User | null
 }
 
-const WORKSPACE_TABS: { id: WorkspaceId; label: string; Icon: ComponentType<{ size?: number; strokeWidth?: number }> }[] = [
-  { id: 'chat', label: 'Chat', Icon: MessageSquare },
-  { id: 'debate', label: 'Debate', Icon: Swords },
-  { id: 'latex', label: 'LaTeX', Icon: FileText },
+const WORKSPACE_TABS: { id: WorkspaceId; label: string }[] = [
+  { id: 'chat', label: 'Chat' },
+  { id: 'debate', label: 'Debate' },
+  { id: 'latex', label: 'LaTeX' },
 ]
 
 const DEFAULT_LATEX_TEMPLATE = `\\documentclass{article}
@@ -52,7 +51,7 @@ function WorkspaceShell({ currentUser }: WorkspaceShellProps) {
         </div>
 
         <div className="workspace-sidebar-nav">
-          {WORKSPACE_TABS.map(({ id, label, Icon }) => {
+          {WORKSPACE_TABS.map(({ id, label }) => {
             const isActive = activeWorkspace === id
 
             return (
@@ -65,7 +64,6 @@ function WorkspaceShell({ currentUser }: WorkspaceShellProps) {
                 aria-label={label}
                 aria-current={isActive ? 'page' : undefined}
               >
-                <Icon size={14} strokeWidth={1.7} />
                 <span className="workspace-rail-label">{label}</span>
               </button>
             )
