@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import type { ComponentType } from 'react'
+import { ChevronLeft, ChevronRight, Swords, MessageSquare, FileText } from 'lucide-react'
 import type { User } from 'firebase/auth'
 import { DebateWorkspace } from './DebateWorkspace'
 import { ChatWorkspace } from './ChatWorkspace'
@@ -11,10 +12,10 @@ interface WorkspaceShellProps {
   currentUser: User | null
 }
 
-const WORKSPACE_TABS: { id: WorkspaceId; label: string }[] = [
-  { id: 'debate', label: 'Debate' },
-  { id: 'chat', label: 'Chat' },
-  { id: 'latex', label: 'LaTeX' },
+const WORKSPACE_TABS: { id: WorkspaceId; label: string; Icon: ComponentType<{ size?: number; strokeWidth?: number }> }[] = [
+  { id: 'debate', label: 'Debate', Icon: Swords },
+  { id: 'chat', label: 'Chat', Icon: MessageSquare },
+  { id: 'latex', label: 'LaTeX', Icon: FileText },
 ]
 
 const DEFAULT_LATEX_TEMPLATE = `\\documentclass{article}
@@ -42,30 +43,30 @@ function WorkspaceShell({ currentUser }: WorkspaceShellProps) {
           <button
             className="workspace-sidebar-toggle"
             type="button"
-            onClick={() => setSidebarCollapsed((value) => !value)}
-            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-pressed={sidebarCollapsed}
-            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            onClick={() => setSidebarCollapsed(true)}
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar"
           >
-            {sidebarCollapsed ? <PanelLeftOpen size={15} strokeWidth={1.6} /> : <PanelLeftClose size={15} strokeWidth={1.6} />}
+            <ChevronLeft size={13} strokeWidth={2} />
           </button>
         </div>
 
         <div className="workspace-sidebar-nav">
-          {WORKSPACE_TABS.map((tab) => {
-            const isActive = activeWorkspace === tab.id
+          {WORKSPACE_TABS.map(({ id, label, Icon }) => {
+            const isActive = activeWorkspace === id
 
             return (
               <button
-                key={tab.id}
+                key={id}
                 className={`workspace-rail-btn${isActive ? ' workspace-rail-btn-active' : ''}`}
                 type="button"
-                onClick={() => setActiveWorkspace(tab.id)}
-                title={tab.label}
-                aria-label={tab.label}
+                onClick={() => setActiveWorkspace(id)}
+                title={label}
+                aria-label={label}
                 aria-current={isActive ? 'page' : undefined}
               >
-                {!sidebarCollapsed && <span className="workspace-rail-label">{tab.label}</span>}
+                <Icon size={14} strokeWidth={1.7} />
+                <span className="workspace-rail-label">{label}</span>
               </button>
             )
           })}
@@ -73,6 +74,17 @@ function WorkspaceShell({ currentUser }: WorkspaceShellProps) {
       </nav>
 
       <div className="workspace-content-area">
+        {sidebarCollapsed && (
+          <button
+            className="workspace-sidebar-pull-tab"
+            type="button"
+            onClick={() => setSidebarCollapsed(false)}
+            aria-label="Expand sidebar"
+            title="Expand sidebar"
+          >
+            <ChevronRight size={12} strokeWidth={2} />
+          </button>
+        )}
         {activeWorkspace === 'debate' && <DebateWorkspace currentUser={currentUser} />}
         {activeWorkspace === 'chat' && <ChatWorkspace currentUser={currentUser} />}
         {activeWorkspace === 'latex' && (
