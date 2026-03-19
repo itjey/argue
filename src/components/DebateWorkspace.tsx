@@ -1045,7 +1045,6 @@ export function DebateWorkspace({ currentUser }: DebateWorkspaceProps) {
 
                 {useDebateMode && (
                   <div className="group-disclaimer">
-                    <span className="group-disclaimer-icon">⚔</span>
                     <span>{debateConfig.participants.length} models · {debateConfig.roundCount} round{debateConfig.roundCount !== 1 ? 's' : ''}</span>
                   </div>
                 )}
