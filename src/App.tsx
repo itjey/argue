@@ -825,7 +825,12 @@ function App() {
       <div className="ambient ambient-three" />
 
       <header className={`topbar${topbarHidden ? ' topbar-hidden' : ''}`}>
-        <a className="brand" href="#top" aria-label="Argue home">
+        <button
+          className="brand brand-button"
+          type="button"
+          aria-label="Argue home"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        >
           <svg className="brand-favicon-logo" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
             <g transform="translate(4, 16) scale(0.82)">
               <path transform="rotate(-30)" d="M0 0L23 -5V5L0 0Z" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round"/>
@@ -833,7 +838,7 @@ function App() {
               <path transform="rotate(30)" d="M0 0L23 -5V5L0 0Z" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round"/>
             </g>
           </svg>
-        </a>
+        </button>
 
         <nav className="nav" aria-label="Primary navigation">
           {workspaceVisible ? (
@@ -855,7 +860,7 @@ function App() {
         </nav>
 
         <button
-          className={`topbar-cta topbar-account-button${
+          className={`topbar-account-button${
             currentUser && isVerified ? ' topbar-account-button-minimal' : ''
           }`}
           onClick={() => openAuthDialog('sign-in')}
@@ -874,7 +879,6 @@ function App() {
             </span>
           ) : (
             <>
-              <LogIn size={16} />
               <span className="topbar-account-copy">
                 <strong>Login</strong>
                 <small>Google or email</small>

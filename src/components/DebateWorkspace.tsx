@@ -937,7 +937,7 @@ export function DebateWorkspace({ currentUser }: DebateWorkspaceProps) {
                   }}
                   title="Toggle debate mode"
                 >
-                  <span>{useDebateMode ? '⚔ Debate' : '⚔ Debate'}</span>
+                  <span>Debate mode</span>
                 </button>
 
                 {!useDebateMode && (

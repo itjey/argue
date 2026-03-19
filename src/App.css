@@ -18,9 +18,9 @@
   z-index: 40;
   margin-top: 0;
   padding: calc(0.48rem + env(safe-area-inset-top)) 2rem 0.88rem;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: 1rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 0;
@@ -52,6 +52,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.9rem;
+  justify-self: start;
   color: var(--ink-strong);
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -163,12 +164,13 @@
 .nav {
   display: inline-flex;
   align-items: center;
+  justify-self: center;
   gap: 1.35rem;
 }
 
 .nav a,
 .nav-link-button,
-.topbar-cta {
+.topbar-account-button {
   color: var(--ink-muted);
   font-size: 0.9rem;
 }
@@ -186,43 +188,41 @@
 .nav a:focus-visible,
 .nav-link-button:hover,
 .nav-link-button:focus-visible,
-.topbar-cta:hover,
-.topbar-cta:focus-visible {
+.topbar-account-button:hover,
+.topbar-account-button:focus-visible {
   color: var(--ink-strong);
 }
 
-.topbar-cta {
+.topbar-account-button {
   display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
-  min-height: 2.7rem;
-  padding: 0.65rem 0.95rem;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 999px;
+  justify-self: end;
+  gap: 0.4rem;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
   background: transparent;
+  text-align: right;
+  cursor: pointer;
   transition:
-    border-color 180ms ease,
     color 180ms ease,
-    background-color 180ms ease;
+    opacity 180ms ease;
 }
 
 .topbar-account-button {
-  justify-content: flex-start;
-  min-width: min(15rem, 100%);
-  text-align: left;
+  justify-content: flex-end;
+  min-width: 0;
+  max-width: min(18rem, 100%);
 }
 
 .topbar-account-button-minimal {
   min-width: 0;
-  padding-inline: 1rem;
-  border-color: transparent;
-  background: transparent;
 }
 
 .topbar-account-button-minimal:hover,
 .topbar-account-button-minimal:focus-visible {
-  border-color: transparent !important;
-  background: transparent !important;
+  opacity: 1;
 }
 
 .topbar-account-button svg {
@@ -247,7 +247,7 @@
   color: var(--ink-strong);
   font-size: 0.9rem;
   font-weight: 400;
-  text-align: right;
+  text-align: inherit;
 }
 
 .topbar-account-copy small {
@@ -255,7 +255,7 @@
   font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  text-align: right;
+  text-align: inherit;
 }
 
 .topbar-account-warning {
@@ -3618,6 +3618,10 @@
     display: none;
   }
 
+  .topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
   .page,
   .topbar {
     width: 100%;
@@ -3658,13 +3662,14 @@
 @media (max-width: 620px) {
   .topbar {
     align-items: stretch;
-    flex-direction: column;
+    grid-template-columns: 1fr;
     padding: 0.95rem;
   }
 
   .brand,
-  .topbar-cta {
+  .topbar-account-button {
     justify-content: center;
+    justify-self: center;
   }
 
   .topbar-account-copy {
