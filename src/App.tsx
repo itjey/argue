@@ -881,7 +881,7 @@ function App() {
                   Add API key in Settings
                 </small>
               ) : !isVerified ? (
-                <small className="topbar-account-warning">Unverified account</small>
+                <small className="topbar-account-warning">⚠ unverified</small>
               ) : null}
             </span>
           ) : (
