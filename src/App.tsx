@@ -844,6 +844,7 @@ function App() {
               </svg>
             </span>
           </span>
+          <span className="brand-wordmark">argue</span>
         </button>
 
         <nav className="nav" aria-label="Primary navigation">

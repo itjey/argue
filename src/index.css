@@ -6,7 +6,7 @@
   font-weight: 400;
   color-scheme: dark;
   color: #d4d4d4;
-  background: #000;
+  background: #111;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -14,9 +14,9 @@
   --font-sans: 'Outfit', sans-serif;
   --font-display: 'Outfit', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
-  --surface: #080808;
-  --surface-soft: #0e0e0e;
-  --surface-muted: #161616;
+  --surface: #181818;
+  --surface-soft: #1e1e1e;
+  --surface-muted: #252525;
   --ink-strong: #e8e8e8;
   --ink-muted: #999;
   --ink-soft: #555;
@@ -25,8 +25,8 @@
   --line-strong: rgba(255, 255, 255, 0.12);
   --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.6);
   --warning: #ff8a3d;
-  --chat-bg: #000;
-  --chat-surface: #0a0a0a;
+  --chat-bg: #111;
+  --chat-surface: #191919;
   --accent: rgba(255, 255, 255, 0.82);
   --accent-muted: rgba(255, 255, 255, 0.08);
 }
@@ -40,7 +40,7 @@
 html {
   scroll-behavior: smooth;
   scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
-  background: #000;
+  background: #111;
   overscroll-behavior: none;
 }
 
@@ -49,7 +49,7 @@ body {
   min-width: 320px;
   height: 100vh;
   overflow: hidden;
-  background: #000;
+  background: #111;
   overscroll-behavior: none;
 }
 
@@ -79,7 +79,7 @@ svg {
 #root {
   height: 100vh;
   overflow: hidden;
-  background: #000;
+  background: #111;
 }
 
 /* ── Workspace Shell ── */
@@ -97,7 +97,7 @@ svg {
   align-items: stretch;
   gap: 20px;
   padding: 18px 16px;
-  background: #000;
+  background: #111;
   border-right: 1px solid var(--line);
   transition: width 0.18s ease, min-width 0.18s ease, padding 0.18s ease;
 }
