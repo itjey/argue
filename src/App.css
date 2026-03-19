@@ -283,6 +283,14 @@
   letter-spacing: 0.02em;
 }
 
+.topbar-account-copy small.topbar-account-warning {
+  color: #f97316;
+}
+
+.topbar-account-copy small.topbar-api-key-warning {
+  color: #ffb366;
+}
+
 .topbar-account-warning {
   color: #f97316;
   font-size: 0.66rem;
