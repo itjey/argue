@@ -1,15 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- 3-blade fan logo, transparent background, black strokes -->
+  <!-- 3-blade fan logo, transparent background, white strokes -->
   <!-- Rotation origin at left-center (4, 16), scaled to fit 32x32 -->
   <g transform="translate(4, 16) scale(0.82)">
     <!-- Left blade: -30deg -->
     <path transform="rotate(-30)" d="M0 0L23 -5V5L0 0Z"
-          fill="none" stroke="black" stroke-width="2.6" stroke-linejoin="round"/>
+          fill="none" stroke="white" stroke-width="2.6" stroke-linejoin="round"/>
     <!-- Center blade: 0deg -->
     <path d="M0 0L23 -5V5L0 0Z"
-          fill="none" stroke="black" stroke-width="2.6" stroke-linejoin="round"/>
+          fill="none" stroke="white" stroke-width="2.6" stroke-linejoin="round"/>
     <!-- Right blade: +30deg -->
     <path transform="rotate(30)" d="M0 0L23 -5V5L0 0Z"
-          fill="none" stroke="black" stroke-width="2.6" stroke-linejoin="round"/>
+          fill="none" stroke="white" stroke-width="2.6" stroke-linejoin="round"/>
   </g>
 </svg>

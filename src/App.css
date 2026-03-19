@@ -59,6 +59,13 @@
   text-transform: lowercase;
 }
 
+.brand-button {
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
 .brand-mark {
   width: 2rem;
   height: 1.35rem;
@@ -71,6 +78,10 @@
   width: 1.6rem;
   height: 1.6rem;
   display: block;
+}
+
+.brand-blade-svg {
+  overflow: visible;
 }
 
 .brand-fan {

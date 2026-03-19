@@ -831,13 +831,19 @@ function App() {
           aria-label="Argue home"
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
         >
-          <svg className="brand-favicon-logo" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <g transform="translate(4, 16) scale(0.82)">
-              <path transform="rotate(-30)" d="M0 0L23 -5V5L0 0Z" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round"/>
-              <path d="M0 0L23 -5V5L0 0Z" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round"/>
-              <path transform="rotate(30)" d="M0 0L23 -5V5L0 0Z" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round"/>
-            </g>
-          </svg>
+          <span className="brand-mark" aria-hidden="true">
+            <span className="brand-fan">
+              <svg className="brand-blade brand-blade-left brand-blade-svg" viewBox="-1 -6 25 12" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0 0L23 -5V5L0 0Z" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round" />
+              </svg>
+              <svg className="brand-blade brand-blade-center brand-blade-svg" viewBox="-1 -6 25 12" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0 0L23 -5V5L0 0Z" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round" />
+              </svg>
+              <svg className="brand-blade brand-blade-right brand-blade-svg" viewBox="-1 -6 25 12" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0 0L23 -5V5L0 0Z" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round" />
+              </svg>
+            </span>
+          </span>
         </button>
 
         <nav className="nav" aria-label="Primary navigation">
