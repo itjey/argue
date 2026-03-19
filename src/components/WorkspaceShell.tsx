@@ -13,8 +13,8 @@ interface WorkspaceShellProps {
 }
 
 const WORKSPACE_TABS: { id: WorkspaceId; label: string; Icon: ComponentType<{ size?: number; strokeWidth?: number }> }[] = [
-  { id: 'debate', label: 'Debate', Icon: Swords },
   { id: 'chat', label: 'Chat', Icon: MessageSquare },
+  { id: 'debate', label: 'Debate', Icon: Swords },
   { id: 'latex', label: 'LaTeX', Icon: FileText },
 ]
 
