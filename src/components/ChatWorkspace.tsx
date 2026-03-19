@@ -17,7 +17,9 @@ import {
   type OpenRouterModelStatsEntry,
 } from '../lib/openrouterStats'
 import { ModelStatsPanel } from './ModelStatsPanel'
+import { syncUserProfile } from '../lib/firebase'
 import { OPENROUTER_KEY_STORAGE } from '../lib/openrouterStorage'
+import { isServerManagedOpenRouter } from '../lib/runtimeConfig'
 
 const SYSTEM_PROMPT = `You are a helpful assistant. Format your responses using Markdown.
 
@@ -31,7 +33,7 @@ Formatting rules:
 Keep responses clear and well-structured.`
 
 interface ChatWorkspaceProps {
-  currentUser?: User
+  currentUser: User | null
 }
 
 interface AttachedFile {
@@ -132,7 +134,7 @@ function normalizeReasoningText(text: string): string {
   return text.replace(/([^\n])(\*\*[A-Z][^*\n]{0,80}\*\*)/g, '$1\n\n$2')
 }
 
-export function ChatWorkspace(_props: ChatWorkspaceProps) {
+export function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [prompt, setPrompt] = useState('')
   const [listening, setListening] = useState(false)
@@ -166,6 +168,7 @@ export function ChatWorkspace(_props: ChatWorkspaceProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null)
   const abortedRef = useRef(false)
+  const serverManagedOpenRouter = isServerManagedOpenRouter()
 
   useEffect(() => {
     fetchOpenRouterModels().then((list) => setModels(list)).catch(() => {})
@@ -258,13 +261,27 @@ export function ChatWorkspace(_props: ChatWorkspaceProps) {
 
   async function runStream(historyBefore: ChatMessage[], userMsg: ChatMessage) {
     const apiKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
-    if (!apiKey.trim() || !selectedModel) {
+
+    if (serverManagedOpenRouter && !currentUser) {
       setMessages((prev) => [...prev, {
         id: crypto.randomUUID(), role: 'assistant',
-        content: !apiKey.trim() ? 'Please add your OpenRouter API key in Settings before chatting.' : 'Please select a model first.',
+        content: 'Sign in before chatting when server-managed OpenRouter is enabled.',
         error: true,
       }])
       return
+    }
+
+    if ((!serverManagedOpenRouter && !apiKey.trim()) || !selectedModel) {
+      setMessages((prev) => [...prev, {
+        id: crypto.randomUUID(), role: 'assistant',
+        content: !selectedModel ? 'Please select a model first.' : 'Please add your OpenRouter API key in Settings before chatting.',
+        error: true,
+      }])
+      return
+    }
+
+    if (currentUser) {
+      await syncUserProfile(currentUser).catch(() => undefined)
     }
 
     const style = getReasoningStyle(selectedModel)
@@ -411,156 +428,158 @@ export function ChatWorkspace(_props: ChatWorkspaceProps) {
       )}
 
       <div className={`prompt-page${hasMessages ? ' prompt-page-chat' : ''}`}>
-        {hasMessages && (
-          <div className="chat-container" ref={chatContainerRef}>
-            {messages.map((msg) => {
-              const hasReasoningTrace = Boolean(msg.reasoning?.trim())
-              const isThinkingExpanded = hasReasoningTrace && expandedThinking.has(msg.id)
-              return (
-                <div key={msg.id} className={`chat-row chat-row-${msg.role}`}>
-                  <div className={`chat-bubble chat-bubble-${msg.role}${msg.error ? ' chat-bubble-error' : ''}`}>
-                    {msg.role === 'user' && msg.attachments && msg.attachments.length > 0 && (
-                      <div className="chat-attachments">
-                        {msg.attachments.map((a) => (
-                          <div key={a.id} className="chat-attachment-pill">
-                            {a.mimeType.startsWith('image/') ? (<img src={a.dataUrl} alt={a.name} className="chat-attachment-thumb" />) : (<Paperclip size={11} />)}
-                            <span>{a.name}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {msg.role === 'assistant' ? (
-                      <div className="chat-markdown">
-                        {msg.isReasoningModel && (
-                          <div className="chat-thinking-row">
-                            <button className={`chat-thinking-toggle${hasReasoningTrace ? '' : ' chat-thinking-toggle-disabled'}`} type="button" disabled={!hasReasoningTrace} aria-expanded={isThinkingExpanded} onClick={() => toggleThinking(msg.id)}>
-                              {msg.streaming && !msg.content && !msg.reasoning ? (<span className="chat-thinking-pulse">Thinking…</span>) : msg.stoppedThinking ? (<span className="chat-thinking-stopped">Stopped thinking</span>) : msg.thinkingDuration != null ? (<span>Thought for {Math.round(msg.thinkingDuration / 1000)}s</span>) : msg.streaming ? (<span className="chat-thinking-pulse">Thinking…</span>) : (<span>Thoughts</span>)}
-                            </button>
-                            {isThinkingExpanded && (<div className="chat-thinking-content"><MarkdownBlock>{normalizeReasoningText(msg.reasoning ?? '')}</MarkdownBlock></div>)}
-                          </div>
-                        )}
-                        <MarkdownBlock>{msg.content}</MarkdownBlock>
-                      </div>
-                    ) : (<p className="chat-user-text">{msg.content}</p>)}
-                  </div>
-                  <div className={`chat-actions chat-actions-${msg.role}`}>
-                    <button className={`chat-action-btn${copiedId === msg.id ? ' chat-action-btn-done' : ''}`} type="button" onClick={() => copyMessage(msg.id, msg.content)} aria-label="Copy" title="Copy">
-                      {copiedId === msg.id ? <Check size={13} /> : <Copy size={13} />}
-                    </button>
-                    {msg.role === 'user' && !streaming && (
-                      <button className="chat-action-btn" type="button" onClick={() => startEdit(msg)} aria-label="Edit" title="Edit & resend"><Pencil size={13} /></button>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        <div className={`prompt-center${hasMessages ? ' prompt-center-sticky' : ''}`}>
-          <div className="prompt-box">
-            {attachments.length > 0 && (
-              <div className="prompt-attachments">
-                {attachments.map((a) => (
-                  <div key={a.id} className="prompt-attachment-pill">
-                    {a.mimeType.startsWith('image/') ? (<img src={a.dataUrl} alt={a.name} className="prompt-attachment-thumb" />) : (<Paperclip size={12} />)}
-                    <span>{a.name}</span>
-                    <button type="button" onClick={() => removeAttachment(a.id)} aria-label="Remove"><X size={11} /></button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <textarea ref={textareaRef} className="prompt-textarea" placeholder={editingId ? 'Edit your message…' : 'Ask anything…'} value={prompt} rows={1} onChange={(e) => { setPrompt(e.target.value); autoResize() }} onKeyDown={handleKeyDown} spellCheck={false} />
-
-            <div className="prompt-actions">
-              <div className="prompt-actions-left">
-                <input ref={fileInputRef} type="file" accept="image/*,.pdf,.txt,.md,.csv" multiple style={{ display: 'none' }} onChange={handleFileChange} />
-
-                <button className={`prompt-pill-btn${!supportsFiles ? ' prompt-pill-btn-disabled' : ''}`} type="button" disabled={!supportsFiles} onClick={() => supportsFiles && fileInputRef.current?.click()} title={supportsFiles ? 'Attach file' : 'Select a multimodal model to attach files'}>
-                  <Paperclip size={15} /><span>Attach</span>
-                </button>
-
-                <div className="model-selector" ref={modelDropRef}>
-                  <button className="model-selector-trigger" type="button" onClick={() => setModelOpen((o) => !o)}>
-                    <span className="model-selector-name">{selectedModel ? selectedModel.name : 'Search models'}</span>
-                    <ChevronDown size={13} className={`model-selector-chevron${modelOpen ? ' model-selector-chevron-open' : ''}`} />
-                  </button>
-                  {modelOpen && (
-                    <div className="model-dropdown">
-                      <div className="model-search-wrap">
-                        <Search size={13} className="model-search-icon" />
-                        <input ref={modelSearchRef} className="model-search-input" placeholder="Search models…" value={modelSearch} onChange={(e) => setModelSearch(e.target.value)} spellCheck={false} />
-                      </div>
-                      <div className="model-list">
-                        {filteredModels.length === 0 && <p className="model-list-empty">No models found</p>}
-                        {groupedModels.map((group) => (
-                          <div key={group.key} className="model-list-group">
-                            <p className="model-list-group-label">{group.label}</p>
-                            {group.models.map((m) => {
-                              const webSearchProfile = getWebSearchModelProfile(m)
-                              return (
-                                <div key={m.id} className={`model-list-item${selectedModel?.id === m.id ? ' model-list-item-active' : ''}`}>
-                                  <button className="model-list-select" type="button" onClick={() => { setSelectedModel(m); setModelOpen(false); setModelSearch(''); if (!isMultimodal(m)) setAttachments([]) }}>
-                                    <span className="model-list-name">{m.name}</span>
-                                    <span className="model-list-id">{m.id}</span>
-                                    <div className="model-list-badges">
-                                      {webSearchProfile.supported && (<span className={`model-list-badge${webSearchProfile.category === 'free' ? ' model-list-badge-free' : ' model-list-badge-metered'}`}>{webSearchProfile.priceLabel}</span>)}
-                                    </div>
-                                  </button>
-                                  <button className="model-list-info-btn" type="button" onClick={(e) => openInfoPanel(e, m)} aria-label={`Info for ${m.name}`}><Info size={13} /></button>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        ))}
-                      </div>
+        <div className="prompt-chat-shell">
+          {hasMessages && (
+            <div className="chat-container" ref={chatContainerRef}>
+              {messages.map((msg) => {
+                const hasReasoningTrace = Boolean(msg.reasoning?.trim())
+                const isThinkingExpanded = hasReasoningTrace && expandedThinking.has(msg.id)
+                return (
+                  <div key={msg.id} className={`chat-row chat-row-${msg.role}`}>
+                    <div className={`chat-bubble chat-bubble-${msg.role}${msg.error ? ' chat-bubble-error' : ''}`}>
+                      {msg.role === 'user' && msg.attachments && msg.attachments.length > 0 && (
+                        <div className="chat-attachments">
+                          {msg.attachments.map((a) => (
+                            <div key={a.id} className="chat-attachment-pill">
+                              {a.mimeType.startsWith('image/') ? (<img src={a.dataUrl} alt={a.name} className="chat-attachment-thumb" />) : (<Paperclip size={11} />)}
+                              <span>{a.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {msg.role === 'assistant' ? (
+                        <div className="chat-markdown">
+                          {msg.isReasoningModel && (
+                            <div className="chat-thinking-row">
+                              <button className={`chat-thinking-toggle${hasReasoningTrace ? '' : ' chat-thinking-toggle-disabled'}`} type="button" disabled={!hasReasoningTrace} aria-expanded={isThinkingExpanded} onClick={() => toggleThinking(msg.id)}>
+                                {msg.streaming && !msg.content && !msg.reasoning ? (<span className="chat-thinking-pulse">Thinking…</span>) : msg.stoppedThinking ? (<span className="chat-thinking-stopped">Stopped thinking</span>) : msg.thinkingDuration != null ? (<span>Thought for {Math.round(msg.thinkingDuration / 1000)}s</span>) : msg.streaming ? (<span className="chat-thinking-pulse">Thinking…</span>) : (<span>Thoughts</span>)}
+                              </button>
+                              {isThinkingExpanded && (<div className="chat-thinking-content"><MarkdownBlock>{normalizeReasoningText(msg.reasoning ?? '')}</MarkdownBlock></div>)}
+                            </div>
+                          )}
+                          <MarkdownBlock>{msg.content}</MarkdownBlock>
+                        </div>
+                      ) : (<p className="chat-user-text">{msg.content}</p>)}
                     </div>
+                    <div className={`chat-actions chat-actions-${msg.role}`}>
+                      <button className={`chat-action-btn${copiedId === msg.id ? ' chat-action-btn-done' : ''}`} type="button" onClick={() => copyMessage(msg.id, msg.content)} aria-label="Copy" title="Copy">
+                        {copiedId === msg.id ? <Check size={13} /> : <Copy size={13} />}
+                      </button>
+                      {msg.role === 'user' && !streaming && (
+                        <button className="chat-action-btn" type="button" onClick={() => startEdit(msg)} aria-label="Edit" title="Edit & resend"><Pencil size={13} /></button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          <div className={`prompt-center${hasMessages ? ' prompt-center-sticky' : ''}`}>
+            <div className="prompt-box">
+              {attachments.length > 0 && (
+                <div className="prompt-attachments">
+                  {attachments.map((a) => (
+                    <div key={a.id} className="prompt-attachment-pill">
+                      {a.mimeType.startsWith('image/') ? (<img src={a.dataUrl} alt={a.name} className="prompt-attachment-thumb" />) : (<Paperclip size={12} />)}
+                      <span>{a.name}</span>
+                      <button type="button" onClick={() => removeAttachment(a.id)} aria-label="Remove"><X size={11} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <textarea ref={textareaRef} className="prompt-textarea" placeholder={editingId ? 'Edit your message…' : 'Ask anything…'} value={prompt} rows={1} onChange={(e) => { setPrompt(e.target.value); autoResize() }} onKeyDown={handleKeyDown} spellCheck={false} />
+
+              <div className="prompt-actions">
+                <div className="prompt-actions-left">
+                  <input ref={fileInputRef} type="file" accept="image/*,.pdf,.txt,.md,.csv" multiple style={{ display: 'none' }} onChange={handleFileChange} />
+
+                  <button className={`prompt-pill-btn${!supportsFiles ? ' prompt-pill-btn-disabled' : ''}`} type="button" disabled={!supportsFiles} onClick={() => supportsFiles && fileInputRef.current?.click()} title={supportsFiles ? 'Attach file' : 'Select a multimodal model to attach files'}>
+                    <Paperclip size={15} /><span>Attach</span>
+                  </button>
+
+                  <div className="model-selector" ref={modelDropRef}>
+                    <button className="model-selector-trigger" type="button" onClick={() => setModelOpen((o) => !o)}>
+                      <span className="model-selector-name">{selectedModel ? selectedModel.name : 'Search models'}</span>
+                      <ChevronDown size={13} className={`model-selector-chevron${modelOpen ? ' model-selector-chevron-open' : ''}`} />
+                    </button>
+                    {modelOpen && (
+                      <div className="model-dropdown">
+                        <div className="model-search-wrap">
+                          <Search size={13} className="model-search-icon" />
+                          <input ref={modelSearchRef} className="model-search-input" placeholder="Search models…" value={modelSearch} onChange={(e) => setModelSearch(e.target.value)} spellCheck={false} />
+                        </div>
+                        <div className="model-list">
+                          {filteredModels.length === 0 && <p className="model-list-empty">No models found</p>}
+                          {groupedModels.map((group) => (
+                            <div key={group.key} className="model-list-group">
+                              <p className="model-list-group-label">{group.label}</p>
+                              {group.models.map((m) => {
+                                const webSearchProfile = getWebSearchModelProfile(m)
+                                return (
+                                  <div key={m.id} className={`model-list-item${selectedModel?.id === m.id ? ' model-list-item-active' : ''}`}>
+                                    <button className="model-list-select" type="button" onClick={() => { setSelectedModel(m); setModelOpen(false); setModelSearch(''); if (!isMultimodal(m)) setAttachments([]) }}>
+                                      <span className="model-list-name">{m.name}</span>
+                                      <span className="model-list-id">{m.id}</span>
+                                      <div className="model-list-badges">
+                                        {webSearchProfile.supported && (<span className={`model-list-badge${webSearchProfile.category === 'free' ? ' model-list-badge-free' : ' model-list-badge-metered'}`}>{webSearchProfile.priceLabel}</span>)}
+                                      </div>
+                                    </button>
+                                    <button className="model-list-info-btn" type="button" onClick={(e) => openInfoPanel(e, m)} aria-label={`Info for ${m.name}`}><Info size={13} /></button>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {(reasoningStyle === 'effort' || reasoningStyle === 'include') && (
+                    <div className="model-selector effort-selector" ref={effortDropRef}>
+                      <button className="model-selector-trigger" type="button" onClick={() => reasoningStyle === 'effort' && setEffortOpen((o) => !o)} title="Reasoning depth">
+                        <span className="model-selector-name">{reasoningStyle === 'include' ? 'Thinking' : (EFFORT_LEVELS.find((e) => e.value === reasoningEffort)?.label ?? 'Thinking')}</span>
+                        {reasoningStyle === 'effort' && <ChevronDown size={13} className={`model-selector-chevron${effortOpen ? ' model-selector-chevron-open' : ''}`} />}
+                      </button>
+                      {effortOpen && reasoningStyle === 'effort' && (
+                        <div className="effort-dropdown">
+                          {EFFORT_LEVELS.map((level) => (
+                            <div key={level.value} className={`effort-option${reasoningEffort === level.value ? ' effort-option-active' : ''}`}>
+                              <button type="button" className="effort-option-select" onClick={() => { setReasoningEffort(level.value); setEffortOpen(false) }}>
+                                <span className="effort-option-label">{level.label}</span>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {supportsWebSearch && (
+                    <button className={`prompt-pill-btn${webSearchEnabled ? ' prompt-pill-btn-active' : ''}`} type="button" onClick={() => setWebSearchEnabled((v) => !v)} title={selectedWebSearchProfile.priceLabel}>
+                      <Search size={15} /><span>{webSearchEnabled ? 'Web on' : 'Web off'}</span>
+                    </button>
                   )}
                 </div>
 
-                {(reasoningStyle === 'effort' || reasoningStyle === 'include') && (
-                  <div className="model-selector effort-selector" ref={effortDropRef}>
-                    <button className="model-selector-trigger" type="button" onClick={() => reasoningStyle === 'effort' && setEffortOpen((o) => !o)} title="Reasoning depth">
-                      <span className="model-selector-name">{reasoningStyle === 'include' ? 'Thinking' : (EFFORT_LEVELS.find((e) => e.value === reasoningEffort)?.label ?? 'Thinking')}</span>
-                      {reasoningStyle === 'effort' && <ChevronDown size={13} className={`model-selector-chevron${effortOpen ? ' model-selector-chevron-open' : ''}`} />}
-                    </button>
-                    {effortOpen && reasoningStyle === 'effort' && (
-                      <div className="effort-dropdown">
-                        {EFFORT_LEVELS.map((level) => (
-                          <div key={level.value} className={`effort-option${reasoningEffort === level.value ? ' effort-option-active' : ''}`}>
-                            <button type="button" className="effort-option-select" onClick={() => { setReasoningEffort(level.value); setEffortOpen(false) }}>
-                              <span className="effort-option-label">{level.label}</span>
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {supportsWebSearch && (
-                  <button className={`prompt-pill-btn${webSearchEnabled ? ' prompt-pill-btn-active' : ''}`} type="button" onClick={() => setWebSearchEnabled((v) => !v)} title={selectedWebSearchProfile.priceLabel}>
-                    <Search size={15} /><span>{webSearchEnabled ? 'Web on' : 'Web off'}</span>
+                <div className="prompt-actions-right">
+                  <button className={`prompt-mic${listening ? ' prompt-mic-active' : ''}`} type="button" onClick={toggleVoice} aria-label={listening ? 'Stop recording' : 'Start voice input'}><Mic size={18} /></button>
+                  <button className={`prompt-submit${streaming ? ' prompt-submit-active' : (prompt.trim() || attachments.length > 0) ? ' prompt-submit-active' : ''}`} type="button" disabled={!streaming && !prompt.trim() && attachments.length === 0} onClick={streaming ? stopStream : handleSubmit} aria-label={streaming ? 'Stop' : 'Submit'}>
+                    {streaming ? <Square size={14} fill="currentColor" /> : <ArrowUp size={18} />}
                   </button>
-                )}
-              </div>
-
-              <div className="prompt-actions-right">
-                <button className={`prompt-mic${listening ? ' prompt-mic-active' : ''}`} type="button" onClick={toggleVoice} aria-label={listening ? 'Stop recording' : 'Start voice input'}><Mic size={18} /></button>
-                <button className={`prompt-submit${streaming ? ' prompt-submit-active' : (prompt.trim() || attachments.length > 0) ? ' prompt-submit-active' : ''}`} type="button" disabled={!streaming && !prompt.trim() && attachments.length === 0} onClick={streaming ? stopStream : handleSubmit} aria-label={streaming ? 'Stop' : 'Submit'}>
-                  {streaming ? <Square size={14} fill="currentColor" /> : <ArrowUp size={18} />}
-                </button>
+                </div>
               </div>
             </div>
-          </div>
 
-          {editingId && (
-            <p className="prompt-edit-notice">
-              Editing — submit to replace &amp; resend
-              <button type="button" className="prompt-edit-cancel" onClick={() => { setEditingId(null); setPrompt('') }}>Cancel</button>
-            </p>
-          )}
+            {editingId && (
+              <p className="prompt-edit-notice">
+                Editing — submit to replace &amp; resend
+                <button type="button" className="prompt-edit-cancel" onClick={() => { setEditingId(null); setPrompt('') }}>Cancel</button>
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </>

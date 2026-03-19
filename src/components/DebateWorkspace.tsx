@@ -37,7 +37,7 @@ Formatting rules:
 Keep responses clear and well-structured.`
 
 interface DebateWorkspaceProps {
-  currentUser: User
+  currentUser: User | null
 }
 
 interface AttachedFile {

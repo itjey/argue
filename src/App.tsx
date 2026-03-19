@@ -886,7 +886,7 @@ function App() {
 
         <main className={`page${workspaceVisible ? ' page-workspace' : ''}`} id="top">
         {workspaceVisible ? (
-          <WorkspaceShell currentUser={currentUser!} />
+          <WorkspaceShell currentUser={currentUser} />
         ) : (
           <>
         <section className="hero section" id="concept">

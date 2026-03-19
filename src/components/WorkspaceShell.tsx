@@ -8,7 +8,7 @@ import { LatexWorkspacePanel } from './LatexWorkspacePanel'
 type WorkspaceId = 'debate' | 'chat' | 'latex'
 
 interface WorkspaceShellProps {
-  currentUser: User
+  currentUser: User | null
 }
 
 const WORKSPACE_TABS: { id: WorkspaceId; icon: typeof Swords; label: string }[] = [
@@ -29,7 +29,7 @@ Write your content here.
 \\end{document}`
 
 function WorkspaceShell({ currentUser }: WorkspaceShellProps) {
-  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceId>('debate')
+  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceId>(currentUser ? 'debate' : 'chat')
 
   return (
     <div className="workspace-shell-layout">
