@@ -277,6 +277,12 @@
   text-align: inherit;
 }
 
+.topbar-account-copy small.topbar-account-warning,
+.topbar-account-copy small.topbar-api-key-warning {
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
 .topbar-account-warning {
   color: #f97316;
   font-size: 0.66rem;
