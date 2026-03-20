@@ -5186,7 +5186,7 @@
 
 /* Space between conversation pairs (user -> assistant = small gap, assistant -> user = larger gap) */
 .chat-row-user {
-  align-items: flex-start;
+  align-items: flex-end;
   margin-top: 1rem;
 }
 
@@ -5200,14 +5200,7 @@
   margin-top: 0.15rem;
 }
 
-.chat-row-label {
-  margin: 0 0 0.3rem;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.3);
-}
+
 
 .chat-bubble {
   max-width: 100%;
