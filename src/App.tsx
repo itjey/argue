@@ -566,6 +566,7 @@ function App() {
       setBusyAction(null)
     } catch (error) {
       const fbErr = error as FirebaseError
+      console.error('[Auth] Google sign-in error:', fbErr.code, fbErr.message)
       if (fbErr.code === 'auth/account-exists-with-different-credential') {
         const credential = GoogleAuthProvider.credentialFromError(fbErr) as OAuthCredential | null
         const conflictEmail = String(fbErr.customData?.email ?? '').trim()
@@ -576,7 +577,11 @@ function App() {
         setAuthMode('sign-in')
         setAuthDialogOpen(true)
         setStatusMessage('Google found an existing account for this email. Sign in with the matching method first.')
-      } else if (fbErr.code !== 'auth/popup-closed-by-user' && fbErr.code !== 'auth/cancelled-popup-request') {
+      } else if (fbErr.code === 'auth/popup-closed-by-user' || fbErr.code === 'auth/cancelled-popup-request') {
+        setErrorMessage('The Google sign-in popup was closed before completing. Please try again, and allow the popup to finish.')
+      } else if (fbErr.code === 'auth/popup-blocked') {
+        setErrorMessage('The browser blocked the Google sign-in popup. Please allow popups for this site and try again.')
+      } else {
         setErrorMessage(formatAuthError(fbErr))
       }
       setBusyAction(null)

@@ -1,24 +1,17 @@
-/* coi-serviceworker — adds COEP header for cross-origin resource loading */
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
-
-self.addEventListener('fetch', e => {
-  if (e.request.cache === 'only-if-cached' && e.request.mode !== 'same-origin') return;
-  if (e.request.url.startsWith('chrome-extension://')) return;
-
-  e.respondWith(
-    fetch(e.request).then(res => {
-      if (!res || res.status === 0 || !res.url.startsWith('http')) return res;
-      const h = new Headers(res.headers);
-      // Only set COEP; intentionally omit COOP so that Firebase Auth
-      // signInWithPopup can communicate across the popup boundary.
-      // SharedArrayBuffer (crossOriginIsolated) requires COOP too, but
-      // GitHub Pages cannot serve real HTTP headers and injecting COOP
-      // via a service worker breaks popup-based OAuth flows.  The Python
-      // runner already falls back to main-thread Pyodide when
-      // crossOriginIsolated is false.
-      h.set('Cross-Origin-Embedder-Policy', 'credentialless');
-      return new Response(res.body, { status: res.status, statusText: res.statusText, headers: h });
-    }).catch(() => fetch(e.request))
+/* This service worker intentionally unregisters itself.
+   A previous version injected COOP headers that broke Firebase Auth popups.
+   Keeping this file ensures the browser fetches it, detects the change,
+   and activates the self-destruct version for anyone who still has the
+   old SW cached. */
+self.addEventListener('install', () => {
+  self.skipWaiting();
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    self.registration.unregister().then(() => {
+      return self.clients.matchAll({ type: 'window' });
+    }).then(clients => {
+      for (const client of clients) client.navigate(client.url);
+    })
   );
 });

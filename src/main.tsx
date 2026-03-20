@@ -4,14 +4,18 @@ import 'katex/dist/katex.min.css'
 import './index.css'
 import App from './App.tsx'
 
-// Register the COI service worker for COEP headers.
-// COOP is intentionally omitted so Firebase Auth popup sign-in works.
-// The Python runner gracefully falls back to main-thread Pyodide when
-// crossOriginIsolated is unavailable.
+// Unregister any previously installed COI service worker.
+// An older version injected Cross-Origin-Opener-Policy headers that break
+// Firebase Auth's signInWithPopup (popup can't postMessage back to opener).
+// The Python runner's prompt()-based fallback works fine without it.
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker
-    .register(import.meta.env.BASE_URL + 'coi-serviceworker.js')
-    .catch(e => console.warn('[COI-SW] failed:', e))
+  navigator.serviceWorker.getRegistrations().then(registrations => {
+    for (const reg of registrations) {
+      reg.unregister().then(ok => {
+        if (ok) console.info('[SW] unregistered', reg.scope)
+      })
+    }
+  })
 }
 
 createRoot(document.getElementById('root')!).render(
