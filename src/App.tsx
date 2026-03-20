@@ -913,7 +913,7 @@ function App() {
         </button>
       </header>
 
-        <main className={`page${workspaceVisible && !pricingOpen ? ' page-workspace' : ''}${pricingOpen ? ' page-pricing' : ''}`} id="top">
+        <main className={`page${workspaceVisible && !pricingOpen ? ' page-workspace' : ''}${pricingOpen ? ' page-pricing' : ''}${!workspaceVisible && !pricingOpen ? ' page-home' : ''}`} id="top">
         {pricingOpen ? (
           <PricingPage onClose={() => setPricingOpen(false)} />
         ) : workspaceVisible ? (
