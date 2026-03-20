@@ -5,13 +5,14 @@ import {
   confirmPasswordReset,
   createUserWithEmailAndPassword,
   EmailAuthProvider,
+  getRedirectResult,
   GoogleAuthProvider,
   linkWithCredential,
   onAuthStateChanged,
   reload,
   sendEmailVerification,
   signInWithEmailAndPassword,
-  signInWithPopup,
+  signInWithRedirect,
   signOut,
   type OAuthCredential,
   type User,
@@ -327,6 +328,31 @@ function App() {
     return unsubscribe
   }, [])
 
+  // Process Google redirect result after returning from accounts.google.com
+  useEffect(() => {
+    getRedirectResult(auth).then((result) => {
+      if (!result) return
+      // onAuthStateChanged already handles setting currentUser;
+      // just close the dialog and clean up pending link state.
+      setPendingGoogleLink(null)
+      resetCredentialForms()
+      setAuthDialogOpen(false)
+    }).catch((err: FirebaseError) => {
+      if (err.code === 'auth/account-exists-with-different-credential') {
+        const credential = GoogleAuthProvider.credentialFromError(err) as OAuthCredential | null
+        const conflictEmail = String(err.customData?.email ?? '').trim()
+        if (credential && conflictEmail) {
+          setPendingGoogleLink({ credential, email: conflictEmail })
+          setAuthEmail(conflictEmail)
+        }
+        setAuthMode('sign-in')
+        setAuthDialogOpen(true)
+        setStatusMessage('Google found an existing account for this email. Sign in with the matching method first.')
+      }
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => {
     lastScrollYRef.current = window.scrollY
     topbarHiddenRef.current = false
@@ -551,38 +577,13 @@ function App() {
   async function handleGoogleSignIn() {
     clearFeedback()
     setBusyAction('google')
-
     try {
       const provider = new GoogleAuthProvider()
       provider.setCustomParameters({ prompt: 'select_account' })
-      const result = await signInWithPopup(auth, provider)
-      await syncUserState(result.user, { lastAuthMethod: 'google' })
-      setPendingGoogleLink(null)
-      resetCredentialForms()
-      setAuthDialogOpen(false)
+      await signInWithRedirect(auth, provider)
+      // Page navigates away — result handled by getRedirectResult effect on return.
     } catch (error) {
-      const firebaseError = error as FirebaseError
-
-      if (firebaseError.code === 'auth/account-exists-with-different-credential') {
-        const credential = GoogleAuthProvider.credentialFromError(
-          firebaseError,
-        ) as OAuthCredential | null
-        const conflictEmail = String(firebaseError.customData?.email ?? '').trim()
-
-        if (credential && conflictEmail) {
-          setPendingGoogleLink({ credential, email: conflictEmail })
-          setAuthEmail(conflictEmail)
-        }
-
-        setAuthMode('sign-in')
-        setAuthDialogOpen(true)
-        setStatusMessage(
-          'Google found an existing account for this email. Sign in with the matching email account first and Argue will merge Google into it.',
-        )
-      } else {
-        setErrorMessage(formatAuthError(firebaseError))
-      }
-    } finally {
+      setErrorMessage(formatAuthError(error as FirebaseError))
       setBusyAction(null)
     }
   }
