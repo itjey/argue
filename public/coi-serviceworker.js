@@ -10,7 +10,10 @@ self.addEventListener('fetch', e => {
     fetch(e.request).then(res => {
       if (!res || res.status === 0 || !res.url.startsWith('http')) return res;
       const h = new Headers(res.headers);
-      h.set('Cross-Origin-Opener-Policy', 'same-origin');
+      // Use restrict-properties instead of same-origin so Firebase Auth
+      // popups (signInWithPopup) can still postMessage back to the opener
+      // while keeping crossOriginIsolated enabled for SharedArrayBuffer.
+      h.set('Cross-Origin-Opener-Policy', 'restrict-properties');
       h.set('Cross-Origin-Embedder-Policy', 'credentialless');
       return new Response(res.body, { status: res.status, statusText: res.statusText, headers: h });
     }).catch(() => fetch(e.request))

@@ -10,7 +10,19 @@ import App from './App.tsx'
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker
     .register(import.meta.env.BASE_URL + 'coi-serviceworker.js')
-    .then(() => { if (!crossOriginIsolated) location.reload() })
+    .then(() => {
+      if (!crossOriginIsolated) {
+        // Guard against infinite reload if the browser does not support
+        // COOP restrict-properties (the value used by the service worker).
+        const key = '__coi_reload'
+        if (!sessionStorage.getItem(key)) {
+          sessionStorage.setItem(key, '1')
+          location.reload()
+        }
+      } else {
+        sessionStorage.removeItem('__coi_reload')
+      }
+    })
     .catch(e => console.warn('[COI-SW] failed:', e))
 }
 
