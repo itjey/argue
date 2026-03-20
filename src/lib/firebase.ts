@@ -8,13 +8,12 @@ import {
 import { doc, getDoc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore'
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyB8h5iGdtNu5C2BdBWh8x4NtAtvlVjs0p8',
-  authDomain: 'cloak-df1d8.firebaseapp.com',
-  projectId: 'cloak-df1d8',
-  storageBucket: 'cloak-df1d8.firebasestorage.app',
-  messagingSenderId: '127027902817',
-  appId: '1:127027902817:web:f5cf0f56da880c1d68ed20',
-  measurementId: 'G-9LDMTZ1WC0',
+  apiKey: 'AIzaSyAqHQ46s488VGbZpmTZetnLTyzDLemJFEU',
+  authDomain: 'argue-app-2026.firebaseapp.com',
+  projectId: 'argue-app-2026',
+  storageBucket: 'argue-app-2026.firebasestorage.app',
+  messagingSenderId: '589955566087',
+  appId: '1:589955566087:web:023ddc973e2c4b48ad78a2',
 }
 
 const app = initializeApp(firebaseConfig)
