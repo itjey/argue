@@ -4355,7 +4355,7 @@
   grid-template-columns: 240px minmax(0, 1fr);
   align-items: stretch;
   justify-items: stretch;
-  height: calc(100vh - 56px);
+  height: 100%;
   padding: 0;
   overflow: hidden;
 }
@@ -6922,7 +6922,7 @@
 
 .debate-workspace-layout {
   display: flex;
-  height: calc(100vh - 56px);
+  height: 100%;
   overflow: hidden;
 }
 
@@ -6968,7 +6968,7 @@
 .debate-config-rail {
   width: 300px;
   min-width: 300px;
-  height: calc(100vh - 56px);
+  height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
   background: #141414;
