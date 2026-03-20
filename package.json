@@ -8,11 +8,17 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "preview": "vite preview",
     "start": "node server/index.mjs",
     "refresh:openrouter-stats": "node scripts/fetch-openrouter-stats.mjs",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "debug": "node scripts/debug.mjs health:check",
+    "debug:env": "node scripts/debug.mjs inspect:env",
+    "debug:build": "node scripts/debug.mjs inspect:build",
+    "debug:network": "node scripts/debug.mjs inspect:network",
+    "validate:deploy": "node scripts/validate-deploy.mjs"
   },
   "dependencies": {
     "firebase": "^12.10.0",
