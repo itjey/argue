@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ArrowLeft, Loader2 } from 'lucide-react'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -60,9 +60,47 @@ export function PricingPage({ onClose }: { onClose: () => void }) {
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly')
   const [custom, setCustom] = useState(false)
   const [customMonthly, setCustomMonthly] = useState(50)
+  const [loadingAmount, setLoadingAmount] = useState<number | null>(null)
+  const [stripeEnabled, setStripeEnabled] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/health')
+      .then((r) => r.json())
+      .then((data) => { if (data?.stripeEnabled) setStripeEnabled(true) })
+      .catch(() => {})
+  }, [])
 
   const isAnnual = billing === 'annual'
   const discount = isAnnual ? ANNUAL_DISCOUNT : 0
+
+  async function startCheckout(monthly: number) {
+    setLoadingAmount(monthly)
+    try {
+      const amountCents = isAnnual
+        ? Math.round(monthly * (1 - ANNUAL_DISCOUNT) * 12 * 100)
+        : monthly * 100
+      const res = await fetch('/api/v1/stripe/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amountCents,
+          billing: isAnnual ? 'annual' : 'monthly',
+          successUrl: `${window.location.origin}/?payment=success`,
+          cancelUrl: `${window.location.origin}/?payment=cancelled`,
+        }),
+      })
+      const data = await res.json()
+      if (data?.url) {
+        window.location.href = data.url
+      } else {
+        alert(data?.error?.message ?? 'Something went wrong. Please try again.')
+      }
+    } catch {
+      alert('Could not connect to payment server. Please try again.')
+    } finally {
+      setLoadingAmount(null)
+    }
+  }
 
   const sliderPct = ((customMonthly - SLIDER_MIN) / (SLIDER_MAX - SLIDER_MIN)) * 100
   const customEffective = customMonthly * (1 - discount)
@@ -130,12 +168,18 @@ export function PricingPage({ onClose }: { onClose: () => void }) {
                   <UsageRows creditsPerMonth={credits} />
 
                   <button
-                    className="pricing-plan-cta"
-                    disabled
-                    title="Payment integration coming soon"
+                    className={`pricing-plan-cta${!stripeEnabled ? ' pricing-plan-cta-disabled' : ''}`}
+                    disabled={!stripeEnabled || loadingAmount !== null}
                     type="button"
+                    onClick={() => stripeEnabled && startCheckout(monthly)}
                   >
-                    Get started · coming soon
+                    {loadingAmount === monthly ? (
+                      <><Loader2 size={14} className="pricing-cta-spinner" /> Redirecting…</>
+                    ) : stripeEnabled ? (
+                      'Get started'
+                    ) : (
+                      'Get started · coming soon'
+                    )}
                   </button>
                 </div>
               )
@@ -175,12 +219,18 @@ export function PricingPage({ onClose }: { onClose: () => void }) {
             <UsageRows creditsPerMonth={customCredits} />
 
             <button
-              className="pricing-plan-cta pricing-custom-cta"
-              disabled
-              title="Payment integration coming soon"
+              className={`pricing-plan-cta pricing-custom-cta${!stripeEnabled ? ' pricing-plan-cta-disabled' : ''}`}
+              disabled={!stripeEnabled || loadingAmount !== null}
               type="button"
+              onClick={() => stripeEnabled && startCheckout(customMonthly)}
             >
-              Get started · coming soon
+              {loadingAmount === customMonthly ? (
+                <><Loader2 size={14} className="pricing-cta-spinner" /> Redirecting…</>
+              ) : stripeEnabled ? (
+                'Get started'
+              ) : (
+                'Get started · coming soon'
+              )}
             </button>
           </div>
         )}

@@ -3,12 +3,15 @@ import { readFile } from 'node:fs/promises'
 import http from 'node:http'
 import { extname, join, normalize } from 'node:path'
 import { Readable } from 'node:stream'
+import Stripe from 'stripe'
 
 const PORT = Number(process.env.PORT ?? 3000)
 const DIST_DIR = join(process.cwd(), 'dist')
 const INDEX_HTML_PATH = join(DIST_DIR, 'index.html')
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1'
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY?.trim() ?? ''
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY?.trim() ?? ''
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET?.trim() ?? ''
 const DEFAULT_ALLOWED_ORIGINS = ['https://itjey.github.io', 'https://pro.gphmt.org']
 const ALLOWED_ORIGINS = new Set(
   (process.env.ALLOWED_ORIGINS ?? DEFAULT_ALLOWED_ORIGINS.join(','))
@@ -251,6 +254,107 @@ async function serveStaticAsset(pathname, response) {
   response.end(await readFile(INDEX_HTML_PATH))
 }
 
+async function handleStripeCheckout(request, response, corsHeaders) {
+  if (request.method === 'OPTIONS') {
+    response.writeHead(204, corsHeaders)
+    response.end()
+    return
+  }
+
+  if (request.method !== 'POST') {
+    writeJson(response, 405, { error: { message: 'Only POST allowed.' } }, corsHeaders)
+    return
+  }
+
+  if (!STRIPE_SECRET_KEY) {
+    writeJson(response, 503, { error: { message: 'Stripe is not configured on this server.' } }, corsHeaders)
+    return
+  }
+
+  let body
+  try {
+    const raw = await readRequestBody(request)
+    body = JSON.parse(raw.toString())
+  } catch {
+    writeJson(response, 400, { error: { message: 'Invalid JSON body.' } }, corsHeaders)
+    return
+  }
+
+  const { amountCents, billing, successUrl, cancelUrl } = body
+
+  if (!Number.isInteger(amountCents) || amountCents < 500) {
+    writeJson(response, 400, { error: { message: 'amountCents must be an integer >= 500.' } }, corsHeaders)
+    return
+  }
+
+  const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2025-01-27.acacia' })
+
+  try {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      mode: 'subscription',
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: { name: 'Argue Credits' },
+            unit_amount: amountCents,
+            recurring: { interval: billing === 'annual' ? 'year' : 'month' },
+          },
+          quantity: 1,
+        },
+      ],
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+    })
+
+    writeJson(response, 200, { url: session.url }, corsHeaders)
+  } catch (err) {
+    writeJson(response, 500, { error: { message: err instanceof Error ? err.message : 'Stripe error.' } }, corsHeaders)
+  }
+}
+
+async function handleStripeWebhook(request, response) {
+  if (request.method !== 'POST') {
+    response.writeHead(405)
+    response.end()
+    return
+  }
+
+  const raw = await readRequestBody(request)
+  const sig = request.headers['stripe-signature']
+
+  if (!STRIPE_WEBHOOK_SECRET || !sig) {
+    // No webhook secret configured — just acknowledge
+    response.writeHead(200)
+    response.end('ok')
+    return
+  }
+
+  const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2025-01-27.acacia' })
+
+  let event
+  try {
+    event = stripe.webhooks.constructEvent(raw, sig, STRIPE_WEBHOOK_SECRET)
+  } catch (err) {
+    response.writeHead(400)
+    response.end(`Webhook signature verification failed: ${err instanceof Error ? err.message : err}`)
+    return
+  }
+
+  // Handle relevant events
+  if (event.type === 'checkout.session.completed') {
+    // TODO: grant credits to the user in Firestore
+    // event.data.object contains the session, including customer_email
+    console.log('[stripe] checkout.session.completed', event.data.object.id)
+  } else if (event.type === 'customer.subscription.deleted') {
+    console.log('[stripe] subscription cancelled', event.data.object.id)
+  }
+
+  response.writeHead(200)
+  response.end('ok')
+}
+
 const server = http.createServer(async (request, response) => {
   try {
     if (!request.url) {
@@ -271,6 +375,16 @@ const server = http.createServer(async (request, response) => {
       return
     }
 
+    if (requestUrl.pathname === '/api/v1/stripe/create-checkout') {
+      await handleStripeCheckout(request, response, corsHeaders)
+      return
+    }
+
+    if (requestUrl.pathname === '/api/v1/stripe/webhook') {
+      await handleStripeWebhook(request, response)
+      return
+    }
+
     if (requestUrl.pathname === '/api/health') {
       writeJson(
         response,
@@ -278,6 +392,7 @@ const server = http.createServer(async (request, response) => {
         {
           ok: true,
           serverManagedOpenRouter: Boolean(OPENROUTER_API_KEY),
+          stripeEnabled: Boolean(STRIPE_SECRET_KEY),
         },
         corsHeaders,
       )

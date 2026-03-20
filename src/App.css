@@ -7678,7 +7678,8 @@
   text-underline-offset: 3px;
   cursor: pointer;
   transition: color 130ms ease;
-  text-align: left;
+  text-align: center;
+  align-self: center;
 }
 
 .pricing-custom-link:hover {
@@ -7690,6 +7691,18 @@
   font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.25);
   line-height: 1.55;
+  text-align: center;
+}
+
+@keyframes pricing-spin {
+  to { transform: rotate(360deg); }
+}
+
+.pricing-cta-spinner {
+  animation: pricing-spin 0.7s linear infinite;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 0.3rem;
 }
 
 /* ── Appearance toggle (in AuthDialog) ──────────────────── */
