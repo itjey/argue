@@ -436,6 +436,7 @@ export function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                 const isThinkingExpanded = hasReasoningTrace && expandedThinking.has(msg.id)
                 return (
                   <div key={msg.id} className={`chat-row chat-row-${msg.role}`}>
+                    <p className="chat-row-label">{msg.role === 'user' ? 'You' : (selectedModel?.name ?? 'Assistant')}</p>
                     <div className={`chat-bubble chat-bubble-${msg.role}${msg.error ? ' chat-bubble-error' : ''}`}>
                       {msg.role === 'user' && msg.attachments && msg.attachments.length > 0 && (
                         <div className="chat-attachments">
