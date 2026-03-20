@@ -18,7 +18,12 @@
     "debug:env": "node scripts/debug.mjs inspect:env",
     "debug:build": "node scripts/debug.mjs inspect:build",
     "debug:network": "node scripts/debug.mjs inspect:network",
-    "validate:deploy": "node scripts/validate-deploy.mjs"
+    "validate:deploy": "node scripts/validate-deploy.mjs",
+    "coach": "node scripts/coach.mjs full-check",
+    "coach:full-check": "node scripts/coach.mjs full-check",
+    "coach:validate": "node scripts/coach.mjs validate-and-deploy",
+    "coach:debug": "node scripts/coach.mjs debug-issue",
+    "coach:build-test": "node scripts/coach.mjs build-and-test"
   },
   "dependencies": {
     "firebase": "^12.10.0",
