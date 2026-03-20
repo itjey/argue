@@ -5203,8 +5203,6 @@
 
 
 .chat-bubble {
-  max-width: 100%;
-  width: 100%;
   padding: 0;
   line-height: 1.6;
   font-size: 0.92rem;
@@ -5212,10 +5210,14 @@
 }
 
 .chat-bubble-user {
+  max-width: 72%;
   color: rgba(255, 255, 255, 0.88);
+  text-align: right;
 }
 
 .chat-bubble-assistant {
+  max-width: 100%;
+  width: 100%;
   color: rgba(255, 255, 255, 0.88);
 }
 
