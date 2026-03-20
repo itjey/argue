@@ -556,9 +556,14 @@ function App() {
     try {
       const provider = new GoogleAuthProvider()
       provider.setCustomParameters({ prompt: 'select_account' })
-      await signInWithPopup(auth, provider)
+      const result = await signInWithPopup(auth, provider)
+      if (result.user) {
+        await syncUserState(result.user, { lastAuthMethod: 'google' })
+      }
       resetCredentialForms()
+      setPendingGoogleLink(null)
       setAuthDialogOpen(false)
+      setBusyAction(null)
     } catch (error) {
       const fbErr = error as FirebaseError
       if (fbErr.code === 'auth/account-exists-with-different-credential') {

@@ -1,4 +1,4 @@
-/* coi-serviceworker — adds COOP/COEP headers so SharedArrayBuffer works on GitHub Pages */
+/* coi-serviceworker — adds COEP header for cross-origin resource loading */
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
 
@@ -10,10 +10,13 @@ self.addEventListener('fetch', e => {
     fetch(e.request).then(res => {
       if (!res || res.status === 0 || !res.url.startsWith('http')) return res;
       const h = new Headers(res.headers);
-      // Use restrict-properties instead of same-origin so Firebase Auth
-      // popups (signInWithPopup) can still postMessage back to the opener
-      // while keeping crossOriginIsolated enabled for SharedArrayBuffer.
-      h.set('Cross-Origin-Opener-Policy', 'restrict-properties');
+      // Only set COEP; intentionally omit COOP so that Firebase Auth
+      // signInWithPopup can communicate across the popup boundary.
+      // SharedArrayBuffer (crossOriginIsolated) requires COOP too, but
+      // GitHub Pages cannot serve real HTTP headers and injecting COOP
+      // via a service worker breaks popup-based OAuth flows.  The Python
+      // runner already falls back to main-thread Pyodide when
+      // crossOriginIsolated is false.
       h.set('Cross-Origin-Embedder-Policy', 'credentialless');
       return new Response(res.body, { status: res.status, statusText: res.statusText, headers: h });
     }).catch(() => fetch(e.request))
