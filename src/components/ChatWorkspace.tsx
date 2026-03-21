@@ -4,6 +4,7 @@ import { ArrowUp, Square, Paperclip, Mic, ChevronDown, Search, X, Info, Copy, Pe
 import {
   fetchOpenRouterModels,
   createOpenRouterChatCompletionStream,
+  isOpenRouterAuthError,
   type OpenRouterModel,
   type OpenRouterChatMessage,
   type OpenRouterReasoningEffort,
@@ -329,7 +330,26 @@ export function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
       }
     } catch (err: unknown) {
       if (!abortedRef.current) {
-        const msg = err instanceof Error ? err.message : 'An error occurred.'
+        const authRejected = isOpenRouterAuthError(err)
+        const msg = authRejected
+          ? serverManagedOpenRouter
+            ? 'The local OpenRouter server key was rejected. Update the local server configuration and try again.'
+            : 'This OpenRouter API key was rejected. Open Settings, replace the key, and try again.'
+          : err instanceof Error
+            ? err.message
+            : 'An error occurred.'
+
+        if (authRejected) {
+          window.dispatchEvent(
+            new CustomEvent('argue-openrouter-auth-error', {
+              detail: {
+                message: msg,
+                openSettings: !serverManagedOpenRouter,
+              },
+            }),
+          )
+        }
+
         setMessages((prev) => prev.map((m) =>
           m.id === assistantId ? { ...m, content: msg, streaming: false, error: true, webSearch: m.webSearch ? { ...m.webSearch, searching: false } : undefined } : m
         ))

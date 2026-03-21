@@ -14,6 +14,14 @@ firepit-log.txt
 dist-ssr
 *.local
 
+# Local Chrome debug profiles
+.chrome-debug-profile/
+.chrome-debug-profile-automation/
+.chrome-auth-copy/
+
+# Local screenshots
+*.png
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -17,30 +17,12 @@ import {
   type User,
   verifyPasswordResetCode,
 } from 'firebase/auth'
-import type { LucideIcon } from 'lucide-react'
 import { PricingPage } from './components/PricingPanel'
 import {
-  ArrowRight,
-  BadgeCheck,
-  BrainCircuit,
-  Braces,
-  CheckCircle2,
-  ChevronRight,
-  Clock3,
-  Code2,
-  FileOutput,
   KeyRound,
-  Layers3,
   LoaderCircle,
-  LockKeyhole,
   LogIn,
   MailCheck,
-  MessagesSquare,
-  ScrollText,
-  ShieldCheck,
-  Sigma,
-  SlidersHorizontal,
-  Workflow,
   X,
 } from 'lucide-react'
 import { AuthDialog, type AuthMode } from './components/AuthDialog'
@@ -59,39 +41,6 @@ import {
   isServerManagedOpenRouter,
 } from './lib/runtimeConfig'
 import './App.css'
-
-type FeatureCard = {
-  icon: LucideIcon
-  eyebrow: string
-  title: string
-  description: string
-}
-
-type FlowStep = {
-  icon: LucideIcon
-  title: string
-  description: string
-}
-
-type Metric = {
-  value: string
-  label: string
-  detail: string
-}
-
-type Model = {
-  icon: LucideIcon
-  name: string
-  specialty: string
-  tone: string
-}
-
-type Message = {
-  icon: LucideIcon
-  speaker: string
-  role: string
-  text: string
-}
 
 type PendingGoogleLink = {
   credential: OAuthCredential
@@ -136,138 +85,6 @@ function formatAuthError(error: FirebaseError) {
   }
 }
 
-const metrics: Metric[] = [
-  {
-    value: '4-room',
-    label: 'collaboration suite',
-    detail: 'Reasoning, coding, math, and critique work in parallel.',
-  },
-  {
-    value: 'BYO',
-    label: 'provider keys',
-    detail: 'Connect your own model accounts and keep spend under control.',
-  },
-  {
-    value: '1 trace',
-    label: 'decision history',
-    detail: 'Every challenge, rebuttal, and synthesis stays visible.',
-  },
-]
-
-const featureCards: FeatureCard[] = [
-  {
-    icon: Code2,
-    eyebrow: 'Programming',
-    title: 'Assign implementation, review, and debugging as separate voices.',
-    description:
-      'Set one model to architect, another to write, and a third to attack edge cases before anything ships.',
-  },
-  {
-    icon: Sigma,
-    eyebrow: 'Math',
-    title: 'Let proof-oriented models pressure test every intermediate step.',
-    description:
-      'Argue keeps symbolic thinking, numerical checks, and dissent together so the final answer survives scrutiny.',
-  },
-  {
-    icon: ScrollText,
-    eyebrow: 'Strategy',
-    title: 'Turn vague briefs into structured decisions with evidence trails.',
-    description:
-      'Research, synthesis, and executive framing happen in one calm room instead of scattered tabs and chats.',
-  },
-]
-
-const flowSteps: FlowStep[] = [
-  {
-    icon: KeyRound,
-    title: 'Bring your own keys',
-    description:
-      'Paste provider credentials once, define guardrails, and keep model choice entirely in your hands.',
-  },
-  {
-    icon: Layers3,
-    title: 'Compose the room',
-    description:
-      'Invite specialists for reasoning, generation, critique, and verification into the same focused workspace.',
-  },
-  {
-    icon: MessagesSquare,
-    title: 'Let them challenge each other',
-    description:
-      'Arguments are explicit. Conflicts surface early. Better answers emerge because disagreement is designed in.',
-  },
-  {
-    icon: FileOutput,
-    title: 'Export the final position',
-    description:
-      'Ship a clean synthesis with accepted steps, rejected branches, and a polished handoff for the human owner.',
-  },
-]
-
-const trustPoints: FlowStep[] = [
-  {
-    icon: LockKeyhole,
-    title: 'User-controlled credentials',
-    description:
-      'Provider access feels deliberate and premium, with the interface designed around calm control rather than clutter.',
-  },
-  {
-    icon: ShieldCheck,
-    title: 'Clear operational boundaries',
-    description:
-      'Every model can be scoped by job, tone, and visibility, so collaborative power never turns into chaos.',
-  },
-  {
-    icon: SlidersHorizontal,
-    title: 'Adjustable collaboration depth',
-    description:
-      'Run a fast consensus for small work or a longer structured debate for difficult tasks without leaving the page.',
-  },
-]
-
-const models: Model[] = [
-  {
-    icon: BrainCircuit,
-    name: 'Reasoning Lead',
-    specialty: 'Frames the problem and questions assumptions.',
-    tone: 'Calm, skeptical, exact',
-  },
-  {
-    icon: Braces,
-    name: 'Code Partner',
-    specialty: 'Designs implementation paths and catches integration risk.',
-    tone: 'Practical, structured',
-  },
-  {
-    icon: Sigma,
-    name: 'Proof Engine',
-    specialty: 'Checks math, logic, and constraint satisfaction.',
-    tone: 'Formal, methodical',
-  },
-]
-
-const thread: Message[] = [
-  {
-    icon: BrainCircuit,
-    speaker: 'Reasoning Lead',
-    role: 'Sets the frame',
-    text: 'The shortest path is not automatically the safest path. We should compare latency, reliability, and maintainability before choosing an architecture.',
-  },
-  {
-    icon: Braces,
-    speaker: 'Code Partner',
-    role: 'Counters with implementation detail',
-    text: 'Agreed, but the current spec rewards simplicity. A thinner service layer lowers surface area while still leaving room for extensibility.',
-  },
-  {
-    icon: Sigma,
-    speaker: 'Proof Engine',
-    role: 'Tests the logic',
-    text: 'The conclusion holds only if retry cost stays bounded. We should model failure bursts before accepting the simpler design outright.',
-  },
-]
-
 function App() {
   const guestModeEnabled = isGuestModeEnabled()
   const serverManagedOpenRouter = isServerManagedOpenRouter()
@@ -297,6 +114,7 @@ function App() {
   const [passwordResetComplete, setPasswordResetComplete] = useState(false)
   const [passwordResetMessage, setPasswordResetMessage] = useState('')
   const [passwordResetError, setPasswordResetError] = useState('')
+  const [openRouterSettingsRequested, setOpenRouterSettingsRequested] = useState(false)
   const [topbarHidden, setTopbarHidden] = useState(false)
   const [hasSavedApiKey, setHasSavedApiKey] = useState(serverManagedOpenRouter)
   const [isLight, setIsLight] = useState(() => {
@@ -391,6 +209,32 @@ function App() {
       window.removeEventListener('keydown', handleEscape)
     }
   }, [authDialogOpen])
+
+  useEffect(() => {
+    const handleOpenRouterAuthError = (
+      event: Event,
+    ) => {
+      const customEvent = event as CustomEvent<{
+        message?: string
+        openSettings?: boolean
+      }>
+
+      clearFeedback()
+      setErrorMessage(
+        customEvent.detail?.message ??
+          'OpenRouter authentication failed. Update the key and try again.',
+      )
+      setOpenRouterSettingsRequested(Boolean(customEvent.detail?.openSettings))
+      setAuthMode('sign-in')
+      setAuthDialogOpen(true)
+    }
+
+    window.addEventListener('argue-openrouter-auth-error', handleOpenRouterAuthError)
+
+    return () => {
+      window.removeEventListener('argue-openrouter-auth-error', handleOpenRouterAuthError)
+    }
+  }, [])
 
   useEffect(() => {
     if (serverManagedOpenRouter) {
@@ -524,6 +368,7 @@ function App() {
 
   function openAuthDialog(mode: AuthMode = 'sign-in') {
     clearFeedback()
+    setOpenRouterSettingsRequested(false)
     resetCredentialForms()
     setAuthMode(mode)
 
@@ -540,12 +385,14 @@ function App() {
 
   function handleDialogClose() {
     clearFeedback()
+    setOpenRouterSettingsRequested(false)
     resetCredentialForms()
     setAuthDialogOpen(false)
   }
 
   function handleModeChange(mode: AuthMode) {
     clearFeedback()
+    setOpenRouterSettingsRequested(false)
     resetCredentialForms()
     setAuthMode(mode)
   }
@@ -837,11 +684,17 @@ function App() {
 
   return (
     <div className="app-shell">
-      <div className="ambient ambient-one" />
-      <div className="ambient ambient-two" />
-      <div className="ambient ambient-three" />
+      {!(!workspaceVisible && !pricingOpen) ? (
+        <>
+          <div className="ambient ambient-one" />
+          <div className="ambient ambient-two" />
+          <div className="ambient ambient-three" />
+        </>
+      ) : null}
 
-      <header className={`topbar${topbarHidden ? ' topbar-hidden' : ''}`}>
+      <header
+        className={`topbar${topbarHidden ? ' topbar-hidden' : ''}${!workspaceVisible && !pricingOpen ? ' topbar-home' : ''}`}
+      >
         <button
           className="brand brand-button"
           type="button"
@@ -876,17 +729,7 @@ function App() {
                 Account
               </button>
             </>
-          ) : (
-            <>
-              <a href="#concept">Concept</a>
-              <a href="#workflow">Workflow</a>
-              <a href="#interface">Interface</a>
-              <a href="#trust">Trust</a>
-              <button className="nav-link-button" onClick={() => setPricingOpen(true)} type="button">
-                Pricing
-              </button>
-            </>
-          )}
+          ) : null}
         </nav>
 
         <button
@@ -911,7 +754,6 @@ function App() {
             <>
               <span className="topbar-account-copy">
                 <strong>Login</strong>
-                <small>Google or email</small>
               </span>
             </>
           )}
@@ -924,351 +766,26 @@ function App() {
         ) : workspaceVisible ? (
           <WorkspaceShell currentUser={currentUser} />
         ) : (
-          <>
-        <section className="hero section" id="concept">
-          <div className="hero-copy">
-            <div className="hero-overline-row">
-              <span className="hero-overline-pill">Private multi-model workspace</span>
-              <span className="hero-overline-pill hero-overline-pill-muted">
-                Live reasoning, metrics, and role-based debate
-              </span>
-            </div>
-            <div className="hero-type-line">
-              <span className="hero-typewriter" aria-label="argue.">
-                argue.
-              </span>
-            </div>
-            <h1>Make frontier models challenge each other until the answer holds.</h1>
-            <p className="hero-text">
-              Argue is a stripped-back multi-model workspace for professionals who
-              want sharper thinking, not louder software. Choose the models,
-              assign the roles, paste your own API keys, and let specialists
-              challenge each other across programming, math, research, and planning.
-            </p>
-            <p className="hero-subtext">
-              Built for people who want a command room, not a toy box.
-            </p>
-
-            <div className="hero-actions">
+          <section className="home-minimal" aria-label="Homepage">
+            <div className="home-minimal-copy">
+              <h1 className="home-minimal-wordmark">argue</h1>
+              <p className="home-minimal-description">
+                A private workspace for sharper conversations with models.
+              </p>
               <button
-                className="button button-primary"
-                onClick={() => openAuthDialog(currentUser ? 'sign-in' : 'sign-up')}
+                className="home-minimal-cta"
+                onClick={() => openAuthDialog('sign-in')}
                 type="button"
               >
-                {currentUser ? 'Open account' : 'Create account'}
-                <ArrowRight size={18} />
+                Start chatting
               </button>
-              <a className="button button-secondary" href="#interface">
-                See the interface
-                <ChevronRight size={18} />
-              </a>
             </div>
-
-            <div className="metric-grid">
-              {metrics.map((metric) => (
-                <article className="metric-card" key={metric.label}>
-                  <p className="metric-value">{metric.value}</p>
-                  <h2>{metric.label}</h2>
-                  <p>{metric.detail}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-
-          <div className="hero-visual">
-            <div className="workspace-shell workspace-shell-hero">
-              <div className="workspace-header">
-                <div>
-                  <p className="workspace-label">Live session</p>
-                  <h2>Boardroom for frontier models</h2>
-                </div>
-                <div className="status-pill">
-                  <BadgeCheck size={16} />
-                  Synthesis in progress
-                </div>
-              </div>
-
-              <div className="workspace-grid">
-                <aside className="workspace-sidebar">
-                  <div className="panel-card">
-                    <p className="panel-label">Prompt brief</p>
-                    <h3>Design a resilient architecture for a high-trust AI product.</h3>
-                    <div className="chip-row">
-                      <span>Code review</span>
-                      <span>Math check</span>
-                      <span>Tradeoff debate</span>
-                    </div>
-                  </div>
-
-                  <div className="panel-card">
-                    <p className="panel-label">Room roster</p>
-                    <div className="roster-list">
-                      {models.map((model) => {
-                        const Icon = model.icon
-
-                        return (
-                          <article className="roster-item" key={model.name}>
-                            <span className="roster-icon">
-                              <Icon size={18} />
-                            </span>
-                            <div>
-                              <h3>{model.name}</h3>
-                              <p>{model.specialty}</p>
-                              <small>{model.tone}</small>
-                            </div>
-                          </article>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </aside>
-
-                <div className="workspace-stage">
-                  <div className="thread-stack">
-                    {thread.map((message) => {
-                      const Icon = message.icon
-
-                      return (
-                        <article className="thread-card" key={message.speaker}>
-                          <div className="thread-icon">
-                            <Icon size={18} />
-                          </div>
-                          <div className="thread-body">
-                            <div className="thread-meta">
-                              <h3>{message.speaker}</h3>
-                              <span>{message.role}</span>
-                            </div>
-                            <p>{message.text}</p>
-                          </div>
-                        </article>
-                      )
-                    })}
-                  </div>
-
-                  <div className="verdict-card">
-                    <div className="verdict-header">
-                      <div>
-                        <p className="panel-label">Accepted position</p>
-                        <h3>Ship the simple path, but prove the failure model first.</h3>
-                      </div>
-                      <div className="verdict-score">
-                        <Clock3 size={16} />
-                        12 min debate
-                      </div>
-                    </div>
-
-                    <div className="verdict-grid">
-                      <div>
-                        <p className="mini-label">Chosen approach</p>
-                        <p className="mini-text">
-                          Lean service layer with explicit retry controls and a
-                          verification pass before rollout.
-                        </p>
-                      </div>
-                      <div>
-                        <p className="mini-label">Rejected branch</p>
-                        <p className="mini-text">
-                          Fully abstracted orchestration added flexibility, but the
-                          maintenance cost was too high for the current scope.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="section" aria-labelledby="capabilities-title">
-          <div className="section-heading">
-            <p className="section-kicker">Use cases</p>
-            <h2 id="capabilities-title">
-              Built for professionals who need precision more than novelty.
-            </h2>
-            <p className="section-copy">
-              The design language is restrained on purpose. Argue should feel like
-              a private control room for difficult decisions, not a dashboard chasing attention.
-            </p>
-          </div>
-
-          <div className="feature-grid">
-            {featureCards.map((feature) => {
-              const Icon = feature.icon
-
-              return (
-                <article className="feature-card" key={feature.title}>
-                  <div className="feature-icon">
-                    <Icon size={20} />
-                  </div>
-                  <p className="feature-eyebrow">{feature.eyebrow}</p>
-                  <h3>{feature.title}</h3>
-                  <p>{feature.description}</p>
-                </article>
-              )
-            })}
-          </div>
-        </section>
-
-        <section className="section workflow-section" id="workflow">
-          <div className="section-heading section-heading-compact">
-            <p className="section-kicker">Workflow</p>
-            <h2>Structure disagreement, then make the final decision readable.</h2>
-          </div>
-
-          <div className="timeline-grid">
-            {flowSteps.map((step, index) => {
-              const Icon = step.icon
-
-              return (
-                <article className="timeline-card" key={step.title}>
-                  <div className="timeline-top">
-                    <span className="timeline-index">{`0${index + 1}`}</span>
-                    <span className="timeline-icon">
-                      <Icon size={18} />
-                    </span>
-                  </div>
-                  <h3>{step.title}</h3>
-                  <p>{step.description}</p>
-                </article>
-              )
-            })}
-          </div>
-        </section>
-
-        <section className="section interface-section" id="interface">
-          <div className="split-layout">
-            <div className="split-copy">
-              <p className="section-kicker">Interface</p>
-              <h2>A precise command surface for serious multi-model work.</h2>
-              <p className="section-copy">
-                Every panel is tuned for clarity. No wasted chrome. No soft decoration.
-                Just structure, contrast, and enough visual hierarchy to keep long sessions readable.
-              </p>
-
-              <div className="trust-list">
-                {trustPoints.map((point) => {
-                  const Icon = point.icon
-
-                  return (
-                    <article className="trust-item" key={point.title}>
-                      <span className="trust-icon">
-                        <Icon size={18} />
-                      </span>
-                      <div>
-                        <h3>{point.title}</h3>
-                        <p>{point.description}</p>
-                      </div>
-                    </article>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div className="control-surface" aria-label="Argue settings preview">
-              <div className="control-card control-card-primary">
-                <div className="control-card-header">
-                  <div>
-                    <p className="panel-label">Account layer</p>
-                    <h3>Unified sign-in across Google and email</h3>
-                  </div>
-                  <ShieldCheck size={18} />
-                </div>
-
-                <div className="provider-list">
-                  <div className="provider-row">
-                    <span>Google</span>
-                    <strong>Enabled</strong>
-                  </div>
-                  <div className="provider-row">
-                    <span>Email + password</span>
-                    <strong>Enabled</strong>
-                  </div>
-                  <div className="provider-row">
-                    <span>Verification</span>
-                    <strong>Required</strong>
-                  </div>
-                  <div className="provider-row">
-                    <span>Profile sync</span>
-                    <strong>Firestore</strong>
-                  </div>
-                </div>
-              </div>
-
-              <div className="control-card">
-                <div className="control-card-header">
-                  <div>
-                    <p className="panel-label">Room settings</p>
-                    <h3>Deliberate orchestration</h3>
-                  </div>
-                  <Workflow size={18} />
-                </div>
-
-                <div className="setting-row">
-                  <span>Debate depth</span>
-                  <span>Focused</span>
-                </div>
-                <div className="setting-row">
-                  <span>Critique pass</span>
-                  <span>Required</span>
-                </div>
-                <div className="setting-row">
-                  <span>Final summary</span>
-                  <span>Executive format</span>
-                </div>
-              </div>
-
-              <div className="control-card control-card-accent">
-                <p className="panel-label">Identity result</p>
-                <h3>One account per email, even when Google gets linked later.</h3>
-                <p className="control-copy">
-                  The auth layer writes account state to Firestore, keeps the email
-                  visible in the product, and prevents messy duplicate identities
-                  when the same person uses different sign-in methods.
-                </p>
-                <div className="chip-row">
-                  <span>Email verified</span>
-                  <span>Google linked</span>
-                  <span>Firestore profile</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="section trust-section" id="trust">
-          <div className="cta-card">
-            <div className="cta-copy">
-              <p className="section-kicker">Positioning</p>
-              <h2>A premium frontend for people who treat AI tooling like infrastructure.</h2>
-              <p>
-                This concept leans into a monochrome system, Lucide-only iconography,
-                a horizontal three-blade mark, typed hero branding, and a tighter,
-                more architectural layout across desktop, tablet, and mobile.
-              </p>
-            </div>
-
-            <div className="cta-points">
-              <div className="cta-point">
-                <CheckCircle2 size={18} />
-                <span>Google and email login</span>
-              </div>
-              <div className="cta-point">
-                <CheckCircle2 size={18} />
-                <span>Verification flow</span>
-              </div>
-              <div className="cta-point">
-                <CheckCircle2 size={18} />
-                <span>Firestore profile sync</span>
-              </div>
-            </div>
-          </div>
-        </section>
-          </>
+          </section>
         )}
       </main>
 
       <AuthDialog
+        autoOpenSettings={openRouterSettingsRequested}
         busyAction={busyAction}
         canAddPassword={canAddPassword}
         confirmPassword={authConfirmPassword}

@@ -222,6 +222,16 @@ type OpenRouterAssistantReply = {
   usage: OpenRouterChatResponse['usage'] | null
 }
 
+class OpenRouterRequestError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'OpenRouterRequestError'
+    this.status = status
+  }
+}
+
 type CreateOpenRouterChatCompletionOptions = {
   apiKey: string
   messages: OpenRouterChatMessage[]
@@ -243,6 +253,35 @@ type CreateOpenRouterChatCompletionStreamOptions =
 const OPENROUTER_CHAT_URL =
   import.meta.env?.VITE_PROXY_URL || 'https://openrouter.ai/api/v1/chat/completions'
 const APP_TITLE = 'Argue'
+
+function buildOpenRouterRequestError(
+  response: Response,
+  payload: OpenRouterChatResponse,
+  fallbackMessage: string,
+) {
+  return new OpenRouterRequestError(
+    payload.error?.message ?? fallbackMessage,
+    response.status,
+  )
+}
+
+function isOpenRouterAuthError(error: unknown) {
+  if (error instanceof OpenRouterRequestError) {
+    return error.status === 401 || error.status === 403
+  }
+
+  if (!(error instanceof Error)) {
+    return false
+  }
+
+  const normalizedMessage = error.message.trim().toLowerCase()
+
+  return (
+    normalizedMessage.includes('user not found') ||
+    normalizedMessage.includes('no cookie auth credentials found') ||
+    normalizedMessage.includes('unauthorized')
+  )
+}
 
 function getAppOrigin() {
   if (typeof window === 'undefined') {
@@ -639,8 +678,10 @@ async function createOpenRouterChatCompletion({
   const payload = (await response.json()) as OpenRouterChatResponse
 
   if (!response.ok) {
-    throw new Error(
-      payload.error?.message ?? 'OpenRouter rejected the chat request.',
+    throw buildOpenRouterRequestError(
+      response,
+      payload,
+      'OpenRouter rejected the chat request.',
     )
   }
 
@@ -756,8 +797,10 @@ async function createOpenRouterChatCompletionStream({
       error: { message: await response.text() },
     }))) as OpenRouterChatResponse
 
-    throw new Error(
-      payload.error?.message ?? 'OpenRouter rejected the streaming chat request.',
+    throw buildOpenRouterRequestError(
+      response,
+      payload,
+      'OpenRouter rejected the streaming chat request.',
     )
   }
 
@@ -806,6 +849,7 @@ export {
   formatModelDate,
   formatOpenRouterPrice,
   getRecentOpenRouterModels,
+  isOpenRouterAuthError,
 }
 
 export type {

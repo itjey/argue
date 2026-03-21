@@ -6,7 +6,7 @@
   font-weight: 400;
   color-scheme: dark;
   color: #d4d4d4;
-  background: #111;
+  background: #2c2c2c;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -25,7 +25,7 @@
   --line-strong: rgba(255, 255, 255, 0.12);
   --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.6);
   --warning: #ff8a3d;
-  --chat-bg: #111;
+  --chat-bg: #2c2c2c;
   --chat-surface: #191919;
   --accent: rgba(255, 255, 255, 0.82);
   --accent-muted: rgba(255, 255, 255, 0.08);
@@ -40,7 +40,7 @@
 html {
   scroll-behavior: smooth;
   scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
-  background: #111;
+  background: #2c2c2c;
   overscroll-behavior: none;
 }
 
@@ -73,7 +73,7 @@ body {
   min-width: 320px;
   height: 100vh;
   overflow: hidden;
-  background: #111;
+  background: #2c2c2c;
   overscroll-behavior: none;
 }
 
@@ -112,7 +112,7 @@ svg {
 #root {
   height: 100vh;
   overflow: hidden;
-  background: #111;
+  background: #2c2c2c;
 }
 
 html[data-theme="light"] #root {
@@ -133,7 +133,7 @@ html[data-theme="light"] #root {
   align-items: center;
   gap: 2px;
   padding: 4px 6px;
-  background: #111;
+  background: #2c2c2c;
   flex-shrink: 0;
 }
 

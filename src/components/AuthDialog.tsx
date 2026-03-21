@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { User } from 'firebase/auth'
 import {
   KeyRound,
@@ -21,6 +21,7 @@ type AuthMode = 'sign-in' | 'sign-up'
 
 type AuthDialogProps = {
   busyAction: string | null
+  autoOpenSettings: boolean
   canAddPassword: boolean
   confirmPassword: string
   currentUser: User | null
@@ -54,6 +55,7 @@ type AuthDialogProps = {
 
 function AuthDialog({
   busyAction,
+  autoOpenSettings,
   canAddPassword,
   confirmPassword,
   currentUser,
@@ -107,6 +109,15 @@ function AuthDialog({
 
     setSettingsOpen((isOpen) => !isOpen)
   }
+
+  useEffect(() => {
+    if (!open || !browserManagedOpenRouter || !autoOpenSettings) {
+      return
+    }
+
+    syncStoredApiKey()
+    setSettingsOpen(true)
+  }, [autoOpenSettings, browserManagedOpenRouter, open])
 
   function applyApiKey(nextValue: string) {
     if (nextValue) {
