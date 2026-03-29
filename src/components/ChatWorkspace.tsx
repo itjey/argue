@@ -11,6 +11,8 @@ import {
   type OpenRouterUrlCitation,
 } from '../lib/openrouter'
 import { MarkdownBlock } from './RichMessageContent'
+import { LatexInputPreview } from './LatexInputPreview'
+import { getProviderLogoUrl, providerNeedsInvert } from '../lib/providerLogos'
 import {
   fetchOpenRouterStatsSnapshot,
   resolveOpenRouterModelStats,
@@ -509,6 +511,7 @@ export function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                 </div>
               )}
 
+              <LatexInputPreview text={prompt} />
               <textarea ref={textareaRef} className="prompt-textarea" placeholder={editingId ? 'Edit your message…' : 'Ask anything…'} value={prompt} rows={1} onChange={(e) => { setPrompt(e.target.value); autoResize() }} onKeyDown={handleKeyDown} spellCheck={false} />
 
               <div className="prompt-actions">
@@ -521,6 +524,7 @@ export function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
 
                   <div className="model-selector" ref={modelDropRef}>
                     <button className="model-selector-trigger" type="button" onClick={() => setModelOpen((o) => !o)}>
+                      {selectedModel && <img className={`model-selector-logo${providerNeedsInvert(selectedModel.id) ? ' model-list-logo-invert' : ''}`} src={getProviderLogoUrl(selectedModel.id)} alt="" width={16} height={16} onError={(e) => { e.currentTarget.style.display = 'none' }} />}
                       <span className="model-selector-name">{selectedModel ? selectedModel.name : 'Search models'}</span>
                       <ChevronDown size={13} className={`model-selector-chevron${modelOpen ? ' model-selector-chevron-open' : ''}`} />
                     </button>
@@ -540,6 +544,7 @@ export function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
                                 return (
                                   <div key={m.id} className={`model-list-item${selectedModel?.id === m.id ? ' model-list-item-active' : ''}`}>
                                     <button className="model-list-select" type="button" onClick={() => { setSelectedModel(m); setModelOpen(false); setModelSearch(''); if (!isMultimodal(m)) setAttachments([]) }}>
+                                      <img className={`model-list-logo${providerNeedsInvert(m.id) ? ' model-list-logo-invert' : ''}`} src={getProviderLogoUrl(m.id)} alt="" width={18} height={18} loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none' }} />
                                       <span className="model-list-name">{m.name}</span>
                                       <span className="model-list-id">{m.id}</span>
                                       <div className="model-list-badges">

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronRight, Download, Loader, RotateCcw } from 'lucide-react'
+import { BrainCircuit, ChevronRight, Download, FolderDown, ImagePlus, Loader, MoreHorizontal, RotateCcw } from 'lucide-react'
 import { compileLatexToPdf } from '../lib/swiftlatex'
+import { PdfCanvasViewer } from './PdfCanvasViewer'
+import { WriteAiSidebar } from './WriteAiSidebar'
 
 type LatexWorkspacePanelProps = {
   hidden?: boolean
@@ -55,18 +57,55 @@ function LatexWorkspacePanel({
   open,
 }: LatexWorkspacePanelProps) {
   const [source, setSource] = useState(initialSource)
-  const [editorWidth, setEditorWidth] = useState(42)
+  const [editorWidth, setEditorWidth] = useState(36)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [compileLog, setCompileLog] = useState('')
   const [compileError, setCompileError] = useState<string | null>(null)
   const [compiling, setCompiling] = useState(false)
   const [autoCompile, setAutoCompile] = useState(true)
   const [showLog, setShowLog] = useState(false)
+  const [dragging, setDragging] = useState(false)
+  const [aiOpen, setAiOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const dragWidthRef = useRef(editorWidth)
   const lastCompiledSourceRef = useRef<string | null>(null)
   const latestCompileRequestRef = useRef(0)
   const previousInitialSourceRef = useRef(initialSource)
+
+  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const name = file.name.replace(/\.[^.]+$/, '')
+      const snippet = `\\includegraphics[width=\\textwidth]{${file.name}} % uploaded: ${name}`
+      setSource((prev) => prev.replace('\\end{document}', `${snippet}\n\\end{document}`))
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+
+  function handleDownloadZip() {
+    const blob = new Blob([source], { type: 'text/plain' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `${sanitizeFilename(label || 'document')}.tex`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
+  useEffect(() => {
+    function onPointerDown(e: PointerEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [])
 
   useEffect(() => {
     if (initialSource === previousInitialSourceRef.current) {
@@ -172,7 +211,10 @@ function LatexWorkspacePanel({
     const startX = event.clientX
     const startWidth = dragWidthRef.current
 
+    setDragging(true)
+
     const onMouseMove = (moveEvent: MouseEvent) => {
+      moveEvent.preventDefault()
       const deltaPercent = ((moveEvent.clientX - startX) / width) * 100
       const nextWidth = Math.max(
         MIN_EDITOR_WIDTH,
@@ -182,17 +224,20 @@ function LatexWorkspacePanel({
       setEditorWidth(nextWidth)
     }
 
-    const onMouseUp = () => {
+    const cleanup = () => {
       document.removeEventListener('mousemove', onMouseMove)
-      document.removeEventListener('mouseup', onMouseUp)
+      document.removeEventListener('mouseup', cleanup)
+      document.removeEventListener('mouseleave', cleanup)
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
+      setDragging(false)
     }
 
     document.body.style.cursor = 'col-resize'
     document.body.style.userSelect = 'none'
     document.addEventListener('mousemove', onMouseMove)
-    document.addEventListener('mouseup', onMouseUp)
+    document.addEventListener('mouseup', cleanup)
+    document.addEventListener('mouseleave', cleanup)
   }
 
   if (!open) {
@@ -208,6 +253,14 @@ function LatexWorkspacePanel({
   const panel = (
     <section className={`latex-workspace-panel${inline ? ' latex-workspace-panel-inline' : ''}`}>
       <header className="latex-workspace-header">
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={handleImageUpload}
+        />
+
         <div className="latex-workspace-actions">
           <button
             className={`latex-workspace-toggle${autoCompile ? ' latex-workspace-toggle-on' : ''}`}
@@ -225,12 +278,30 @@ function LatexWorkspacePanel({
             {showLog ? 'Hide log' : 'Show log'}
           </button>
 
+          <button
+            className="latex-workspace-btn"
+            type="button"
+            onClick={() => imageInputRef.current?.click()}
+            title="Upload image"
+          >
+            <ImagePlus size={14} />
+          </button>
+
           {pdfUrl ? (
             <a className="latex-workspace-btn" download={pdfFileName} href={pdfUrl}>
               <Download size={14} />
               <span>PDF</span>
             </a>
           ) : null}
+
+          <button
+            className="latex-workspace-btn"
+            type="button"
+            onClick={handleDownloadZip}
+            title="Download .tex source"
+          >
+            <FolderDown size={14} />
+          </button>
 
           <button
             className="latex-workspace-btn latex-workspace-btn-primary"
@@ -242,6 +313,16 @@ function LatexWorkspacePanel({
             <span>{compiling ? 'Compiling…' : 'Compile'}</span>
           </button>
 
+          <button
+            className={`latex-workspace-btn${aiOpen ? ' latex-workspace-btn-active' : ''}`}
+            type="button"
+            onClick={() => setAiOpen((v) => !v)}
+            title="AI Assistant"
+          >
+            <BrainCircuit size={14} />
+            <span>AI</span>
+          </button>
+
           <button className="latex-workspace-btn" type="button" onClick={onHide} title="Hide workspace">
             <ChevronRight size={14} />
             <span>Hide</span>
@@ -250,6 +331,7 @@ function LatexWorkspacePanel({
       </header>
 
       <div className="latex-workspace-body" ref={containerRef}>
+        {dragging && <div className="latex-workspace-drag-overlay" />}
         <div
           className="latex-workspace-pane latex-workspace-editor-pane"
           style={{ width: `${editorWidth}%` }}
@@ -294,11 +376,7 @@ function LatexWorkspacePanel({
             ) : null}
 
             {pdfUrl ? (
-              <iframe
-                className="latex-workspace-pdf"
-                src={pdfUrl}
-                title="LaTeX PDF preview"
-              />
+              <PdfCanvasViewer pdfUrl={pdfUrl} />
             ) : compiling ? (
               <div className="latex-workspace-placeholder">
                 <Loader size={16} className="code-run-spinner" />
@@ -306,11 +384,18 @@ function LatexWorkspacePanel({
               </div>
             ) : (
               <div className="latex-workspace-placeholder">
-                <span>Edit the source or run a compile to generate a PDF preview.</span>
+                <span>Edit the source to generate a PDF preview.</span>
               </div>
             )}
           </div>
         </div>
+
+        {aiOpen && (
+          <WriteAiSidebar
+            source={source}
+            onApplyEdit={(newSource) => setSource(newSource)}
+          />
+        )}
       </div>
     </section>
   )

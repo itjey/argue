@@ -10,6 +10,7 @@ import {
   type OpenRouterUrlCitation,
 } from '../lib/openrouter'
 import { MarkdownBlock } from './RichMessageContent'
+import { LatexInputPreview } from './LatexInputPreview'
 import {
   fetchOpenRouterStatsSnapshot,
   resolveOpenRouterModelStats,
@@ -886,6 +887,7 @@ export function DebateWorkspace({ currentUser }: DebateWorkspaceProps) {
               </div>
             )}
 
+            <LatexInputPreview text={prompt} />
             <textarea
               ref={textareaRef}
               className="prompt-textarea"

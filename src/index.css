@@ -132,15 +132,19 @@ html[data-theme="light"] #root {
   flex-direction: row;
   align-items: center;
   gap: 2px;
-  padding: 4px 6px;
+  padding: 4px 10px;
   background: #2c2c2c;
   flex-shrink: 0;
+  position: relative;
+  z-index: 51;
+  width: 100%;
+  border-bottom: none;
 }
 
 .workspace-tab-btn {
   display: inline-flex;
   align-items: center;
-  padding: 0.22rem 0.55rem;
+  padding: 0.4rem 0.7rem;
   border: none;
   border-radius: 0.35rem;
   background: transparent;

@@ -13,7 +13,7 @@ interface WorkspaceShellProps {
 const WORKSPACE_TABS: { id: WorkspaceId; label: string }[] = [
   { id: 'chat', label: 'Chat' },
   { id: 'debate', label: 'Debate' },
-  { id: 'latex', label: 'LaTeX' },
+  { id: 'latex', label: 'Write' },
 ]
 
 const DEFAULT_LATEX_TEMPLATE = `\\documentclass{article}

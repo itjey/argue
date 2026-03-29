@@ -242,9 +242,14 @@ export function PricingPage({ onClose }: { onClose: () => void }) {
               or price your own plan instead
             </button>
           ) : (
-            <button className="pricing-custom-link" onClick={() => setCustom(false)} type="button">
-              ← back to plans
-            </button>
+            <>
+              <button className="pricing-custom-link" onClick={() => setCustom(false)} type="button">
+                ← back to plans
+              </button>
+              <p className="pricing-page-free-note">
+                or use for free through <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">OpenRouter</a> with your own API key
+              </p>
+            </>
           )}
           <p className="pricing-page-footnote">
             Credits are purchased via your Argue account and used across all AI features.

@@ -38,7 +38,6 @@ import {
 } from './lib/openrouterStorage'
 import {
   isGuestModeEnabled,
-  isServerManagedOpenRouter,
 } from './lib/runtimeConfig'
 import './App.css'
 
@@ -87,7 +86,6 @@ function formatAuthError(error: FirebaseError) {
 
 function App() {
   const guestModeEnabled = isGuestModeEnabled()
-  const serverManagedOpenRouter = isServerManagedOpenRouter()
   const lastScrollYRef = useRef(0)
   const topbarHiddenRef = useRef(false)
   const scrollFrameRef = useRef<number | null>(null)
@@ -116,7 +114,7 @@ function App() {
   const [passwordResetError, setPasswordResetError] = useState('')
   const [openRouterSettingsRequested, setOpenRouterSettingsRequested] = useState(false)
   const [topbarHidden, setTopbarHidden] = useState(false)
-  const [hasSavedApiKey, setHasSavedApiKey] = useState(serverManagedOpenRouter)
+  const [hasSavedApiKey, setHasSavedApiKey] = useState(false)
   const [isLight, setIsLight] = useState(() => {
     const stored = window.localStorage.getItem('argue-theme') === 'light'
     document.documentElement.setAttribute('data-theme', stored ? 'light' : 'dark')
@@ -237,11 +235,6 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (serverManagedOpenRouter) {
-      setHasSavedApiKey(true)
-      return undefined
-    }
-
     const syncSavedApiKey = () => {
       const storedKey = window.localStorage.getItem(OPENROUTER_KEY_STORAGE) ?? ''
       setHasSavedApiKey(storedKey.trim().length > 0)
@@ -266,7 +259,7 @@ function App() {
       window.removeEventListener('storage', syncSavedApiKey)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [serverManagedOpenRouter])
+  }, [])
 
   function clearFeedback() {
     setStatusMessage('')
@@ -720,8 +713,12 @@ function App() {
         <nav className="nav" aria-label="Primary navigation">
           {workspaceVisible ? (
             <>
-              <a href="#chat">Chat</a>
-              <a href="#models">Models</a>
+              <button className="nav-link-button" onClick={() => setPricingOpen(false)} type="button">
+                Chat
+              </button>
+              <button className="nav-link-button" onClick={() => setPricingOpen(false)} type="button">
+                Models
+              </button>
               <button className="nav-link-button" onClick={() => setPricingOpen(true)} type="button">
                 Pricing
               </button>
@@ -742,9 +739,9 @@ function App() {
           {currentUser ? (
             <span className="topbar-account-copy">
               <strong>{currentUser.email ?? 'Account'}</strong>
-              {!serverManagedOpenRouter && !hasSavedApiKey ? (
+              {!hasSavedApiKey ? (
                 <small className="topbar-api-key-warning">
-                  Add API key in Settings
+                  no credits
                 </small>
               ) : !isVerified ? (
                 <small className="topbar-account-warning">⚠ unverified</small>
