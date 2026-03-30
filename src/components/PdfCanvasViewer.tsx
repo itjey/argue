@@ -29,7 +29,7 @@ function PdfCanvasViewer({ pdfUrl }: { pdfUrl: string }) {
         canvas.width = viewport.width
         canvas.height = viewport.height
         const ctx = canvas.getContext('2d')!
-        await page.render({ canvasContext: ctx, viewport }).promise
+        await page.render({ canvasContext: ctx, viewport, canvas } as Parameters<typeof page.render>[0]).promise
         pages.push(canvas.toDataURL('image/png'))
       }
 

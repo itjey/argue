@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { BrainCircuit, ChevronRight, Download, FolderDown, ImagePlus, Loader, MoreHorizontal, RotateCcw } from 'lucide-react'
+import { BrainCircuit, ChevronRight, Download, FolderDown, ImagePlus, Loader, RotateCcw } from 'lucide-react'
 import { compileLatexToPdf } from '../lib/swiftlatex'
 import { PdfCanvasViewer } from './PdfCanvasViewer'
 import { WriteAiSidebar } from './WriteAiSidebar'
@@ -66,9 +66,7 @@ function LatexWorkspacePanel({
   const [showLog, setShowLog] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [aiOpen, setAiOpen] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
   const imageInputRef = useRef<HTMLInputElement>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const dragWidthRef = useRef(editorWidth)
   const lastCompiledSourceRef = useRef<string | null>(null)
@@ -96,16 +94,6 @@ function LatexWorkspacePanel({
     a.click()
     URL.revokeObjectURL(a.href)
   }
-
-  useEffect(() => {
-    function onPointerDown(e: PointerEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false)
-      }
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [])
 
   useEffect(() => {
     if (initialSource === previousInitialSourceRef.current) {

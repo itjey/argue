@@ -603,7 +603,7 @@ export function WriteAiSidebar({
                       <ReactMarkdown
                         components={{
                           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                          pre: ({ node, children }: any) => {
+                          pre: ({ node, children: _children }: any) => {
                             const codeNode = node?.children?.[0]
                             const classNames: string[] = (codeNode?.properties?.className as string[]) ?? []
                             const langId = classNames.find((c: string) => c.startsWith('language-'))?.replace('language-', '') ?? ''
