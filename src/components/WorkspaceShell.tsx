@@ -44,6 +44,7 @@ function WorkspaceShell({ currentUser }: WorkspaceShellProps) {
             {label}
           </button>
         ))}
+        <div id="workspace-tab-actions" className="workspace-tab-actions" />
       </nav>
 
       <div className="workspace-content-area">

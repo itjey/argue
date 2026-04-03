@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ChangeEvent } from 'react'
 import type { User } from 'firebase/auth'
-import { ArrowUp, Square, Paperclip, Mic, ChevronDown, Search, X, Info, Copy, Pencil, Check } from 'lucide-react'
+import { ArrowUp, Square, Paperclip, Mic, ChevronDown, ChevronRight, Search, X, Info, Copy, Pencil, Check } from 'lucide-react'
 import {
   fetchOpenRouterModels,
   createOpenRouterChatCompletionStream,
@@ -22,6 +22,8 @@ import {
 import { ModelStatsPanel } from './ModelStatsPanel'
 import { syncUserProfile } from '../lib/firebase'
 import { OPENROUTER_KEY_STORAGE } from '../lib/openrouterStorage'
+import { saveChat, sanitizeMessagesForStorage, type SavedChat } from '../lib/chatHistory'
+import { ChatSidebar } from './ChatSidebar'
 import { isServerManagedOpenRouter } from '../lib/runtimeConfig'
 
 const SYSTEM_PROMPT = `You are a helpful assistant. Format your responses using Markdown.
@@ -151,6 +153,11 @@ export function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
   const [effortOpen, setEffortOpen] = useState(false)
   const effortDropRef = useRef<HTMLDivElement>(null)
 
+  const [activeChatId, setActiveChatId] = useState<string | null>(null)
+  const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const messagesRef = useRef<ChatMessage[]>([])
+
   const [models, setModels] = useState<OpenRouterModel[]>([])
   const [selectedModel, setSelectedModel] = useState<OpenRouterModel | null>(null)
   const [modelSearch, setModelSearch] = useState('')
@@ -223,6 +230,47 @@ export function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
     if (!el || !shouldAutoScrollRef.current) return
     el.scrollTop = el.scrollHeight; lastScrollTopRef.current = el.scrollTop
   }, [messages])
+
+  useEffect(() => { messagesRef.current = messages }, [messages])
+
+  const activeChatIdRef = useRef(activeChatId)
+  useEffect(() => { activeChatIdRef.current = activeChatId }, [activeChatId])
+
+  const selectedModelRef = useRef(selectedModel)
+  useEffect(() => { selectedModelRef.current = selectedModel }, [selectedModel])
+
+  function autoSaveChat() {
+    if (!currentUser) return
+    const msgs = messagesRef.current
+    if (msgs.length === 0) return
+    const sanitized = sanitizeMessagesForStorage(msgs as unknown as { id: string; role: string; content: string; [key: string]: unknown }[])
+    if (sanitized.length === 0) return
+    saveChat(currentUser.uid, {
+      id: activeChatIdRef.current ?? undefined,
+      workspace: 'chat',
+      modelId: selectedModelRef.current?.id ?? null,
+      messages: sanitized,
+    }).then((id) => {
+      setActiveChatId(id)
+      setSidebarRefreshKey((k) => k + 1)
+    }).catch(() => {})
+  }
+
+  function handleLoadChat(chat: SavedChat) {
+    setMessages(chat.messages as unknown as ChatMessage[])
+    setActiveChatId(chat.id)
+    setPrompt('')
+    setEditingId(null)
+    setAttachments([])
+  }
+
+  function handleNewChat() {
+    setMessages([])
+    setActiveChatId(null)
+    setPrompt('')
+    setEditingId(null)
+    setAttachments([])
+  }
 
   function autoResize() {
     const el = textareaRef.current; if (!el) return
@@ -356,13 +404,25 @@ export function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
           m.id === assistantId ? { ...m, content: msg, streaming: false, error: true, webSearch: m.webSearch ? { ...m.webSearch, searching: false } : undefined } : m
         ))
       }
-    } finally { setStreaming(false) }
+    } finally {
+      setStreaming(false)
+      if (currentUser && !abortedRef.current) autoSaveChat()
+    }
   }
 
   async function handleSubmit() {
     const text = prompt.trim()
     if (!text && attachments.length === 0) return
-    if (!selectedModel || streaming) return
+    if (streaming) return
+    if (!selectedModel) {
+      setMessages((prev) => [...prev, {
+        id: crypto.randomUUID(),
+        role: 'assistant' as const,
+        content: 'Please select a model before sending a message.',
+        error: true,
+      }])
+      return
+    }
 
     shouldAutoScrollRef.current = true
     const userMsg: ChatMessage = {
@@ -449,7 +509,28 @@ export function ChatWorkspace({ currentUser }: ChatWorkspaceProps) {
         </div>
       )}
 
-      <div className={`prompt-page${hasMessages ? ' prompt-page-chat prompt-page-chat-solo' : ''}`}>
+      <div className={`prompt-page${hasMessages ? ' prompt-page-chat prompt-page-chat-solo' : ''}`} style={{ position: 'relative' }}>
+        {currentUser && hasMessages && !sidebarCollapsed && (
+          <ChatSidebar
+            userId={currentUser.uid}
+            workspace="chat"
+            activeChatId={activeChatId}
+            onSelectChat={handleLoadChat}
+            onNewChat={handleNewChat}
+            refreshKey={sidebarRefreshKey}
+            onCollapse={() => setSidebarCollapsed(true)}
+          />
+        )}
+        {currentUser && hasMessages && sidebarCollapsed && (
+          <button
+            className="chat-sidebar-expand"
+            type="button"
+            onClick={() => setSidebarCollapsed(false)}
+            title="Show chats"
+          >
+            <ChevronRight size={14} />
+          </button>
+        )}
         <div className="prompt-chat-shell">
           {hasMessages && (
             <div className="chat-container" ref={chatContainerRef}>

@@ -644,7 +644,17 @@ function extractSsePayload(rawEvent: string) {
 }
 
 async function fetchOpenRouterModels() {
-  return getBundledOpenRouterModels()
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/models')
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const payload = (await response.json()) as { data: OpenRouterModel[] }
+    if (!Array.isArray(payload.data) || payload.data.length === 0) throw new Error('Empty')
+    return payload.data
+      .map((model) => normalizeOpenRouterModel(model))
+      .sort((left, right) => left.name.localeCompare(right.name))
+  } catch {
+    return getBundledOpenRouterModels()
+  }
 }
 
 async function createOpenRouterChatCompletion({

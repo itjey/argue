@@ -195,6 +195,13 @@ html[data-theme="light"] .workspace-tab-btn-active:hover {
   background: rgba(0, 0, 0, 0.09);
 }
 
+.workspace-tab-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .workspace-content-area {
   flex: 1;
   overflow: hidden;

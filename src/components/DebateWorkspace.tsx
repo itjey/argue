@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ChangeEvent } from 'react'
 import type { User } from 'firebase/auth'
-import { ArrowUp, ChevronDown, Info, Mic, Paperclip, Search, Square, X, Copy, Pencil, Check } from 'lucide-react'
+import { ArrowUp, ChevronDown, ChevronLeft, ChevronRight, Info, Mic, Paperclip, Search, Square, X, Copy, Pencil, Check } from 'lucide-react'
 import {
   fetchOpenRouterModels,
   createOpenRouterChatCompletionStream,
@@ -19,8 +19,11 @@ import {
 } from '../lib/openrouterStats'
 import { ModelStatsPanel } from './ModelStatsPanel'
 import { DebateConfigPanel } from './DebateConfigPanel'
+import { getProviderLogoUrl, providerNeedsInvert } from '../lib/providerLogos'
 import { DebateMetricsSummary } from './DebateMetricsSummary'
 import { TemplateManager } from './TemplateManager'
+import { saveChat, sanitizeMessagesForStorage, type SavedChat } from '../lib/chatHistory'
+import { ChatSidebar } from './ChatSidebar'
 import { DEFAULT_DEBATE_CONFIG, validateDebateConfig, type DebateConfig } from '../lib/debateConfig'
 import { runDebateSession, type RoundStage } from '../lib/debateEngine'
 import type { RoundMetrics } from '../lib/debateMetrics'
@@ -184,6 +187,11 @@ export function DebateWorkspace({ currentUser }: DebateWorkspaceProps) {
   const [effortOpen, setEffortOpen] = useState(false)
   const effortDropRef = useRef<HTMLDivElement>(null)
 
+  const [activeChatId, setActiveChatId] = useState<string | null>(null)
+  const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const messagesRef = useRef<ChatMessage[]>([])
+
   // Debate config
   const [debateConfig, setDebateConfig] = useState<DebateConfig>(DEFAULT_DEBATE_CONFIG)
   const [configCollapsed, setConfigCollapsed] = useState(true)
@@ -274,6 +282,47 @@ export function DebateWorkspace({ currentUser }: DebateWorkspaceProps) {
     el.scrollTop = el.scrollHeight
     lastScrollTopRef.current = el.scrollTop
   }, [messages])
+
+  useEffect(() => { messagesRef.current = messages }, [messages])
+
+  const activeChatIdRef = useRef(activeChatId)
+  useEffect(() => { activeChatIdRef.current = activeChatId }, [activeChatId])
+
+  const selectedModelRef = useRef(selectedModel)
+  useEffect(() => { selectedModelRef.current = selectedModel }, [selectedModel])
+
+  function autoSaveChat() {
+    if (!currentUser) return
+    const msgs = messagesRef.current
+    if (msgs.length === 0) return
+    const sanitized = sanitizeMessagesForStorage(msgs as unknown as { id: string; role: string; content: string; [key: string]: unknown }[])
+    if (sanitized.length === 0) return
+    saveChat(currentUser.uid, {
+      id: activeChatIdRef.current ?? undefined,
+      workspace: 'debate',
+      modelId: selectedModelRef.current?.id ?? null,
+      messages: sanitized,
+    }).then((id) => {
+      setActiveChatId(id)
+      setSidebarRefreshKey((k) => k + 1)
+    }).catch(() => {})
+  }
+
+  function handleLoadChat(chat: SavedChat) {
+    setMessages(chat.messages as unknown as ChatMessage[])
+    setActiveChatId(chat.id)
+    setPrompt('')
+    setEditingId(null)
+    setAttachments([])
+  }
+
+  function handleNewChat() {
+    setMessages([])
+    setActiveChatId(null)
+    setPrompt('')
+    setEditingId(null)
+    setAttachments([])
+  }
 
   function autoResize() {
     const el = textareaRef.current
@@ -419,6 +468,7 @@ export function DebateWorkspace({ currentUser }: DebateWorkspaceProps) {
       }
     } finally {
       setStreaming(false)
+      if (currentUser && !abortedRef.current) autoSaveChat()
     }
   }
 
@@ -570,6 +620,7 @@ export function DebateWorkspace({ currentUser }: DebateWorkspaceProps) {
     } finally {
       setStreaming(false)
       abortControllerRef.current = null
+      if (currentUser) autoSaveChat()
     }
   }
 
@@ -578,8 +629,15 @@ export function DebateWorkspace({ currentUser }: DebateWorkspaceProps) {
     if (!text && attachments.length === 0) return
     if (streaming) return
 
-    // For debate mode, we don't need a single model selected
-    if (!useDebateMode && !selectedModel) return
+    if (!useDebateMode && !selectedModel) {
+      setMessages((prev) => [...prev, {
+        id: crypto.randomUUID(),
+        role: 'assistant' as const,
+        content: 'Please select a model before sending a message.',
+        error: true,
+      }])
+      return
+    }
 
     shouldAutoScrollRef.current = true
 
@@ -719,6 +777,27 @@ export function DebateWorkspace({ currentUser }: DebateWorkspaceProps) {
       )}
 
       <div className={`debate-workspace-layout${useDebateMode ? ' debate-workspace-layout-configured' : ''}`}>
+      {currentUser && hasMessages && !sidebarCollapsed && (
+        <ChatSidebar
+          userId={currentUser.uid}
+          workspace="debate"
+          activeChatId={activeChatId}
+          onSelectChat={handleLoadChat}
+          onNewChat={handleNewChat}
+          onCollapse={() => setSidebarCollapsed(true)}
+          refreshKey={sidebarRefreshKey}
+        />
+      )}
+      {currentUser && hasMessages && sidebarCollapsed && (
+        <button
+          className="chat-sidebar-expand"
+          type="button"
+          onClick={() => setSidebarCollapsed(false)}
+          title="Show chats"
+        >
+          <ChevronRight size={14} />
+        </button>
+      )}
       <div className={`prompt-page${hasMessages ? ' prompt-page-chat' : ''}`}>
         {/* Chat history */}
         {hasMessages && (
@@ -942,6 +1021,16 @@ export function DebateWorkspace({ currentUser }: DebateWorkspaceProps) {
                         type="button"
                         onClick={() => setModelOpen((o) => !o)}
                       >
+                        {selectedModel && (
+                          <img
+                            className={`model-selector-logo${providerNeedsInvert(selectedModel.id) ? ' model-list-logo-invert' : ''}`}
+                            src={getProviderLogoUrl(selectedModel.id)}
+                            alt=""
+                            width={16}
+                            height={16}
+                            onError={(e) => { e.currentTarget.style.display = 'none' }}
+                          />
+                        )}
                         <span className="model-selector-name">
                           {selectedModel ? selectedModel.name : 'Search models'}
                         </span>
@@ -980,6 +1069,15 @@ export function DebateWorkspace({ currentUser }: DebateWorkspaceProps) {
                                           if (!isMultimodal(m)) setAttachments([])
                                         }}
                                       >
+                                        <img
+                                          className={`model-list-logo${providerNeedsInvert(m.id) ? ' model-list-logo-invert' : ''}`}
+                                          src={getProviderLogoUrl(m.id)}
+                                          alt=""
+                                          width={18}
+                                          height={18}
+                                          loading="lazy"
+                                          onError={(e) => { e.currentTarget.style.display = 'none' }}
+                                        />
                                         <span className="model-list-name">{m.name}</span>
                                         <span className="model-list-id">{m.id}</span>
                                         <div className="model-list-badges">
@@ -1084,16 +1182,31 @@ export function DebateWorkspace({ currentUser }: DebateWorkspaceProps) {
           )}
         </div>
       </div>
-      {useDebateMode && (
+      <button
+        className={`debate-config-tab${!configCollapsed && useDebateMode ? ' debate-config-tab-open' : ''}`}
+        type="button"
+        onClick={() => {
+          if (!useDebateMode) {
+            setUseDebateMode(true)
+            setConfigCollapsed(false)
+          } else {
+            setConfigCollapsed((c) => !c)
+          }
+        }}
+        title={configCollapsed ? 'Open config' : 'Close config'}
+      >
+        {configCollapsed || !useDebateMode ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+      </button>
+      {useDebateMode && !configCollapsed && (
         <aside className="debate-config-rail">
           <DebateConfigPanel
             config={debateConfig}
             models={models}
             onChange={setDebateConfig}
-            collapsed={configCollapsed}
-            onToggleCollapse={() => setConfigCollapsed((c) => !c)}
+            collapsed={false}
+            onToggleCollapse={() => setConfigCollapsed(true)}
           />
-          {!configCollapsed && currentUser && (
+          {currentUser && (
             <TemplateManager
               userId={currentUser.uid}
               currentConfig={debateConfig}

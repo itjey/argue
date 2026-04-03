@@ -438,7 +438,7 @@ export function WriteAiSidebar({
         <div className="write-ai-header-left">
           <span className="write-ai-title">Assistant</span>
           <button
-            className={`write-ai-collab-toggle${collabMode ? ' write-ai-collab-toggle-on' : ''}`}
+            className="write-ai-collab-toggle"
             type="button"
             onClick={() => setCollabMode((v) => !v)}
             title={collabMode ? 'Switch to single model' : 'Switch to collab mode'}
@@ -447,12 +447,8 @@ export function WriteAiSidebar({
           </button>
         </div>
         <div className="write-ai-model-selector" ref={modelDropRef}>
-          <button
-            className="write-ai-model-trigger"
-            type="button"
-            onClick={() => setModelOpen((o) => !o)}
-          >
-            {selectedModel && (
+          <div className="write-ai-model-search-combo">
+            {!modelOpen && selectedModel ? (
               <img
                 className={`write-ai-model-logo${providerNeedsInvert(selectedModel.id) ? ' model-list-logo-invert' : ''}`}
                 src={getProviderLogoUrl(selectedModel.id)}
@@ -461,24 +457,28 @@ export function WriteAiSidebar({
                 height={14}
                 onError={(e) => { e.currentTarget.style.display = 'none' }}
               />
+            ) : (
+              <Search size={12} className="write-ai-search-icon" />
             )}
-            <span>{selectedModel ? selectedModel.name : 'Select model'}</span>
-            <ChevronDown size={12} />
-          </button>
+            <input
+              ref={modelSearchRef}
+              className="write-ai-model-input"
+              placeholder="Search models…"
+              value={modelOpen ? modelSearch : (selectedModel ? selectedModel.name : '')}
+              onChange={(e) => {
+                setModelSearch(e.target.value)
+                if (!modelOpen) setModelOpen(true)
+              }}
+              onFocus={() => {
+                setModelOpen(true)
+                setModelSearch('')
+              }}
+              spellCheck={false}
+            />
+          </div>
 
           {modelOpen && (
             <div className="write-ai-model-dropdown">
-              <div className="write-ai-model-search-wrap">
-                <Search size={12} />
-                <input
-                  ref={modelSearchRef}
-                  className="write-ai-model-search"
-                  placeholder="Search…"
-                  value={modelSearch}
-                  onChange={(e) => setModelSearch(e.target.value)}
-                  spellCheck={false}
-                />
-              </div>
               <div className="write-ai-model-list">
                 {filteredModels.length === 0 && (
                   <p className="write-ai-model-empty">No models found</p>
@@ -502,8 +502,8 @@ export function WriteAiSidebar({
                       className={`write-ai-model-item-logo${providerNeedsInvert(m.id) ? ' model-list-logo-invert' : ''}`}
                       src={getProviderLogoUrl(m.id)}
                       alt=""
-                      width={16}
-                      height={16}
+                      width={14}
+                      height={14}
                       loading="lazy"
                       onError={(e) => { e.currentTarget.style.display = 'none' }}
                     />
@@ -553,7 +553,7 @@ export function WriteAiSidebar({
       <div className="write-ai-messages" ref={messagesRef}>
         {messages.length === 0 && (
           <div className="write-ai-empty">
-            <p>{collabMode ? 'Select models above, then ask a question — each model will take turns responding about your document.' : 'Ask the AI to help with your document — draft sections, fix errors, generate equations, or improve structure.'}</p>
+            <p>{collabMode ? 'Select models above, then ask a question — each model will take turns responding about your document.' : 'Ask the AI to help with your document'}</p>
           </div>
         )}
 

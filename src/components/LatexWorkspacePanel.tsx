@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { BrainCircuit, ChevronRight, Download, FolderDown, ImagePlus, Loader, RotateCcw } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, FolderDown, ImagePlus, Loader, RotateCcw, X } from 'lucide-react'
 import { compileLatexToPdf } from '../lib/swiftlatex'
 import { PdfCanvasViewer } from './PdfCanvasViewer'
 import { WriteAiSidebar } from './WriteAiSidebar'
@@ -238,85 +238,53 @@ function LatexWorkspacePanel({
 
   const pdfFileName = `${sanitizeFilename(label || 'latex-document')}.pdf`
 
+  const tabActionsTarget = document.getElementById('workspace-tab-actions')
+
   const panel = (
     <section className={`latex-workspace-panel${inline ? ' latex-workspace-panel-inline' : ''}`}>
-      <header className="latex-workspace-header">
-        <input
-          ref={imageInputRef}
-          type="file"
-          accept="image/*"
-          style={{ display: 'none' }}
-          onChange={handleImageUpload}
-        />
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleImageUpload}
+      />
 
-        <div className="latex-workspace-actions">
+      {tabActionsTarget && createPortal(
+        <>
           <button
-            className={`latex-workspace-toggle${autoCompile ? ' latex-workspace-toggle-on' : ''}`}
+            className="latex-workspace-icon-btn"
             type="button"
-            onClick={() => setAutoCompile((currentValue) => !currentValue)}
+            onClick={() => void compileSource(source)}
+            disabled={compiling}
+            title="Compile"
           >
-            Auto preview
+            {compiling ? <Loader size={15} className="code-run-spinner" /> : <RotateCcw size={15} />}
           </button>
-
           <button
-            className="latex-workspace-btn"
-            type="button"
-            onClick={() => setShowLog((currentValue) => !currentValue)}
-          >
-            {showLog ? 'Hide log' : 'Show log'}
-          </button>
-
-          <button
-            className="latex-workspace-btn"
+            className="latex-workspace-icon-btn"
             type="button"
             onClick={() => imageInputRef.current?.click()}
             title="Upload image"
           >
-            <ImagePlus size={14} />
+            <ImagePlus size={15} />
           </button>
-
           {pdfUrl ? (
-            <a className="latex-workspace-btn" download={pdfFileName} href={pdfUrl}>
-              <Download size={14} />
-              <span>PDF</span>
+            <a className="latex-workspace-icon-btn" download={pdfFileName} href={pdfUrl} title="Download PDF">
+              <Download size={15} />
             </a>
           ) : null}
-
           <button
-            className="latex-workspace-btn"
+            className="latex-workspace-icon-btn"
             type="button"
             onClick={handleDownloadZip}
             title="Download .tex source"
           >
-            <FolderDown size={14} />
+            <FolderDown size={15} />
           </button>
-
-          <button
-            className="latex-workspace-btn latex-workspace-btn-primary"
-            type="button"
-            onClick={() => void compileSource(source)}
-            disabled={compiling}
-          >
-            {compiling ? <Loader size={14} className="code-run-spinner" /> : <RotateCcw size={14} />}
-            <span>{compiling ? 'Compiling…' : 'Compile'}</span>
-          </button>
-
-          <button
-            className={`latex-workspace-btn${aiOpen ? ' latex-workspace-btn-active' : ''}`}
-            type="button"
-            onClick={() => setAiOpen((v) => !v)}
-            title="AI Assistant"
-          >
-            <BrainCircuit size={14} />
-            <span>AI</span>
-          </button>
-
-          <button className="latex-workspace-btn" type="button" onClick={onHide} title="Hide workspace">
-            <ChevronRight size={14} />
-            <span>Hide</span>
-          </button>
-        </div>
-      </header>
+        </>,
+        tabActionsTarget
+      )}
 
       <div className="latex-workspace-body" ref={containerRef}>
         {dragging && <div className="latex-workspace-drag-overlay" />}
@@ -377,6 +345,15 @@ function LatexWorkspacePanel({
             )}
           </div>
         </div>
+
+        <button
+          className="ai-sidebar-toggle"
+          type="button"
+          onClick={() => setAiOpen((v) => !v)}
+          title={aiOpen ? 'Collapse AI panel' : 'Expand AI panel'}
+        >
+          {aiOpen ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+        </button>
 
         {aiOpen && (
           <WriteAiSidebar

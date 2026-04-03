@@ -4559,7 +4559,7 @@
 .prompt-page {
   --prompt-shell-max-width: clamp(68rem, 80vw, 92rem);
   --prompt-content-max-width: clamp(46rem, 62vw, 70rem);
-  --prompt-composer-max-width: 420px;
+  --prompt-composer-max-width: 680px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4608,13 +4608,19 @@
 }
 
 .chat-sidebar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 240px;
+  z-index: 15;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   gap: 0.75rem;
   min-height: 0;
   padding: 0.75rem 0.6rem;
-  border-right: 1px solid rgba(255, 255, 255, 0.04);
-  background: transparent;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  background: #2c2c2c;
 }
 
 .chat-sidebar-header,
@@ -4632,36 +4638,29 @@
 
 .chat-sidebar-header strong,
 .chat-main-header strong {
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.82rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .chat-sidebar-new {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 0;
-  width: 28px;
-  height: 28px;
   padding: 0;
   border: none;
-  border-radius: 0.4rem;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.5);
-  font: inherit;
-  font-size: 0.78rem;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.3);
   cursor: pointer;
-  transition: background 140ms ease, color 140ms ease;
+  transition: color 120ms ease;
   flex-shrink: 0;
 }
 
 .chat-sidebar-new:hover,
 .chat-sidebar-new:focus-visible {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .chat-sidebar-new:disabled,
@@ -4763,7 +4762,63 @@
 }
 
 .chat-sidebar-item-meta {
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 0.68rem;
+}
+
+.chat-sidebar-item-delete {
+  position: absolute;
+  top: 6px;
+  right: 4px;
   display: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  padding: 0;
+}
+
+.chat-sidebar-item:hover .chat-sidebar-item-delete {
+  display: flex;
+}
+
+.chat-sidebar-item-delete:hover {
+  color: #ff6060;
+  background: rgba(255, 70, 70, 0.1);
+}
+
+.chat-sidebar-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.chat-sidebar-expand {
+  flex: 0 0 auto;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 60px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: none;
+  border-radius: 0 10px 10px 0;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  padding: 0;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.chat-sidebar-expand:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .prompt-page-chat .prompt-chat-shell {
@@ -6119,9 +6174,9 @@
 .latex-workspace-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 1rem;
-  padding: 0.85rem 0.85rem 0.6rem;
+  padding: 4px 10px;
   border-bottom: none;
   background: transparent;
 }
@@ -6357,58 +6412,31 @@
 .latex-workspace-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 0.45rem;
-  flex-wrap: wrap;
+  gap: 0.15rem;
 }
 
-.latex-workspace-btn,
-.latex-workspace-toggle {
+.latex-workspace-icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
-  min-height: 2rem;
-  padding: 0.45rem 0.8rem;
-  border-radius: 0.55rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.03);
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 0.78rem;
+  padding: 0.4rem;
+  border: none;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.3);
   text-decoration: none;
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+  transition: background 100ms ease, color 100ms ease;
 }
 
-.latex-workspace-btn:hover,
-.latex-workspace-toggle:hover {
+.latex-workspace-icon-btn:hover {
   background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.16);
-  color: rgba(255, 255, 255, 0.95);
+  color: rgba(255, 255, 255, 0.7);
 }
 
-.latex-workspace-btn:disabled,
-.latex-workspace-toggle:disabled {
-  opacity: 0.45;
+.latex-workspace-icon-btn:disabled {
+  opacity: 0.35;
   cursor: default;
-}
-
-.latex-workspace-btn-active {
-  background: rgba(96, 165, 250, 0.14);
-  border-color: rgba(96, 165, 250, 0.24);
-  color: rgba(219, 234, 254, 0.95);
-}
-
-.latex-workspace-btn-primary {
-  background: rgba(96, 165, 250, 0.12);
-  border-color: rgba(96, 165, 250, 0.22);
-  color: rgba(255, 255, 255, 0.96);
-}
-
-.latex-workspace-toggle-on {
-  background: rgba(96, 165, 250, 0.14);
-  border-color: rgba(96, 165, 250, 0.24);
-  color: rgba(219, 234, 254, 0.95);
 }
 
 .latex-workspace-statusbar {
@@ -6599,6 +6627,31 @@
   color: rgba(255, 255, 255, 0.2);
 }
 
+/* ── AI Sidebar Toggle Arrow ── */
+
+.ai-sidebar-toggle {
+  flex: 0 0 auto;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 60px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-right: none;
+  border-radius: 10px 0 0 10px;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+  padding: 0;
+}
+
+.ai-sidebar-toggle:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.7);
+}
+
 /* ── Write AI Sidebar ── */
 
 .write-ai-sidebar {
@@ -6666,11 +6719,11 @@
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  padding: 0.28rem 0.55rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 0.4rem;
+  padding: 0.15rem 0;
+  border: none;
+  border-radius: 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.35);
   font: inherit;
   font-size: 0.75rem;
   cursor: pointer;
@@ -6679,7 +6732,7 @@
 }
 
 .write-ai-model-trigger:hover {
-  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .write-ai-model-trigger span {
@@ -6694,6 +6747,41 @@
   border-radius: 2px;
   object-fit: contain;
   flex-shrink: 0;
+}
+
+.write-ai-model-search-combo {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.1rem 0;
+  transition: border-color 120ms;
+}
+
+.write-ai-model-search-combo:focus-within {
+  border-bottom-color: rgba(255, 255, 255, 0.25);
+}
+
+.write-ai-search-icon {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.write-ai-model-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  padding: 0.1rem 0;
+  color: rgba(255, 255, 255, 0.7);
+  font: inherit;
+  font-size: 0.75rem;
+  outline: none;
+  max-width: 160px;
+}
+
+.write-ai-model-input::placeholder {
+  color: rgba(255, 255, 255, 0.25);
 }
 
 .write-ai-model-dropdown {
@@ -6790,27 +6878,20 @@
 }
 
 .write-ai-collab-toggle {
-  padding: 0.15rem 0.45rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 0.3rem;
+  padding: 0.15rem 0;
+  border: none;
+  border-radius: 0;
   background: transparent;
   color: rgba(255, 255, 255, 0.35);
   font: inherit;
   font-size: 0.68rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 120ms ease;
+  transition: color 120ms ease;
 }
 
 .write-ai-collab-toggle:hover {
-  border-color: rgba(255, 255, 255, 0.15);
   color: rgba(255, 255, 255, 0.6);
-}
-
-.write-ai-collab-toggle-on {
-  border-color: rgba(168, 130, 255, 0.3);
-  background: rgba(168, 130, 255, 0.1);
-  color: rgba(200, 170, 255, 0.9);
 }
 
 .write-ai-collab-bar {
@@ -8090,8 +8171,16 @@
 
 .debate-workspace-layout {
   display: flex;
+  width: 100%;
   height: 100%;
+  min-height: calc(100vh - 56px);
   overflow: hidden;
+}
+
+.debate-workspace-layout > .chat-sidebar {
+  width: 240px;
+  min-width: 240px;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 /* prompt-page must flex-grow to fill the chat column */
@@ -8118,33 +8207,72 @@
   overflow-y: auto;
 }
 
-/* Input bar stays pinned at bottom */
+/* Force center the input bar in debate layout */
+.debate-workspace-layout .prompt-center,
 .debate-workspace-layout .prompt-center-sticky {
+  max-width: none !important;
+  width: 100% !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
   flex-shrink: 0;
+  padding-left: 1rem;
+  padding-right: 1rem;
 }
 
-/* When config rail is present, remove centering compensation */
-.debate-workspace-layout-configured > .prompt-page {
-  padding: 2rem 1rem;
+.debate-workspace-layout .prompt-box {
+  max-width: 680px;
+  margin-left: auto !important;
+  margin-right: auto !important;
 }
 
-.debate-workspace-layout-configured > .prompt-page-chat {
+
+/* ── Debate config pull tab ───────────────────────────────────── */
+.debate-config-tab {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 60px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-right: none;
+  border-radius: 10px 0 0 10px;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
   padding: 0;
+  transition: background 140ms ease, color 140ms ease, right 140ms ease;
+}
+
+.debate-config-tab:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.debate-config-tab-open {
+  right: 300px;
 }
 
 /* ── Debate config right rail ─────────────────────────────────── */
 .debate-config-rail {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
   width: 300px;
-  min-width: 300px;
-  height: 100%;
+  z-index: 99;
   overflow-y: auto;
   overflow-x: hidden;
-  background: #141414;
+  background: #2c2c2c;
   border-left: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: 1.5rem 1.25rem 2.5rem;
+  padding: 6rem 1rem 2.5rem;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.07) transparent;
 }
@@ -8182,11 +8310,11 @@
 
 .debate-config-title {
   margin: 0;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.28);
+  font-size: 0.82rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgba(255, 255, 255, 0.4);
 }
 
 .debate-config-collapse-btn {
@@ -8239,10 +8367,11 @@
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  padding: 0.55rem 0.7rem;
-  border-radius: 0.4rem;
-  background: rgba(255, 70, 70, 0.1);
-  border: 1px solid rgba(255, 70, 70, 0.2);
+  padding: 0.55rem 0;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 70, 70, 0.15);
   margin: 0.75rem 0 0;
 }
 
@@ -8261,7 +8390,8 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.debate-config-section:last-child {
+.debate-config-section:last-child,
+.debate-config-section:last-of-type {
   border-bottom: none;
   padding-bottom: 0;
 }
@@ -8292,10 +8422,11 @@
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
-  padding: 0.75rem 0.85rem;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 0.6rem;
+  padding: 0.65rem 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 0;
 }
 
 .debate-config-participant-row {
@@ -8338,8 +8469,10 @@
   max-width: none;
   justify-content: space-between;
   font-size: 0.8rem;
-  padding: 0.38rem 0.65rem;
-  border-radius: 0.45rem;
+  padding: 0.38rem 0;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
 }
 
 .debate-config-model-selector .model-dropdown {
@@ -8354,8 +8487,9 @@
 .debate-config-role-select {
   width: 100%;
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 0.45rem;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
   padding: 0.38rem 0.65rem;
   color: rgba(255, 255, 255, 0.65);
   font: inherit;
@@ -8368,7 +8502,7 @@
 }
 
 .debate-config-role-select:focus {
-  border-color: rgba(255, 255, 255, 0.22);
+  border-bottom-color: rgba(255, 255, 255, 0.3);
 }
 
 /* Token budget row */
@@ -8388,8 +8522,9 @@
 .debate-config-number-input {
   width: 80px;
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 0.35rem;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
   padding: 0.3rem 0.5rem;
   color: var(--ink-strong);
   font: inherit;
@@ -8397,12 +8532,22 @@
   text-align: right;
   outline: none;
   transition: border-color 120ms;
+  -moz-appearance: textfield;
 }
 
 .debate-config-budget-input:focus,
 .debate-config-number-input:focus {
-  border-color: rgba(255, 255, 255, 0.25);
+  border-bottom-color: rgba(255, 255, 255, 0.3);
 }
+
+.debate-config-budget-input::-webkit-inner-spin-button,
+.debate-config-budget-input::-webkit-outer-spin-button,
+.debate-config-number-input::-webkit-inner-spin-button,
+.debate-config-number-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 
 /* Label–control row */
 .debate-config-row {
@@ -8419,27 +8564,23 @@
 
 /* On/Off toggle button */
 .debate-config-toggle {
-  padding: 0.22rem 0.7rem;
+  padding: 0.22rem 0;
   font: inherit;
   font-size: 0.74rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 99px;
+  border: none;
   background: transparent;
   color: rgba(255, 255, 255, 0.3);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 120ms, color 120ms, border-color 120ms;
+  transition: color 120ms;
 }
 
 .debate-config-toggle:hover {
   color: rgba(255, 255, 255, 0.65);
-  border-color: rgba(255, 255, 255, 0.18);
 }
 
 .debate-config-toggle-on {
-  background: rgba(255, 255, 255, 0.09);
   color: rgba(255, 255, 255, 0.88);
-  border-color: rgba(255, 255, 255, 0.18);
 }
 
 /* Inline add button */
@@ -8482,24 +8623,159 @@
   background: rgba(255, 70, 70, 0.1);
 }
 
-/* Synthesis radio group */
+/* Synthesis toggle group */
 .debate-config-radio-group {
   display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  gap: 0.25rem;
 }
 
 .debate-config-radio {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.5);
+  position: relative;
   cursor: pointer;
 }
 
 .debate-config-radio input[type="radio"] {
-  accent-color: rgba(255, 255, 255, 0.75);
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.debate-config-radio span {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.3);
+  border-bottom: 2px solid transparent;
+  transition: color 120ms, border-color 120ms;
+}
+
+.debate-config-radio:hover span {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.debate-config-radio input[type="radio"]:checked + span {
+  color: rgba(255, 255, 255, 0.9);
+  border-bottom-color: rgba(255, 255, 255, 0.5);
+}
+
+/* ── Model search combo (inline search bar) ──────────────── */
+.debate-config-model-search-combo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.15rem 0;
+  transition: border-color 120ms;
+}
+
+.debate-config-model-search-combo:focus-within {
+  border-bottom-color: rgba(255, 255, 255, 0.3);
+}
+
+.debate-config-search-icon {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.debate-config-model-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  padding: 0.15rem 0;
+  color: rgba(255, 255, 255, 0.85);
+  font: inherit;
+  font-size: 0.82rem;
+  outline: none;
+}
+
+.debate-config-model-input::placeholder {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.debate-config-model-results {
+  max-height: 180px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.07) transparent;
+}
+
+.debate-config-model-result {
+  display: flex;
+  align-items: center;
+  padding: 0.35rem 0.2rem;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+  text-align: left;
+  transition: color 80ms;
+}
+
+.debate-config-model-result:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.debate-config-model-result-active {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.debate-config-model-result-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.debate-config-model-empty {
+  padding: 0.5rem 0.2rem;
+  margin: 0;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.debate-config-model-logo {
+  flex-shrink: 0;
+  border-radius: 2px;
+  object-fit: contain;
+}
+
+.debate-config-model-result-logo {
+  flex-shrink: 0;
+  border-radius: 2px;
+  object-fit: contain;
+  margin-right: 0.35rem;
+}
+
+/* ── Template manager inside config rail ──────────────────── */
+.debate-config-rail .template-manager {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 1rem 0 0;
+  margin: 0;
+}
+
+.debate-config-rail .template-manager-save-row input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
+}
+
+.debate-config-rail .template-manager-save-row button,
+.debate-config-rail .template-manager-list-item button {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: rgba(255, 255, 255, 0.35);
 }
 
 /* ── Pricing page ────────────────────────────────────────── */
