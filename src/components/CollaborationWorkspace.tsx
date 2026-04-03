@@ -142,7 +142,7 @@ const GROUP_MODELS_CONFIG = [
 ]
 
 const GROUP_SYSTEM_PROMPT = `You are participating in a multi-model collaborative problem-solving session.
-Format responses using Markdown. Use $...\$ for inline math and $$...$$ for block equations.
+Format responses using Markdown. Use $...$ for inline math and $$...$$ for block equations.
 Use fenced code blocks with language hints (e.g. \`\`\`python). Be thorough and precise.`
 
 /** Ensure **Title** section headers in reasoning text appear on their own paragraph. */
@@ -220,7 +220,8 @@ function getWebSearchModelProfile(model: OpenRouterModel | null) {
 
 
 
-export function CollaborationWorkspace(_props: CollaborationWorkspaceProps) {
+export function CollaborationWorkspace({ currentUser }: CollaborationWorkspaceProps) {
+  void currentUser
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [prompt, setPrompt] = useState('')
   const [listening, setListening] = useState(false)

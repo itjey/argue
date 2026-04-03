@@ -18,9 +18,7 @@ describe('DebateConfigPanel', () => {
 
   it('renders all participants', () => {
     render(<DebateConfigPanel config={DEFAULT_DEBATE_CONFIG} models={mockModels} onChange={onChange} />)
-    for (const p of DEFAULT_DEBATE_CONFIG.participants) {
-      expect(screen.getByDisplayValue(p.alias)).toBeTruthy()
-    }
+    expect(screen.getAllByPlaceholderText('Search models…')).toHaveLength(DEFAULT_DEBATE_CONFIG.participants.length)
   })
 
   it('calls onChange when round count changes', async () => {

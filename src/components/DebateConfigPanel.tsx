@@ -4,7 +4,6 @@ import type { OpenRouterModel } from '../lib/openrouter'
 import { getProviderLogoUrl, providerNeedsInvert } from '../lib/providerLogos'
 import {
   DEFAULT_DEBATE_CONFIG,
-  PREDEFINED_ROLES,
   validateDebateConfig,
   type DebateConfig,
   type DebateParticipant,
@@ -22,8 +21,6 @@ interface DebateConfigPanelProps {
 function DebateConfigPanel({ config, models, onChange, collapsed, onToggleCollapse }: DebateConfigPanelProps) {
   const [modelSearches, setModelSearches] = useState<Record<string, string>>({})
   const [openModelDropdown, setOpenModelDropdown] = useState<string | null>(null)
-  const [judgeSearch, setJudgeSearch] = useState('')
-  const [judgeDropdownOpen, setJudgeDropdownOpen] = useState(false)
 
   const errors = validateDebateConfig(config)
 

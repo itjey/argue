@@ -113,8 +113,12 @@ function AuthDialog({
       return
     }
 
-    syncStoredApiKey()
-    setSettingsOpen(true)
+    const timeoutId = window.setTimeout(() => {
+      syncStoredApiKey()
+      setSettingsOpen(true)
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
   }, [autoOpenSettings, open])
 
   function applyApiKey(nextValue: string) {

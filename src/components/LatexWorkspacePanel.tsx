@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronLeft, ChevronRight, Download, FolderDown, ImagePlus, Loader, RotateCcw, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, FolderDown, ImagePlus, Loader, RotateCcw } from 'lucide-react'
 import { compileLatexToPdf } from '../lib/swiftlatex'
 import { PdfCanvasViewer } from './PdfCanvasViewer'
 import { WriteAiSidebar } from './WriteAiSidebar'
@@ -56,13 +56,13 @@ function LatexWorkspacePanel({
   onHide,
   open,
 }: LatexWorkspacePanelProps) {
+  void onHide
   const [source, setSource] = useState(initialSource)
   const [editorWidth, setEditorWidth] = useState(36)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [compileLog, setCompileLog] = useState('')
   const [compileError, setCompileError] = useState<string | null>(null)
   const [compiling, setCompiling] = useState(false)
-  const [autoCompile, setAutoCompile] = useState(true)
   const [showLog, setShowLog] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [aiOpen, setAiOpen] = useState(false)
@@ -169,7 +169,7 @@ function LatexWorkspacePanel({
   }, [])
 
   useEffect(() => {
-    if (!open || hidden || !autoCompile) {
+    if (!open || hidden) {
       return
     }
 
@@ -184,7 +184,7 @@ function LatexWorkspacePanel({
     return () => {
       window.clearTimeout(timeoutId)
     }
-  }, [autoCompile, compileSource, hidden, open, source])
+  }, [compileSource, hidden, open, source])
 
   function onSplitterMouseDown(event: ReactMouseEvent<HTMLDivElement>) {
     event.preventDefault()

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import {
   ArrowUp,
   Check,
-  ChevronDown,
   Loader,
   Replace,
   Search,
@@ -33,6 +32,35 @@ interface WriteAiMessage {
   thinkingDuration?: number
   thinkingStart?: number
   modelName?: string
+}
+
+type MarkdownCodeNode = {
+  properties?: {
+    className?: unknown
+  }
+  children?: Array<{
+    value?: unknown
+  }>
+}
+
+function getMarkdownCodeNode(node: unknown): MarkdownCodeNode | null {
+  if (!node || typeof node !== 'object' || !('children' in node)) {
+    return null
+  }
+
+  const children = (node as { children?: unknown }).children
+
+  if (!Array.isArray(children) || children.length === 0) {
+    return null
+  }
+
+  const firstChild = children[0]
+
+  if (!firstChild || typeof firstChild !== 'object') {
+    return null
+  }
+
+  return firstChild as MarkdownCodeNode
 }
 
 const WRITE_SYSTEM_PROMPT = `You are an expert LaTeX writing assistant embedded in a scientific document editor. The user's full LaTeX source is provided below. You can:
@@ -210,7 +238,7 @@ export function WriteAiSidebar({
     abortedRef.current = false
 
     const systemPrompt = WRITE_SYSTEM_PROMPT.replace('{SOURCE}', source)
-    let conversationHistory: OpenRouterChatMessage[] = [
+    const conversationHistory: OpenRouterChatMessage[] = [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: text },
     ]
@@ -602,13 +630,14 @@ export function WriteAiSidebar({
                     <div className="write-ai-markdown">
                       <ReactMarkdown
                         components={{
-                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                          pre: ({ node, children: _children }: any) => {
-                            const codeNode = node?.children?.[0]
-                            const classNames: string[] = (codeNode?.properties?.className as string[]) ?? []
+                          pre: ({ node }) => {
+                            const codeNode = getMarkdownCodeNode(node)
+                            const classNames = Array.isArray(codeNode?.properties?.className)
+                              ? codeNode.properties.className.filter((value): value is string => typeof value === 'string')
+                              : []
                             const langId = classNames.find((c: string) => c.startsWith('language-'))?.replace('language-', '') ?? ''
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            const rawCode: string = (codeNode?.children?.[0] as any)?.value ?? ''
+                            const rawValue = codeNode?.children?.[0]?.value
+                            const rawCode = typeof rawValue === 'string' ? rawValue : ''
                             return (
                               <WriteAiCodeBlock
                                 code={rawCode}
